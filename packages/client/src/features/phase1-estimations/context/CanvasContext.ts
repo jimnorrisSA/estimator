@@ -11,10 +11,17 @@ export interface TextEditRequest {
   onCommit: (next: string) => void;
 }
 
+export interface DisciplinePickRequest {
+  x: number;
+  y: number;
+  featureId: string;
+}
+
 export interface CanvasContextValue {
   registerNode: (id: string, node: Konva.Node) => void;
   unregisterNode: (id: string) => void;
   requestTextEdit: (req: TextEditRequest) => void;
+  requestDisciplinePick: (req: DisciplinePickRequest) => void;
 }
 
 export const CanvasContext = createContext<CanvasContextValue | null>(null);

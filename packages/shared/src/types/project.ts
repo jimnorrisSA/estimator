@@ -14,22 +14,23 @@ export interface Estimate {
   unit: EstimateUnit;
 }
 
-export interface PostIt {
+// A single named, estimated task within a discipline group
+export interface TaskItem {
+  id: string;
+  label: string;
+  estimate: Estimate;
+}
+
+// A discipline "card" inside a feature box — groups related tasks by discipline
+export interface DisciplineGroup {
   id: string;
   featureId: string;
   discipline: Discipline;
   color: string;
-  position: { x: number; y: number };
-  width: number;
-  height: number;
-  taskLabel: string;
-  estimate: Estimate;
-  // Derived — not stored
-  resolvedWorkingDays?: number;
-  // Plantastic sync
-  plantasticIssueId?: string;
+  tasks: TaskItem[];
+  // Plantastic sync — each task maps to a Plantastic issue
+  plantasticIssueIds?: Record<string, string>; // taskId → plantastic issue id
   updatedAt: string;
-  updatedBy: string;
 }
 
 export interface Feature {
@@ -37,11 +38,9 @@ export interface Feature {
   projectId: string;
   name: string;
   position: { x: number; y: number };
-  width: number;
-  height: number;
+  width: number; // height is derived from content
   color: string;
-  postits: PostIt[];
-  // Plantastic sync
+  groups: DisciplineGroup[];
   plantasticEpicId?: string;
   updatedAt: string;
 }
@@ -51,9 +50,9 @@ export interface Resource {
   projectId: string;
   name: string;
   role: Discipline;
-  rollOnDate: string;   // ISO date
-  rollOffDate: string;  // ISO date
-  allocationPct: number; // 0–100
+  rollOnDate: string;
+  rollOffDate: string;
+  allocationPct: number;
   dailyRate: number;
   currency: string;
   notes: string;
@@ -65,10 +64,8 @@ export interface Milestone {
   projectId: string;
   label: string;
   type: "feature-derived" | "manual";
-  // feature-derived: featureId is set; date is computed from last task end
   featureId?: string;
-  // manual: date or anchorFeatureId is set
-  date?: string;         // ISO date
+  date?: string;
   anchorFeatureId?: string;
   updatedAt: string;
 }
@@ -76,13 +73,12 @@ export interface Milestone {
 export interface Project {
   id: string;
   name: string;
-  owner: string;  // Google account email
-  contingencyPct: number;  // default 15
+  owner: string;
+  contingencyPct: number;
   calendarMode: "actual" | "four-week";
   features: Feature[];
   resources: Resource[];
   milestones: Milestone[];
-  // Plantastic sync
   plantasticProjectId?: string;
   createdAt: string;
   updatedAt: string;

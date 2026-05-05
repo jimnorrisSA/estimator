@@ -4,8 +4,15 @@ import type Konva from "konva";
 import type { Feature } from "@estimator/shared";
 import { useEstimationsStore } from "../store/estimationsStore.js";
 import { useCanvasContext } from "../context/CanvasContext.js";
-import { PostItNote } from "./PostItNote.js";
-import { FEATURE_HEADER_H } from "../utils/defaults.js";
+import { DisciplineGroupCard } from "./DisciplineGroupCard.js";
+import {
+  featureHeight,
+  computeGroupLayouts,
+  addGroupButtonY,
+  FEATURE_HEADER_H,
+  ADD_GROUP_H,
+  FEATURE_MIN_W,
+} from "../utils/layout.js";
 
 const TITLE_FONT = 14;
 
@@ -18,36 +25,31 @@ interface Props {
 
 export function FeatureBox({ feature, selectedId, onSelect, stageScale }: Props) {
   const groupRef = useRef<Konva.Group>(null);
-  const { registerNode, unregisterNode, requestTextEdit } = useCanvasContext();
+  const { registerNode, unregisterNode, requestDisciplinePick } = useCanvasContext();
   const updateFeaturePosition = useEstimationsStore((s) => s.updateFeaturePosition);
-  const updateFeatureSize = useEstimationsStore((s) => s.updateFeatureSize);
+  const updateFeatureWidth = useEstimationsStore((s) => s.updateFeatureWidth);
 
   const isSelected = selectedId === feature.id;
+  const boxH = featureHeight(feature.groups);
+  const groupLayouts = computeGroupLayouts(feature);
+  const addBtnY = addGroupButtonY(feature);
 
   useEffect(() => {
     if (groupRef.current) registerNode(feature.id, groupRef.current);
     return () => unregisterNode(feature.id);
   }, [feature.id, registerNode, unregisterNode]);
 
-  function openNameEdit() {
+  function handleAddGroupClick() {
     const node = groupRef.current;
     if (!node) return;
     const stage = node.getStage();
     if (!stage) return;
-    const container = stage.container().getBoundingClientRect();
     const absPos = node.getAbsolutePosition();
-    const scale = stageScale;
-
-    requestTextEdit({
-      value: feature.name,
-      x: container.left + absPos.x * scale + 8,
-      y: container.top + absPos.y * scale + 4,
-      width: (feature.width - 16) / scale,
-      height: (FEATURE_HEADER_H - 8) / scale,
-      fontSize: TITLE_FONT,
-      onCommit: () => {
-        // Feature rename propagation is deferred to v2; name edits stubbed here
-      },
+    const containerRect = stage.container().getBoundingClientRect();
+    requestDisciplinePick({
+      x: containerRect.left + (absPos.x + FEATURE_MIN_W / 2) * stageScale,
+      y: containerRect.top + (absPos.y + addBtnY) * stageScale,
+      featureId: feature.id,
     });
   }
 
@@ -59,28 +61,21 @@ export function FeatureBox({ feature, selectedId, onSelect, stageScale }: Props)
       draggable
       onClick={() => onSelect(feature.id)}
       onTap={() => onSelect(feature.id)}
-      onDblClick={openNameEdit}
-      onDblTap={openNameEdit}
       onDragEnd={(e) => {
         updateFeaturePosition(feature.id, { x: e.target.x(), y: e.target.y() });
       }}
       onTransformEnd={() => {
         const node = groupRef.current!;
         const scaleX = node.scaleX();
-        const scaleY = node.scaleY();
         node.scaleX(1);
         node.scaleY(1);
-        updateFeatureSize(
-          feature.id,
-          Math.max(200, feature.width * scaleX),
-          Math.max(200, feature.height * scaleY)
-        );
+        updateFeatureWidth(feature.id, Math.max(FEATURE_MIN_W, feature.width * scaleX));
       }}
     >
       {/* Box background */}
       <Rect
         width={feature.width}
-        height={feature.height}
+        height={boxH}
         fill="#f9fafb"
         stroke={isSelected ? "#3b82f6" : "#d1d5db"}
         strokeWidth={isSelected ? 2 : 1}
@@ -90,18 +85,12 @@ export function FeatureBox({ feature, selectedId, onSelect, stageScale }: Props)
         shadowOffsetY={2}
       />
 
-      {/* Header bar */}
-      <Rect
-        width={feature.width}
-        height={FEATURE_HEADER_H}
-        fill="#e5e7eb"
-        cornerRadius={[6, 6, 0, 0]}
-      />
+      {/* Header */}
+      <Rect width={feature.width} height={FEATURE_HEADER_H} fill="#e5e7eb" cornerRadius={[6, 6, 0, 0]} />
       <Text
         x={10}
-        y={10}
+        y={11}
         width={feature.width - 20}
-        height={FEATURE_HEADER_H - 10}
         text={feature.name}
         fontSize={TITLE_FONT}
         fontStyle="bold"
@@ -109,19 +98,45 @@ export function FeatureBox({ feature, selectedId, onSelect, stageScale }: Props)
         ellipsis
       />
 
-      {/* Post-its */}
-      {feature.postits.map((p) => (
-        <PostItNote
-          key={p.id}
-          postit={p}
+      {/* Discipline group cards */}
+      {feature.groups.map((g, i) => (
+        <DisciplineGroupCard
+          key={g.id}
+          group={g}
+          layout={groupLayouts[i]}
           featureId={feature.id}
-          featureWidth={feature.width}
-          featureHeight={feature.height}
-          isSelected={selectedId === p.id}
+          selectedId={selectedId}
           onSelect={onSelect}
           stageScale={stageScale}
         />
       ))}
+
+      {/* Add discipline button */}
+      <Group y={addBtnY} onClick={handleAddGroupClick} onTap={handleAddGroupClick}>
+        <Rect
+          width={feature.width}
+          height={ADD_GROUP_H}
+          fill="transparent"
+        />
+        <Rect
+          x={10}
+          width={feature.width - 20}
+          height={ADD_GROUP_H}
+          fill="#f3f4f6"
+          cornerRadius={4}
+          stroke="#e5e7eb"
+          strokeWidth={1}
+        />
+        <Text
+          x={10}
+          y={(ADD_GROUP_H - 12) / 2}
+          width={feature.width - 20}
+          text="+ Add discipline"
+          fontSize={12}
+          fill="#6b7280"
+          align="center"
+        />
+      </Group>
     </Group>
   );
 }

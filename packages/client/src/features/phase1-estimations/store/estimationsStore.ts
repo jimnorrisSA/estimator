@@ -1,13 +1,13 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import type { Feature, EstimateUnit } from "@estimator/shared";
-import { makeFeature } from "../utils/defaults.js";
+import type { Discipline, EstimateUnit, Feature } from "@estimator/shared";
+import { makeFeature, makeGroup } from "../utils/defaults.js";
 
 const MAX_HISTORY = 50;
 
 interface EstimationsStore {
   features: Feature[];
-  selectedId: string | null;
+  selectedId: string | null; // feature id or task id
   _past: Feature[][];
   _future: Feature[][];
 
@@ -16,18 +16,19 @@ interface EstimationsStore {
 
   generateFeatures: (names: string[]) => void;
   updateFeaturePosition: (id: string, pos: { x: number; y: number }) => void;
-  updateFeatureSize: (id: string, w: number, h: number) => void;
+  updateFeatureWidth: (id: string, width: number) => void;
 
-  updatePostItPosition: (fid: string, pid: string, pos: { x: number; y: number }) => void;
-  updatePostItSize: (fid: string, pid: string, w: number, h: number) => void;
-  updatePostItLabel: (fid: string, pid: string, label: string) => void;
-  updatePostItEstimate: (fid: string, pid: string, value: number, unit: EstimateUnit) => void;
-  updatePostItColor: (fid: string, pid: string, color: string) => void;
+  addGroup: (featureId: string, discipline: Discipline) => void;
+  deleteGroup: (featureId: string, groupId: string) => void;
+
+  addTask: (featureId: string, groupId: string, label: string) => string;
+  updateTaskLabel: (featureId: string, groupId: string, taskId: string, label: string) => void;
+  updateTaskEstimate: (featureId: string, groupId: string, taskId: string, value: number, unit: EstimateUnit) => void;
+  deleteTask: (featureId: string, groupId: string, taskId: string) => void;
 
   setSelected: (id: string | null) => void;
 }
 
-// Wraps a features update with history recording
 function recorded(
   set: (fn: (s: EstimationsStore) => Partial<EstimationsStore>) => void,
   get: () => EstimationsStore,
@@ -83,91 +84,118 @@ export const useEstimationsStore = create<EstimationsStore>()(
 
       updateFeaturePosition(id, pos) {
         recorded(set, get, (fs) =>
+          fs.map((f) => (f.id === id ? { ...f, position: pos, updatedAt: now() } : f))
+        );
+      },
+
+      updateFeatureWidth(id, width) {
+        recorded(set, get, (fs) =>
+          fs.map((f) => (f.id === id ? { ...f, width, updatedAt: now() } : f))
+        );
+      },
+
+      addGroup(featureId, discipline) {
+        recorded(set, get, (fs) =>
           fs.map((f) =>
-            f.id === id ? { ...f, position: pos, updatedAt: new Date().toISOString() } : f
+            f.id !== featureId
+              ? f
+              : { ...f, groups: [...f.groups, makeGroup(discipline, featureId)], updatedAt: now() }
           )
         );
       },
 
-      updateFeatureSize(id, w, h) {
+      deleteGroup(featureId, groupId) {
         recorded(set, get, (fs) =>
           fs.map((f) =>
-            f.id === id ? { ...f, width: w, height: h, updatedAt: new Date().toISOString() } : f
+            f.id !== featureId
+              ? f
+              : { ...f, groups: f.groups.filter((g) => g.id !== groupId), updatedAt: now() }
           )
         );
       },
 
-      updatePostItPosition(fid, pid, pos) {
+      addTask(featureId, groupId, label) {
+        const taskId = crypto.randomUUID();
         recorded(set, get, (fs) =>
           fs.map((f) =>
-            f.id !== fid
+            f.id !== featureId
               ? f
               : {
                   ...f,
-                  postits: f.postits.map((p) =>
-                    p.id === pid ? { ...p, position: pos, updatedAt: new Date().toISOString() } : p
+                  groups: f.groups.map((g) =>
+                    g.id !== groupId
+                      ? g
+                      : {
+                          ...g,
+                          tasks: [
+                            ...g.tasks,
+                            { id: taskId, label, estimate: { value: 1, unit: "day" } },
+                          ],
+                          updatedAt: now(),
+                        }
+                  ),
+                  updatedAt: now(),
+                }
+          )
+        );
+        return taskId;
+      },
+
+      updateTaskLabel(featureId, groupId, taskId, label) {
+        recorded(set, get, (fs) =>
+          fs.map((f) =>
+            f.id !== featureId
+              ? f
+              : {
+                  ...f,
+                  groups: f.groups.map((g) =>
+                    g.id !== groupId
+                      ? g
+                      : {
+                          ...g,
+                          tasks: g.tasks.map((t) => (t.id === taskId ? { ...t, label } : t)),
+                          updatedAt: now(),
+                        }
                   ),
                 }
           )
         );
       },
 
-      updatePostItSize(fid, pid, w, h) {
+      updateTaskEstimate(featureId, groupId, taskId, value, unit) {
         recorded(set, get, (fs) =>
           fs.map((f) =>
-            f.id !== fid
+            f.id !== featureId
               ? f
               : {
                   ...f,
-                  postits: f.postits.map((p) =>
-                    p.id === pid ? { ...p, width: w, height: h, updatedAt: new Date().toISOString() } : p
+                  groups: f.groups.map((g) =>
+                    g.id !== groupId
+                      ? g
+                      : {
+                          ...g,
+                          tasks: g.tasks.map((t) =>
+                            t.id === taskId ? { ...t, estimate: { value, unit } } : t
+                          ),
+                          updatedAt: now(),
+                        }
                   ),
                 }
           )
         );
       },
 
-      updatePostItLabel(fid, pid, label) {
+      deleteTask(featureId, groupId, taskId) {
         recorded(set, get, (fs) =>
           fs.map((f) =>
-            f.id !== fid
+            f.id !== featureId
               ? f
               : {
                   ...f,
-                  postits: f.postits.map((p) =>
-                    p.id === pid ? { ...p, taskLabel: label, updatedAt: new Date().toISOString() } : p
-                  ),
-                }
-          )
-        );
-      },
-
-      updatePostItEstimate(fid, pid, value, unit) {
-        recorded(set, get, (fs) =>
-          fs.map((f) =>
-            f.id !== fid
-              ? f
-              : {
-                  ...f,
-                  postits: f.postits.map((p) =>
-                    p.id === pid
-                      ? { ...p, estimate: { value, unit }, updatedAt: new Date().toISOString() }
-                      : p
-                  ),
-                }
-          )
-        );
-      },
-
-      updatePostItColor(fid, pid, color) {
-        recorded(set, get, (fs) =>
-          fs.map((f) =>
-            f.id !== fid
-              ? f
-              : {
-                  ...f,
-                  postits: f.postits.map((p) =>
-                    p.id === pid ? { ...p, color, updatedAt: new Date().toISOString() } : p
+                  groups: f.groups.map((g) =>
+                    g.id !== groupId
+                      ? g
+                      : { ...g, tasks: g.tasks.filter((t) => t.id !== taskId), updatedAt: now() }
                   ),
                 }
           )
@@ -179,9 +207,12 @@ export const useEstimationsStore = create<EstimationsStore>()(
       },
     }),
     {
-      name: "estimator-phase1",
-      // Don't persist history — only current state matters across sessions
+      name: "estimator-phase1-v2",
       partialize: (s) => ({ features: s.features }),
     }
   )
 );
+
+function now() {
+  return new Date().toISOString();
+}
