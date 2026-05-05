@@ -367,4 +367,29 @@ The integration is **round-trip**: changes in either system flow to the other, i
 
 **[implied — only what is needed to make the spec actionable]**
 
-- **Frontend.** SPA (React recommended; Vue acceptable). Phase 1 canvas built on **Konva** (well-suited for resizable shapes, and gives us touch support for free when mobile lands in v2); Phase 2–4 timelines built on SVG (simpler, lighter, prints well
+- **Frontend.** SPA (React recommended; Vue acceptable). Phase 1 canvas built on **Konva** (well-suited for resizable shapes, and gives us touch support for free when mobile lands in v2); Phase 2–4 timelines built on SVG (simpler, lighter, prints well).
+
+- **Backend.** Written in **Go**. Handles REST API, Google OAuth session management, document export generation, and the Plantastic integration adapter.
+
+- **Data store.** **MongoDB**. Document-oriented storage maps well to the nested Project → Feature → PostIt structure. Each project is a top-level document; features and post-its are embedded sub-documents. Resources and milestones are embedded arrays on the project document.
+
+- **Real-time sync.** CRDT layer using **Yjs**. Because Yjs is a JavaScript-native library, the WebSocket sync server runs as a lightweight **Node.js sidecar** (y-websocket) alongside the Go API. The Go server owns persistence; the Yjs sidecar owns live collaborative sync and writes final state back to the Go API on document update. This keeps the Go codebase free of Yjs internals while preserving the real-time collab requirement.
+
+- **Presence channel.** Ephemeral WebSocket broadcasts (cursor positions, selections) ride on the Yjs sidecar's awareness protocol — no persistence required.
+
+- **Auth flow.** Google OAuth 2.0 via the Go server. Session token stored in an HTTP-only cookie. Yjs sidecar validates the same session cookie before accepting a WebSocket connection.
+
+### 9.1 Technology decisions (confirmed)
+
+| Concern | Choice | Notes |
+|---------|--------|-------|
+| Frontend framework | React + Vite | TypeScript throughout |
+| Phase 1 canvas | Konva + react-konva | |
+| Phase 2–4 timelines | SVG | |
+| Client state | Zustand | Persists to localStorage until server is up |
+| CRDT / real-time | Yjs + y-websocket | Node.js sidecar |
+| Backend language | **Go** | REST API, auth, exports, Plantastic adapter |
+| Data store | **MongoDB** | mongo-driver for Go |
+| Authentication | Google OAuth 2.0 | Restricted to @soulassembly.com |
+| HTTP router (Go) | Gin | TBC during server build |
+| Deployment | TBD | |
