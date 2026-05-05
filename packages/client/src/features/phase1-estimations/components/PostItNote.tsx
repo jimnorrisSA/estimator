@@ -51,26 +51,26 @@ export function PostItNote({
     if (!node) return;
     const stage = node.getStage();
     if (!stage) return;
-    const container = stage.container().getBoundingClientRect();
+    // getAbsolutePosition() already accounts for all parent transforms including stage scale/pan
     const absPos = node.getAbsolutePosition();
-    const scale = stageScale;
+    const containerRect = stage.container().getBoundingClientRect();
 
     requestTextEdit({
       value: postit.taskLabel,
-      x: container.left + absPos.x * scale + PADDING,
-      y: container.top + absPos.y * scale + DISCIPLINE_LABEL_H + PADDING,
-      width: (postit.width - PADDING * 2) / scale,
-      height: (postit.height * 0.5) / scale,
-      fontSize: LABEL_FONT,
+      x: containerRect.left + absPos.x + PADDING * stageScale,
+      y: containerRect.top + absPos.y + DISCIPLINE_LABEL_H * stageScale,
+      width: (postit.width - PADDING * 2) * stageScale,
+      height: postit.height * 0.55 * stageScale,
+      fontSize: LABEL_FONT * stageScale,
       onCommit: (v) => updatePostItLabel(featureId, postit.id, v),
     });
   }
 
-  function dragBound(pos: { x: number; y: number }) {
-    return {
-      x: Math.max(0, Math.min(pos.x, featureWidth - postit.width)),
-      y: Math.max(0, Math.min(pos.y, featureHeight - postit.height)),
-    };
+  // onDragMove clamps in local (parent-group) coordinates — correct coordinate space
+  function onDragMove(e: Konva.KonvaEventObject<DragEvent>) {
+    const node = e.target;
+    node.x(Math.max(0, Math.min(node.x(), featureWidth - postit.width)));
+    node.y(Math.max(0, Math.min(node.y(), featureHeight - postit.height)));
   }
 
   return (
@@ -79,7 +79,7 @@ export function PostItNote({
       x={postit.position.x}
       y={postit.position.y}
       draggable
-      dragBoundFunc={dragBound}
+      onDragMove={onDragMove}
       onClick={() => onSelect(postit.id)}
       onTap={() => onSelect(postit.id)}
       onDblClick={openLabelEdit}
@@ -145,7 +145,7 @@ export function PostItNote({
         ellipsis
       />
 
-      {/* Estimate */}
+      {/* Estimate — smaller text, enlarges on hover */}
       <Text
         x={PADDING}
         y={postit.height - (estimateHover ? ESTIMATE_FONT_HOVER : ESTIMATE_FONT) - PADDING - 2}

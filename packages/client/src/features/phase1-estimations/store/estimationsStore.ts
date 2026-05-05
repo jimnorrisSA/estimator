@@ -3,9 +3,16 @@ import { persist } from "zustand/middleware";
 import type { Feature, EstimateUnit } from "@estimator/shared";
 import { makeFeature } from "../utils/defaults.js";
 
+const MAX_HISTORY = 50;
+
 interface EstimationsStore {
   features: Feature[];
   selectedId: string | null;
+  _past: Feature[][];
+  _future: Feature[][];
+
+  undo: () => void;
+  redo: () => void;
 
   generateFeatures: (names: string[]) => void;
   updateFeaturePosition: (id: string, pos: { x: number; y: number }) => void;
@@ -20,11 +27,47 @@ interface EstimationsStore {
   setSelected: (id: string | null) => void;
 }
 
+// Wraps a features update with history recording
+function recorded(
+  set: (fn: (s: EstimationsStore) => Partial<EstimationsStore>) => void,
+  get: () => EstimationsStore,
+  updater: (features: Feature[]) => Feature[]
+) {
+  const current = get().features;
+  set((s) => ({
+    features: updater(s.features),
+    _past: [...s._past.slice(-(MAX_HISTORY - 1)), current],
+    _future: [],
+  }));
+}
+
 export const useEstimationsStore = create<EstimationsStore>()(
   persist(
     (set, get) => ({
       features: [],
       selectedId: null,
+      _past: [],
+      _future: [],
+
+      undo() {
+        const { _past, features, _future } = get();
+        if (!_past.length) return;
+        set({
+          features: _past[_past.length - 1],
+          _past: _past.slice(0, -1),
+          _future: [features, ..._future.slice(0, MAX_HISTORY - 1)],
+        });
+      },
+
+      redo() {
+        const { _future, features, _past } = get();
+        if (!_future.length) return;
+        set({
+          features: _future[0],
+          _past: [..._past.slice(-(MAX_HISTORY - 1)), features],
+          _future: _future.slice(1),
+        });
+      },
 
       generateFeatures(names) {
         const existing = new Set(get().features.map((f) => f.name));
@@ -34,29 +77,29 @@ export const useEstimationsStore = create<EstimationsStore>()(
           .filter((n) => n && !existing.has(n))
           .map((n, i) => makeFeature(n, offset + i));
         if (newFeatures.length) {
-          set((s) => ({ features: [...s.features, ...newFeatures] }));
+          recorded(set, get, (fs) => [...fs, ...newFeatures]);
         }
       },
 
       updateFeaturePosition(id, pos) {
-        set((s) => ({
-          features: s.features.map((f) =>
+        recorded(set, get, (fs) =>
+          fs.map((f) =>
             f.id === id ? { ...f, position: pos, updatedAt: new Date().toISOString() } : f
-          ),
-        }));
+          )
+        );
       },
 
       updateFeatureSize(id, w, h) {
-        set((s) => ({
-          features: s.features.map((f) =>
+        recorded(set, get, (fs) =>
+          fs.map((f) =>
             f.id === id ? { ...f, width: w, height: h, updatedAt: new Date().toISOString() } : f
-          ),
-        }));
+          )
+        );
       },
 
       updatePostItPosition(fid, pid, pos) {
-        set((s) => ({
-          features: s.features.map((f) =>
+        recorded(set, get, (fs) =>
+          fs.map((f) =>
             f.id !== fid
               ? f
               : {
@@ -65,13 +108,13 @@ export const useEstimationsStore = create<EstimationsStore>()(
                     p.id === pid ? { ...p, position: pos, updatedAt: new Date().toISOString() } : p
                   ),
                 }
-          ),
-        }));
+          )
+        );
       },
 
       updatePostItSize(fid, pid, w, h) {
-        set((s) => ({
-          features: s.features.map((f) =>
+        recorded(set, get, (fs) =>
+          fs.map((f) =>
             f.id !== fid
               ? f
               : {
@@ -80,13 +123,13 @@ export const useEstimationsStore = create<EstimationsStore>()(
                     p.id === pid ? { ...p, width: w, height: h, updatedAt: new Date().toISOString() } : p
                   ),
                 }
-          ),
-        }));
+          )
+        );
       },
 
       updatePostItLabel(fid, pid, label) {
-        set((s) => ({
-          features: s.features.map((f) =>
+        recorded(set, get, (fs) =>
+          fs.map((f) =>
             f.id !== fid
               ? f
               : {
@@ -95,13 +138,13 @@ export const useEstimationsStore = create<EstimationsStore>()(
                     p.id === pid ? { ...p, taskLabel: label, updatedAt: new Date().toISOString() } : p
                   ),
                 }
-          ),
-        }));
+          )
+        );
       },
 
       updatePostItEstimate(fid, pid, value, unit) {
-        set((s) => ({
-          features: s.features.map((f) =>
+        recorded(set, get, (fs) =>
+          fs.map((f) =>
             f.id !== fid
               ? f
               : {
@@ -112,13 +155,13 @@ export const useEstimationsStore = create<EstimationsStore>()(
                       : p
                   ),
                 }
-          ),
-        }));
+          )
+        );
       },
 
       updatePostItColor(fid, pid, color) {
-        set((s) => ({
-          features: s.features.map((f) =>
+        recorded(set, get, (fs) =>
+          fs.map((f) =>
             f.id !== fid
               ? f
               : {
@@ -127,14 +170,18 @@ export const useEstimationsStore = create<EstimationsStore>()(
                     p.id === pid ? { ...p, color, updatedAt: new Date().toISOString() } : p
                   ),
                 }
-          ),
-        }));
+          )
+        );
       },
 
       setSelected(id) {
         set({ selectedId: id });
       },
     }),
-    { name: "estimator-phase1" }
+    {
+      name: "estimator-phase1",
+      // Don't persist history — only current state matters across sessions
+      partialize: (s) => ({ features: s.features }),
+    }
   )
 );
