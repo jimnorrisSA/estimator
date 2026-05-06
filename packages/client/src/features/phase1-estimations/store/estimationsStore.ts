@@ -15,6 +15,7 @@ interface EstimationsStore {
   redo: () => void;
 
   generateFeatures: (names: string[]) => void;
+  updateFeatureName: (id: string, name: string) => void;
   updateFeaturePosition: (id: string, pos: { x: number; y: number }) => void;
   updateFeatureWidth: (id: string, width: number) => void;
 
@@ -80,6 +81,12 @@ export const useEstimationsStore = create<EstimationsStore>()(
         if (newFeatures.length) {
           recorded(set, get, (fs) => [...fs, ...newFeatures]);
         }
+      },
+
+      updateFeatureName(id, name) {
+        recorded(set, get, (fs) =>
+          fs.map((f) => (f.id === id ? { ...f, name, updatedAt: now() } : f))
+        );
       },
 
       updateFeaturePosition(id, pos) {
