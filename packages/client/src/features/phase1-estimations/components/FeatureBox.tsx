@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Group, Rect, Text } from "react-konva";
 import type Konva from "konva";
 import type { Feature } from "@estimator/shared";
@@ -29,10 +29,13 @@ interface Props {
 
 export function FeatureBox({ feature, selectedId, onSelect, stageScale }: Props) {
   const groupRef = useRef<Konva.Group>(null);
-  const { registerNode, unregisterNode, requestTextEdit, requestDisciplinePick } = useCanvasContext();
+  const { registerNode, unregisterNode, requestTextEdit, requestDisciplinePick, requestConfirm } = useCanvasContext();
   const updateFeatureName = useEstimationsStore((s) => s.updateFeatureName);
   const updateFeaturePosition = useEstimationsStore((s) => s.updateFeaturePosition);
   const updateFeatureWidth = useEstimationsStore((s) => s.updateFeatureWidth);
+  const deleteFeature = useEstimationsStore((s) => s.deleteFeature);
+  const setSelected = useEstimationsStore((s) => s.setSelected);
+  const [deleteHover, setDeleteHover] = useState(false);
 
   const isSelected = selectedId === feature.id;
   const boxH = featureHeight(feature.groups);
@@ -72,6 +75,20 @@ export function FeatureBox({ feature, selectedId, onSelect, stageScale }: Props)
       fontSize: TITLE_FONT,
       onCommit: (v) => {
         if (v.trim()) updateFeatureName(feature.id, v.trim());
+      },
+    });
+  }
+
+  function handleDelete() {
+    const taskCount = feature.groups.reduce((n, g) => n + g.tasks.length, 0);
+    const taskNote = taskCount > 0
+      ? ` This will permanently remove ${taskCount} task${taskCount !== 1 ? "s" : ""}.`
+      : "";
+    requestConfirm({
+      message: `Delete "${feature.name}"?${taskNote}`,
+      onConfirm: () => {
+        deleteFeature(feature.id);
+        setSelected(null);
       },
     });
   }
@@ -146,8 +163,8 @@ export function FeatureBox({ feature, selectedId, onSelect, stageScale }: Props)
         onDblTap={handleRename}
       />
 
-      {/* Task / day counter — top-right of header */}
-      {counterText !== "" && (
+      {/* Task / day counter — top-right of header (hidden when selected to make room for delete button) */}
+      {counterText !== "" && !isSelected && (
         <Text
           x={feature.width - COUNTER_W - 8}
           y={(FEATURE_HEADER_H - COUNTER_FONT) / 2}
@@ -157,6 +174,34 @@ export function FeatureBox({ feature, selectedId, onSelect, stageScale }: Props)
           fill="#6b7280"
           align="right"
         />
+      )}
+
+      {/* Delete button — visible only when selected */}
+      {isSelected && (
+        <Group
+          x={feature.width - 28}
+          y={(FEATURE_HEADER_H - 20) / 2}
+          onClick={(e) => { e.cancelBubble = true; handleDelete(); }}
+          onTap={(e) => { e.cancelBubble = true; handleDelete(); }}
+          onMouseEnter={() => setDeleteHover(true)}
+          onMouseLeave={() => setDeleteHover(false)}
+        >
+          <Rect
+            width={20}
+            height={20}
+            cornerRadius={4}
+            fill={deleteHover ? "#ef4444" : "#fee2e2"}
+          />
+          <Text
+            width={20}
+            height={20}
+            text="×"
+            fontSize={14}
+            fill={deleteHover ? "#ffffff" : "#ef4444"}
+            align="center"
+            verticalAlign="middle"
+          />
+        </Group>
       )}
 
       {/* Empty state hint */}

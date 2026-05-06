@@ -31,6 +31,8 @@
 |--------|-----|
 | Move a feature box | Click and drag the feature box |
 | Resize a feature box | Click a feature box to select it, then drag the left or right handles. Height adjusts automatically based on content. |
+| Rename a feature box | Double-click the header bar or the feature name |
+| Delete a feature box | Click the feature box to select it, then click the **×** button that appears in the top-right of the header. A confirmation dialog will appear — click **Delete** to confirm. This removes the feature and all its discipline cards and tasks. |
 | Add a discipline card | Click the **+ Add discipline** button at the bottom of a feature box, then choose a discipline from the popup |
 
 ---

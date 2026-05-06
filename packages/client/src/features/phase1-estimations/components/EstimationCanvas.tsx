@@ -3,10 +3,11 @@ import { Stage, Layer, Transformer } from "react-konva";
 import type Konva from "konva";
 import type { Discipline } from "@estimator/shared";
 import { useEstimationsStore } from "../store/estimationsStore.js";
-import { CanvasContext, type TextEditRequest, type DisciplinePickRequest } from "../context/CanvasContext.js";
+import { CanvasContext, type TextEditRequest, type DisciplinePickRequest, type ConfirmRequest } from "../context/CanvasContext.js";
 import { FeatureBox } from "./FeatureBox.js";
 import { TextOverlay } from "./TextOverlay.js";
 import { DisciplinePicker } from "./DisciplinePicker.js";
+import { ConfirmDialog } from "./ConfirmDialog.js";
 
 const MIN_SCALE = 0.2;
 const MAX_SCALE = 3;
@@ -21,6 +22,7 @@ export function EstimationCanvas() {
   const [pos, setPos] = useState({ x: 0, y: 0 });
   const [textEdit, setTextEdit] = useState<TextEditRequest | null>(null);
   const [disciplinePick, setDisciplinePick] = useState<DisciplinePickRequest | null>(null);
+  const [confirmReq, setConfirmReq] = useState<ConfirmRequest | null>(null);
 
   const features = useEstimationsStore((s) => s.features);
   const selectedId = useEstimationsStore((s) => s.selectedId);
@@ -62,6 +64,10 @@ export function EstimationCanvas() {
     setDisciplinePick(req);
   }, []);
 
+  const requestConfirm = useCallback((req: ConfirmRequest) => {
+    setConfirmReq(req);
+  }, []);
+
   function onWheel(e: Konva.KonvaEventObject<WheelEvent>) {
     e.evt.preventDefault();
     const stage = e.target.getStage()!;
@@ -83,7 +89,7 @@ export function EstimationCanvas() {
   }
 
   return (
-    <CanvasContext.Provider value={{ registerNode, unregisterNode, requestTextEdit, requestDisciplinePick }}>
+    <CanvasContext.Provider value={{ registerNode, unregisterNode, requestTextEdit, requestDisciplinePick, requestConfirm }}>
       <div ref={containerRef} className="w-full h-full relative overflow-hidden bg-gray-100">
         <div
           className="absolute inset-0 pointer-events-none"
@@ -137,6 +143,9 @@ export function EstimationCanvas() {
             onPick={handleDisciplinePick}
             onDone={() => setDisciplinePick(null)}
           />
+        )}
+        {confirmReq && (
+          <ConfirmDialog req={confirmReq} onDone={() => setConfirmReq(null)} />
         )}
       </div>
     </CanvasContext.Provider>

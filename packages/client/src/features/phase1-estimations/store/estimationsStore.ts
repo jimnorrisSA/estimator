@@ -19,6 +19,7 @@ interface EstimationsStore {
   updateFeaturePosition: (id: string, pos: { x: number; y: number }) => void;
   updateFeatureWidth: (id: string, width: number) => void;
 
+  deleteFeature: (id: string) => void;
   addGroup: (featureId: string, discipline: Discipline) => void;
   deleteGroup: (featureId: string, groupId: string) => void;
 
@@ -80,6 +81,17 @@ export const useEstimationsStore = create<EstimationsStore>()(
           .map((n, i) => makeFeature(n, offset + i));
         if (newFeatures.length) {
           recorded(set, get, (fs) => [...fs, ...newFeatures]);
+        }
+      },
+
+      deleteFeature(id) {
+        recorded(set, get, (fs) => fs.filter((f) => f.id !== id));
+        // Clear selection if the deleted feature or one of its tasks was selected
+        if (get().selectedId) {
+          const stillExists = get().features.some(
+            (f) => f.id === get().selectedId || f.groups.some((g) => g.tasks.some((t) => t.id === get().selectedId))
+          );
+          if (!stillExists) set({ selectedId: null });
         }
       },
 

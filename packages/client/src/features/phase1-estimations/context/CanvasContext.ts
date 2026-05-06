@@ -17,11 +17,17 @@ export interface DisciplinePickRequest {
   featureId: string;
 }
 
+export interface ConfirmRequest {
+  message: string;
+  onConfirm: () => void;
+}
+
 export interface CanvasContextValue {
   registerNode: (id: string, node: Konva.Node) => void;
   unregisterNode: (id: string) => void;
   requestTextEdit: (req: TextEditRequest) => void;
   requestDisciplinePick: (req: DisciplinePickRequest) => void;
+  requestConfirm: (req: ConfirmRequest) => void;
 }
 
 export const CanvasContext = createContext<CanvasContextValue | null>(null);
