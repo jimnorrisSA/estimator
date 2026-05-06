@@ -12,6 +12,7 @@ import {
   FEATURE_HEADER_H,
   ADD_GROUP_H,
   FEATURE_MIN_W,
+  FEATURE_PAD,
 } from "../utils/layout.js";
 
 const TITLE_FONT = 14;
@@ -44,11 +45,12 @@ export function FeatureBox({ feature, selectedId, onSelect, stageScale }: Props)
     if (!node) return;
     const stage = node.getStage();
     if (!stage) return;
+    // getAbsolutePosition() already includes stage scale + pan — gives canvas-element-pixel coords
     const absPos = node.getAbsolutePosition();
     const containerRect = stage.container().getBoundingClientRect();
     requestDisciplinePick({
-      x: containerRect.left + (absPos.x + FEATURE_MIN_W / 2) * stageScale,
-      y: containerRect.top + (absPos.y + addBtnY) * stageScale,
+      x: containerRect.left + absPos.x + (feature.width / 2) * stageScale,
+      y: containerRect.top + absPos.y + addBtnY * stageScale,
       featureId: feature.id,
     });
   }
@@ -98,6 +100,20 @@ export function FeatureBox({ feature, selectedId, onSelect, stageScale }: Props)
         ellipsis
       />
 
+      {/* Empty state hint */}
+      {feature.groups.length === 0 && (
+        <Text
+          x={FEATURE_PAD}
+          y={FEATURE_HEADER_H + 12}
+          width={feature.width - FEATURE_PAD * 2}
+          text="Add a discipline to get started"
+          fontSize={11}
+          fill="#9ca3af"
+          align="center"
+          fontStyle="italic"
+        />
+      )}
+
       {/* Discipline group cards */}
       {feature.groups.map((g, i) => (
         <DisciplineGroupCard
@@ -113,11 +129,7 @@ export function FeatureBox({ feature, selectedId, onSelect, stageScale }: Props)
 
       {/* Add discipline button */}
       <Group y={addBtnY} onClick={handleAddGroupClick} onTap={handleAddGroupClick}>
-        <Rect
-          width={feature.width}
-          height={ADD_GROUP_H}
-          fill="transparent"
-        />
+        <Rect width={feature.width} height={ADD_GROUP_H} fill="transparent" />
         <Rect
           x={10}
           width={feature.width - 20}

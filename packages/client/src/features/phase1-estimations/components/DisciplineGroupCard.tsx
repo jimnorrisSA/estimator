@@ -1,4 +1,6 @@
+import { useRef } from "react";
 import { Group, Rect, Text } from "react-konva";
+import type Konva from "konva";
 import type { DisciplineGroup } from "@estimator/shared";
 import { useEstimationsStore } from "../store/estimationsStore.js";
 import { useCanvasContext } from "../context/CanvasContext.js";
@@ -24,51 +26,60 @@ interface Props {
 }
 
 export function DisciplineGroupCard({ group, layout, featureId, selectedId, onSelect, stageScale }: Props) {
+  const cardRef = useRef<Konva.Group>(null);
   const { requestTextEdit } = useCanvasContext();
   const addTask = useEstimationsStore((s) => s.addTask);
   const updateTaskLabel = useEstimationsStore((s) => s.updateTaskLabel);
 
+  // Get the screen-space position of a point (offsetX, offsetY) within this card.
+  // getAbsolutePosition() returns canvas-element-pixel coords (stage scale + pan already applied).
+  function screenPos(offsetX: number, offsetY: number) {
+    const node = cardRef.current;
+    if (!node) return { x: 0, y: 0 };
+    const stage = node.getStage();
+    if (!stage) return { x: 0, y: 0 };
+    const rect = stage.container().getBoundingClientRect();
+    const abs = node.getAbsolutePosition();
+    return {
+      x: rect.left + abs.x + offsetX * stageScale,
+      y: rect.top + abs.y + offsetY * stageScale,
+    };
+  }
+
   function openTaskEdit(taskId: string, currentLabel: string, taskY: number) {
-    const absX = layout.x;
-    const absY = layout.y + taskY;
+    const { x, y } = screenPos(PAD, taskY + (TASK_ROW_H - LABEL_FONT) / 2 - 2);
     requestTextEdit({
       value: currentLabel,
-      x: absX * stageScale + PAD,
-      y: absY * stageScale + 2,
+      x,
+      y,
       width: (layout.width - PAD * 2) * stageScale,
-      height: (TASK_ROW_H - 4) * stageScale,
-      fontSize: LABEL_FONT * stageScale,
+      height: TASK_ROW_H * stageScale,
+      fontSize: LABEL_FONT,
       onCommit: (v) => updateTaskLabel(featureId, group.id, taskId, v),
     });
   }
 
+  // Don't add task to store until the user actually commits a label
   function handleAddTask() {
-    const taskId = addTask(featureId, group.id, "");
-    const taskIndex = useEstimationsStore.getState().features
-      .find((f) => f.id === featureId)?.groups
-      .find((g) => g.id === group.id)?.tasks.length ?? 0;
-    const taskY = GROUP_HEADER_H + (taskIndex - 1) * TASK_ROW_H;
-
+    const newTaskY = GROUP_HEADER_H + group.tasks.length * TASK_ROW_H;
+    const { x, y } = screenPos(PAD, newTaskY + (TASK_ROW_H - LABEL_FONT) / 2 - 2);
     requestTextEdit({
       value: "",
-      x: layout.x * stageScale + PAD,
-      y: (layout.y + taskY) * stageScale + 2,
+      x,
+      y,
       width: (layout.width - PAD * 2) * stageScale,
-      height: (TASK_ROW_H - 4) * stageScale,
-      fontSize: LABEL_FONT * stageScale,
+      height: TASK_ROW_H * stageScale,
+      fontSize: LABEL_FONT,
       onCommit: (v) => {
-        if (v.trim()) {
-          updateTaskLabel(featureId, group.id, taskId, v.trim());
-        }
+        if (v.trim()) addTask(featureId, group.id, v.trim());
       },
     });
   }
 
-  // Darken the color slightly for the header
   const headerColor = darken(group.color, 0.15);
 
   return (
-    <Group x={layout.x} y={layout.y}>
+    <Group ref={cardRef} x={layout.x} y={layout.y}>
       {/* Card background */}
       <Rect
         width={layout.width}
@@ -108,17 +119,8 @@ export function DisciplineGroupCard({ group, layout, featureId, selectedId, onSe
             onDblClick={() => openTaskEdit(task.id, task.label, ty)}
             onDblTap={() => openTaskEdit(task.id, task.label, ty)}
           >
-            {/* Row highlight when selected */}
-            {isSelected && (
-              <Rect
-                width={layout.width}
-                height={TASK_ROW_H}
-                fill="rgba(255,255,255,0.5)"
-              />
-            )}
-            {/* Subtle divider */}
+            {isSelected && <Rect width={layout.width} height={TASK_ROW_H} fill="rgba(255,255,255,0.5)" />}
             <Rect y={0} width={layout.width} height={1} fill="rgba(0,0,0,0.06)" />
-            {/* Label */}
             <Text
               x={PAD}
               y={(TASK_ROW_H - LABEL_FONT) / 2}
@@ -128,7 +130,6 @@ export function DisciplineGroupCard({ group, layout, featureId, selectedId, onSe
               fill={task.label ? "#1f2937" : "#9ca3af"}
               ellipsis
             />
-            {/* Estimate — right-aligned */}
             <Text
               x={layout.width - 44}
               y={(TASK_ROW_H - EST_FONT) / 2}

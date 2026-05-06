@@ -31,7 +31,7 @@ export function makeFeature(name: string, index: number): Feature {
   const y = 80 + row * (300 + GAP);
 
   const id = crypto.randomUUID();
-  const groups: DisciplineGroup[] = DEFAULT_DISCIPLINES.map((d) => makeGroup(d, id));
+  const groups: DisciplineGroup[] = [];
 
   return {
     id,
