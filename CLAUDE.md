@@ -52,6 +52,10 @@ Round-trip sync uses `origin` stamps to suppress echo loops (spec §7.4).
 Both mirror the same spec data model. Keep them in sync when the schema changes.
 One source of truth per task — Phase 1 canvas, Phase 2 grid, and Phase 4 timeline are views of the same records.
 
+## Slack inbox
+
+`slack_inbox.jsonl` in the project root receives messages Jim sends to `#jim-claude-code` (written by `slack_listener.py`). When working autonomously or between tasks, check this file for new instructions (`"read": false` entries), act on them, then mark them read by setting `"read": true`.
+
 ## Slack notifications
 
 A notifier script lives at `notify_slack.py` in the project root. Use it to keep Jim updated in `#jim-claude-code`.
