@@ -51,3 +51,26 @@ Round-trip sync uses `origin` stamps to suppress echo loops (spec §7.4).
 - **Go (server):** `server/internal/models/project.go`
 Both mirror the same spec data model. Keep them in sync when the schema changes.
 One source of truth per task — Phase 1 canvas, Phase 2 grid, and Phase 4 timeline are views of the same records.
+
+## Slack notifications
+
+A notifier script lives at `notify_slack.py` in the project root. Use it to keep Jim updated in `#jim-claude-code`.
+
+```bash
+python notify_slack.py <status> "<message>" ["<details>"]
+```
+
+| Status | When to use |
+|---|---|
+| `start` | Beginning a significant task |
+| `progress` | Meaningful milestone reached |
+| `blocked` | Need Jim's input to continue |
+| `done` | Task fully complete |
+| `error` | Unrecoverable error |
+
+**Rules:**
+- Only notify at meaningful moments — not every file save
+- `blocked` means pause and wait for Jim's reply before continuing
+- Keep messages short enough to read on a phone screen
+- Include file names in the details field when relevant
+- Don't stack multiple `blocked` notifications
