@@ -56,6 +56,7 @@ export interface Resource {
   dailyRate: number;
   currency: string;
   notes: string;
+  plantasticUserId?: string;
   updatedAt: string;
 }
 

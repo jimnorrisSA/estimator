@@ -17,6 +17,7 @@ export interface ScheduledTask {
   isPinned: boolean;
   notes: string;
   cost: number;
+  assignedResourceId?: string;
 }
 
 export interface ScheduleResult {
@@ -91,7 +92,11 @@ export function runScheduler(
           slots[slotIndex] = endDay;
         }
 
-        const rate = ratesByDiscipline[discipline][slotIndex] ?? 0;
+        const assignedResourceId = ov?.assignedResourceId;
+        const assignedResource = assignedResourceId
+          ? resources.find((r) => r.id === assignedResourceId)
+          : undefined;
+        const rate = assignedResource?.dailyRate ?? ratesByDiscipline[discipline][slotIndex] ?? 0;
 
         tasks.push({
           taskId: task.id,
@@ -109,6 +114,7 @@ export function runScheduler(
           isPinned,
           notes: ov?.notes ?? "",
           cost: wd * rate,
+          assignedResourceId,
         });
       }
     }

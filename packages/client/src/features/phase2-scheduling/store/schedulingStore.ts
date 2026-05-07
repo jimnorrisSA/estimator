@@ -24,6 +24,7 @@ export interface TaskOverride {
   startDay?: number;
   endDay?: number;
   notes: string;
+  assignedResourceId?: string;
 }
 
 interface SchedulingStore {
@@ -34,6 +35,7 @@ interface SchedulingStore {
   updateSettings: (patch: Partial<ScheduleSettings>) => void;
   setOverride: (taskId: string, patch: Partial<TaskOverride>) => void;
   clearOverride: (taskId: string) => void;
+  assignResource: (taskId: string, resourceId: string | null) => void;
 
   addResource: (role: Discipline, name: string) => void;
   updateResource: (id: string, patch: Partial<Pick<Resource, "name" | "dailyRate" | "allocationPct">>) => void;
@@ -96,6 +98,19 @@ export const useSchedulingStore = create<SchedulingStore>()(
           delete next[taskId];
           return { overrides: next };
         });
+      },
+
+      assignResource(taskId, resourceId) {
+        set((s) => ({
+          overrides: {
+            ...s.overrides,
+            [taskId]: {
+              ...{ notes: "" },
+              ...s.overrides[taskId],
+              assignedResourceId: resourceId ?? undefined,
+            },
+          },
+        }));
       },
 
       addResource(role, name) {

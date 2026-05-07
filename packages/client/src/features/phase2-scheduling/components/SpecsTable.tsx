@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import type { Feature, EstimateUnit } from "@estimator/shared";
+import type { Feature, EstimateUnit, Resource, Discipline } from "@estimator/shared";
 import type { ScheduledTask } from "../utils/scheduler.js";
 import type { ScheduleSettings } from "../store/schedulingStore.js";
 import { useEstimationsStore } from "../../phase1-estimations/store/estimationsStore.js";
@@ -26,6 +26,8 @@ export function SpecsTable({ tasks, features, settings, currencySymbol }: Props)
   const updateTaskEstimate = useEstimationsStore((s) => s.updateTaskEstimate);
   const overrides = useSchedulingStore((s) => s.overrides);
   const setOverride = useSchedulingStore((s) => s.setOverride);
+  const assignResource = useSchedulingStore((s) => s.assignResource);
+  const resources = useSchedulingStore((s) => s.resources);
 
   const maxDay = tasks.length > 0 ? Math.max(...tasks.map((t) => t.endDay)) : 0;
 
@@ -148,7 +150,15 @@ export function SpecsTable({ tasks, features, settings, currencySymbol }: Props)
                     {dayLabel(task.endDay)}
                   </td>
 
-                  <td className="px-3 py-2 text-xs text-gray-400 border-b border-gray-100">—</td>
+                  <td className="px-3 py-2 border-b border-gray-100">
+                    <ResourcePicker
+                      taskId={task.taskId}
+                      discipline={task.discipline}
+                      assignedResourceId={task.assignedResourceId}
+                      resources={resources}
+                      onAssign={assignResource}
+                    />
+                  </td>
 
                   {hasCosts && (
                     <td className="px-3 py-2 text-xs border-b border-gray-100 tabular-nums text-right">
@@ -249,6 +259,41 @@ function EstimateValueInput({
         if (e.key === "Escape") { setDraft(String(value)); e.currentTarget.blur(); }
       }}
     />
+  );
+}
+
+function ResourcePicker({
+  taskId,
+  discipline,
+  assignedResourceId,
+  resources,
+  onAssign,
+}: {
+  taskId: string;
+  discipline: Discipline;
+  assignedResourceId?: string;
+  resources: Resource[];
+  onAssign: (taskId: string, resourceId: string | null) => void;
+}) {
+  const matching = resources.filter((r) => r.role === discipline);
+
+  if (matching.length === 0) {
+    return <span className="text-xs text-gray-300">—</span>;
+  }
+
+  return (
+    <select
+      value={assignedResourceId ?? ""}
+      className="text-xs border border-gray-200 rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white text-gray-700 max-w-[140px]"
+      onChange={(e) => onAssign(taskId, e.target.value || null)}
+    >
+      <option value="">Unassigned</option>
+      {matching.map((r) => (
+        <option key={r.id} value={r.id}>
+          {r.name}
+        </option>
+      ))}
+    </select>
   );
 }
 
