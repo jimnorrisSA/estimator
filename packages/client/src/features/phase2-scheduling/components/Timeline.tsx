@@ -4,6 +4,7 @@ import type { ScheduleResult, ScheduledTask } from "../utils/scheduler.js";
 import type { ScheduleSettings } from "../store/schedulingStore.js";
 import { useSchedulingStore } from "../store/schedulingStore.js";
 import { useEstimationsStore } from "../../phase1-estimations/store/estimationsStore.js";
+import { useMilestonesStore } from "../../phase3-milestones/store/milestonesStore.js";
 import {
   buildWorkingDayCalendar,
   formatDateShort,
@@ -17,6 +18,7 @@ const DAY_W = 22;
 const MONTH_H = 22;
 const WEEK_H = 20;
 const HEADER_H = MONTH_H + WEEK_H;
+const MILESTONE_LANE_H = 30;
 const SLOT_H = 28;
 const ROW_VPAD = 5;
 const ROW_GAP = 6;
@@ -169,6 +171,8 @@ export function Timeline({ result, features, settings, viewMode, onToggleView }:
 
   const { setOverride, clearOverride } = useSchedulingStore();
   const updateTaskEstimate = useEstimationsStore((s) => s.updateTaskEstimate);
+  const milestones = useMilestonesStore((s) => s.milestones);
+  const milestoneH = milestones.length > 0 ? MILESTONE_LANE_H : 0;
 
   function handleMove(taskId: string, startDay: number, endDay: number) {
     setOverride(taskId, { startDay, endDay });
@@ -243,7 +247,7 @@ export function Timeline({ result, features, settings, viewMode, onToggleView }:
     );
   }
 
-  const svgH = HEADER_H + contY + CONT_ROW_H + BOTTOM_PAD;
+  const svgH = HEADER_H + milestoneH + contY + CONT_ROW_H + BOTTOM_PAD;
   const chartW = Math.max(projectEndDay * DAY_W + 20 * DAY_W, 480);
 
   return (
@@ -271,12 +275,21 @@ export function Timeline({ result, features, settings, viewMode, onToggleView }:
         <div className="flex items-stretch">
           {/* Fixed label column */}
           <svg data-label-svg width={LABEL_W} height={svgH} className="flex-shrink-0 border-r border-[#2e2848]" style={{ background: "#14112a" }}>
+            {milestoneH > 0 && (
+              <>
+                <rect x={0} y={HEADER_H} width={LABEL_W} height={milestoneH} fill="#1a1628" />
+                <text x={LABEL_W - 12} y={HEADER_H + milestoneH / 2} textAnchor="end" dominantBaseline="middle" fontSize={11} fill="#5c5575" fontStyle="italic">
+                  Milestones
+                </text>
+                <line x1={0} y1={HEADER_H + milestoneH} x2={LABEL_W} y2={HEADER_H + milestoneH} stroke="#2e2848" strokeWidth={1} />
+              </>
+            )}
             {viewMode === "detailed"
               ? rowLayouts.map((layout) => (
                   <g key={layout.discipline}>
                     <text
                       x={LABEL_W - 12}
-                      y={HEADER_H + layout.rowY + layout.height / 2 - (layout.capacity > 1 ? 8 : 0)}
+                      y={HEADER_H + milestoneH + layout.rowY + layout.height / 2 - (layout.capacity > 1 ? 8 : 0)}
                       textAnchor="end" dominantBaseline="middle" fontSize={13} fill="#c5bedf" fontWeight="600"
                     >
                       {layout.discipline}
@@ -284,7 +297,7 @@ export function Timeline({ result, features, settings, viewMode, onToggleView }:
                     {layout.capacity > 1 && (
                       <text
                         x={LABEL_W - 12}
-                        y={HEADER_H + layout.rowY + layout.height / 2 + 9}
+                        y={HEADER_H + milestoneH + layout.rowY + layout.height / 2 + 9}
                         textAnchor="end" dominantBaseline="middle" fontSize={11} fill="#5c5575"
                       >
                         ×{layout.capacity} people
@@ -296,7 +309,7 @@ export function Timeline({ result, features, settings, viewMode, onToggleView }:
                   <text
                     key={row.featureId}
                     x={LABEL_W - 12}
-                    y={HEADER_H + row.rowY + SUMMARY_ROW_H / 2}
+                    y={HEADER_H + milestoneH + row.rowY + SUMMARY_ROW_H / 2}
                     textAnchor="end" dominantBaseline="middle" fontSize={12} fill="#c5bedf" fontWeight="600"
                   >
                     {row.featureName.length > 12 ? row.featureName.slice(0, 11) + "…" : row.featureName}
@@ -304,7 +317,7 @@ export function Timeline({ result, features, settings, viewMode, onToggleView }:
                 ))}
             <text
               x={LABEL_W - 12}
-              y={HEADER_H + contY + CONT_ROW_H / 2}
+              y={HEADER_H + milestoneH + contY + CONT_ROW_H / 2}
               textAnchor="end" dominantBaseline="middle" fontSize={12} fill="#5c5575" fontStyle="italic"
             >
               Contingency
@@ -314,21 +327,46 @@ export function Timeline({ result, features, settings, viewMode, onToggleView }:
           {/* Scrollable chart */}
           <div className="overflow-x-auto flex-1" style={{ background: "#14112a" }}>
             <svg data-chart-svg width={chartW} height={svgH}>
+              {/* Milestone lane */}
+              {milestoneH > 0 && (
+                <>
+                  <rect x={0} y={HEADER_H} width={chartW} height={milestoneH} fill="#1a1628" />
+                  {milestones.map((m) => {
+                    const { startDay, endDay } = milestoneWorkingDays(m, settings.calendarMode, settings.startDate, cal);
+                    const x = startDay * DAY_W;
+                    const w = Math.max(4, (endDay - startDay) * DAY_W - 2);
+                    const barH = milestoneH - 8;
+                    const maxChars = Math.floor((w - 10) / 5.5);
+                    return (
+                      <g key={m.id}>
+                        <rect x={x} y={HEADER_H + 4} width={w} height={barH} rx={3} fill={m.color} opacity={0.85} />
+                        {w > 30 && (
+                          <text x={x + 5} y={HEADER_H + 4 + barH / 2} dominantBaseline="middle" fontSize={10} fontWeight="600" fill="white" style={{ pointerEvents: "none", userSelect: "none" }}>
+                            {m.title.length > maxChars ? m.title.slice(0, maxChars) + "…" : m.title}
+                          </text>
+                        )}
+                      </g>
+                    );
+                  })}
+                  <line x1={0} y1={HEADER_H + milestoneH} x2={chartW} y2={HEADER_H + milestoneH} stroke="#2e2848" strokeWidth={1} />
+                </>
+              )}
+
               {/* Row backgrounds */}
               {viewMode === "detailed"
                 ? rowLayouts.map((layout, i) => (
                     <rect key={`bg-${layout.discipline}`}
-                      x={0} y={HEADER_H + layout.rowY} width={chartW} height={layout.height}
+                      x={0} y={HEADER_H + milestoneH + layout.rowY} width={chartW} height={layout.height}
                       fill={i % 2 === 0 ? "#1d1930" : "#201c32"} />
                   ))
                 : summaryRows.map((row, i) => (
                     <rect key={`bg-${row.featureId}`}
-                      x={0} y={HEADER_H + row.rowY} width={chartW} height={SUMMARY_ROW_H}
+                      x={0} y={HEADER_H + milestoneH + row.rowY} width={chartW} height={SUMMARY_ROW_H}
                       fill={i % 2 === 0 ? "#1d1930" : "#201c32"} />
                   ))}
               <rect
                 x={0}
-                y={HEADER_H + contY}
+                y={HEADER_H + milestoneH + contY}
                 width={chartW}
                 height={CONT_ROW_H}
                 fill="#18152a"
@@ -347,6 +385,7 @@ export function Timeline({ result, features, settings, viewMode, onToggleView }:
                 calendarMode={settings.calendarMode}
                 cal={cal}
                 svgH={svgH}
+                milestoneH={milestoneH}
               />
 
               {/* Task bars */}
@@ -355,7 +394,7 @@ export function Timeline({ result, features, settings, viewMode, onToggleView }:
                     const layout = rowLayouts.find((r) => r.discipline === task.discipline);
                     if (!layout) return null;
                     const barH = SLOT_H - 4;
-                    const y = HEADER_H + layout.rowY + ROW_VPAD + task.slotIndex * SLOT_H;
+                    const y = HEADER_H + milestoneH + layout.rowY + ROW_VPAD + task.slotIndex * SLOT_H;
                     const color = featureColors.get(task.featureId) ?? "#7c3aed";
                     return (
                       <DraggableTaskBar key={task.taskId} task={task} y={y} barH={barH} color={color}
@@ -365,7 +404,7 @@ export function Timeline({ result, features, settings, viewMode, onToggleView }:
                 : summaryRows.map((row) => {
                     const x = row.startDay * DAY_W;
                     const barW = Math.max(4, (row.endDay - row.startDay) * DAY_W - 2);
-                    const y = HEADER_H + row.rowY + 5;
+                    const y = HEADER_H + milestoneH + row.rowY + 5;
                     const barH = SUMMARY_ROW_H - 10;
                     const maxChars = Math.floor((barW - 10) / 6);
                     return (
@@ -407,14 +446,14 @@ export function Timeline({ result, features, settings, viewMode, onToggleView }:
                 const lineColor = isOverrun ? "#ef4444" : "#22c55e";
                 return (
                   <g>
-                    <line x1={dx} y1={HEADER_H} x2={dx} y2={svgH - BOTTOM_PAD}
+                    <line x1={dx} y1={HEADER_H + milestoneH} x2={dx} y2={svgH - BOTTOM_PAD}
                       stroke={lineColor} strokeWidth={2} strokeDasharray="4 3" />
-                    <rect x={dx - 1} y={HEADER_H} width={isOverrun ? dx - 1 : chartW - dx}
-                      height={svgH - HEADER_H - BOTTOM_PAD}
+                    <rect x={dx - 1} y={HEADER_H + milestoneH} width={isOverrun ? dx - 1 : chartW - dx}
+                      height={svgH - HEADER_H - milestoneH - BOTTOM_PAD}
                       fill={isOverrun ? "#ef4444" : "#22c55e"} opacity={0.05} />
-                    <rect x={dx - 28} y={HEADER_H + 4} width={56} height={16} rx={3}
+                    <rect x={dx - 28} y={HEADER_H + milestoneH + 4} width={56} height={16} rx={3}
                       fill={lineColor} />
-                    <text x={dx} y={HEADER_H + 12} textAnchor="middle" dominantBaseline="middle"
+                    <text x={dx} y={HEADER_H + milestoneH + 12} textAnchor="middle" dominantBaseline="middle"
                       fontSize={10} fill="white" fontWeight="600"
                       style={{ pointerEvents: "none" }}>
                       {isOverrun ? "OVERRUN" : "TARGET"}
@@ -429,7 +468,7 @@ export function Timeline({ result, features, settings, viewMode, onToggleView }:
                   <title>Contingency — {settings.contingencyPct}%</title>
                   <rect
                     x={totalDays * DAY_W}
-                    y={HEADER_H + contY + 5}
+                    y={HEADER_H + milestoneH + contY + 5}
                     width={Math.max(2, contingencyDays * DAY_W - 2)}
                     height={CONT_ROW_H - 10}
                     rx={3}
@@ -440,7 +479,7 @@ export function Timeline({ result, features, settings, viewMode, onToggleView }:
                   {contingencyDays * DAY_W > 60 && (
                     <text
                       x={totalDays * DAY_W + (contingencyDays * DAY_W) / 2}
-                      y={HEADER_H + contY + CONT_ROW_H / 2}
+                      y={HEADER_H + milestoneH + contY + CONT_ROW_H / 2}
                       textAnchor="middle"
                       dominantBaseline="middle"
                       fontSize={11}
@@ -546,14 +585,38 @@ function ActualDateHeader({ projectEndDay, cal, chartW }: { projectEndDay: numbe
   return <>{els}</>;
 }
 
-function GridLines({ projectEndDay, calendarMode, cal, svgH }: { projectEndDay: number; calendarMode: string; cal: Date[]; svgH: number }) {
+function milestoneWorkingDays(
+  m: { startDate: string; endDate: string },
+  calendarMode: string,
+  startDate: string,
+  cal: Date[]
+): { startDay: number; endDay: number } {
+  if (calendarMode === "actual" && cal.length > 0) {
+    const mStart = parseISODate(m.startDate);
+    const mEnd = parseISODate(m.endDate);
+    const startDay = Math.max(0, cal.findIndex((d) => d >= mStart));
+    let endDay = cal.findIndex((d) => d > mEnd);
+    if (endDay < 0) endDay = cal.length;
+    return { startDay, endDay: Math.max(startDay + 1, endDay) };
+  }
+  const projStart = parseISODate(startDate);
+  const mStart = parseISODate(m.startDate);
+  const mEnd = parseISODate(m.endDate);
+  return {
+    startDay: Math.max(0, Math.round(((mStart.getTime() - projStart.getTime()) / 86400000) * 5 / 7)),
+    endDay: Math.max(1, Math.round(((mEnd.getTime() - projStart.getTime()) / 86400000) * 5 / 7)),
+  };
+}
+
+function GridLines({ projectEndDay, calendarMode, cal, svgH, milestoneH }: { projectEndDay: number; calendarMode: string; cal: Date[]; svgH: number; milestoneH: number }) {
   const bottom = svgH - BOTTOM_PAD;
+  const top = HEADER_H + milestoneH;
   const lines: React.ReactNode[] = [];
   if (calendarMode === "four-week") {
     for (let d = 5; d <= projectEndDay; d += 5) {
       const isMonth = d % 20 === 0;
       lines.push(
-        <line key={`gl-${d}`} x1={d * DAY_W} y1={HEADER_H} x2={d * DAY_W} y2={bottom}
+        <line key={`gl-${d}`} x1={d * DAY_W} y1={top} x2={d * DAY_W} y2={bottom}
           stroke={isMonth ? "#2e2848" : "#1e1a2e"} strokeWidth={isMonth ? 1.5 : 1} />
       );
     }
@@ -563,7 +626,7 @@ function GridLines({ projectEndDay, calendarMode, cal, svgH }: { projectEndDay: 
       if (!date || date.getDay() !== 1) continue;
       const isMonthStart = date.getDate() <= 7;
       lines.push(
-        <line key={`gl-${d}`} x1={d * DAY_W} y1={HEADER_H} x2={d * DAY_W} y2={bottom}
+        <line key={`gl-${d}`} x1={d * DAY_W} y1={top} x2={d * DAY_W} y2={bottom}
           stroke={isMonthStart ? "#2e2848" : "#1e1a2e"} strokeWidth={isMonthStart ? 1.5 : 1} />
       );
     }
