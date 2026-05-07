@@ -3,9 +3,10 @@ import { Stage, Layer, Transformer } from "react-konva";
 import type Konva from "konva";
 import type { Discipline } from "@estimator/shared";
 import { useEstimationsStore } from "../store/estimationsStore.js";
-import { CanvasContext, type TextEditRequest, type DisciplinePickRequest, type ConfirmRequest } from "../context/CanvasContext.js";
+import { CanvasContext, type TextEditRequest, type EstimateEditRequest, type DisciplinePickRequest, type ConfirmRequest } from "../context/CanvasContext.js";
 import { FeatureBox } from "./FeatureBox.js";
 import { TextOverlay } from "./TextOverlay.js";
+import { EstimateOverlay } from "./EstimateOverlay.js";
 import { DisciplinePicker } from "./DisciplinePicker.js";
 import { ConfirmDialog } from "./ConfirmDialog.js";
 
@@ -21,6 +22,7 @@ export function EstimationCanvas() {
   const [scale, setScale] = useState(1);
   const [pos, setPos] = useState({ x: 0, y: 0 });
   const [textEdit, setTextEdit] = useState<TextEditRequest | null>(null);
+  const [estimateEdit, setEstimateEdit] = useState<EstimateEditRequest | null>(null);
   const [disciplinePick, setDisciplinePick] = useState<DisciplinePickRequest | null>(null);
   const [confirmReq, setConfirmReq] = useState<ConfirmRequest | null>(null);
 
@@ -60,6 +62,10 @@ export function EstimationCanvas() {
     setTextEdit(req);
   }, []);
 
+  const requestEstimateEdit = useCallback((req: EstimateEditRequest) => {
+    setEstimateEdit(req);
+  }, []);
+
   const requestDisciplinePick = useCallback((req: DisciplinePickRequest) => {
     setDisciplinePick(req);
   }, []);
@@ -89,7 +95,7 @@ export function EstimationCanvas() {
   }
 
   return (
-    <CanvasContext.Provider value={{ registerNode, unregisterNode, requestTextEdit, requestDisciplinePick, requestConfirm }}>
+    <CanvasContext.Provider value={{ registerNode, unregisterNode, requestTextEdit, requestEstimateEdit, requestDisciplinePick, requestConfirm }}>
       <div ref={containerRef} className="w-full h-full relative overflow-hidden bg-gray-100">
         <div
           className="absolute inset-0 pointer-events-none"
@@ -137,6 +143,7 @@ export function EstimationCanvas() {
         </Stage>
 
         {textEdit && <TextOverlay edit={textEdit} onDone={() => setTextEdit(null)} />}
+        {estimateEdit && <EstimateOverlay edit={estimateEdit} onDone={() => setEstimateEdit(null)} />}
         {disciplinePick && (
           <DisciplinePicker
             req={disciplinePick}

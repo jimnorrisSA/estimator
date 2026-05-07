@@ -1,7 +1,7 @@
 import { useRef } from "react";
 import { Group, Rect, Text } from "react-konva";
 import type Konva from "konva";
-import type { DisciplineGroup } from "@estimator/shared";
+import type { DisciplineGroup, EstimateUnit } from "@estimator/shared";
 import { useEstimationsStore } from "../store/estimationsStore.js";
 import { useCanvasContext } from "../context/CanvasContext.js";
 import {
@@ -27,9 +27,10 @@ interface Props {
 
 export function DisciplineGroupCard({ group, layout, featureId, selectedId, onSelect, stageScale }: Props) {
   const cardRef = useRef<Konva.Group>(null);
-  const { requestTextEdit } = useCanvasContext();
+  const { requestTextEdit, requestEstimateEdit } = useCanvasContext();
   const addTask = useEstimationsStore((s) => s.addTask);
   const updateTaskLabel = useEstimationsStore((s) => s.updateTaskLabel);
+  const updateTaskEstimate = useEstimationsStore((s) => s.updateTaskEstimate);
 
   // Get the screen-space position of a point (offsetX, offsetY) within this card.
   // getAbsolutePosition() returns canvas-element-pixel coords (stage scale + pan already applied).
@@ -56,6 +57,20 @@ export function DisciplineGroupCard({ group, layout, featureId, selectedId, onSe
       height: TASK_ROW_H * stageScale,
       fontSize: LABEL_FONT,
       onCommit: (v) => updateTaskLabel(featureId, group.id, taskId, v),
+    });
+  }
+
+  const EST_HIT_W = 44;
+
+  function openEstimateEdit(taskId: string, currentValue: number, currentUnit: EstimateUnit, taskY: number) {
+    // Position the overlay so its right edge aligns with the right edge of the estimate text
+    const { x, y } = screenPos(layout.width, taskY + (TASK_ROW_H - EST_FONT) / 2);
+    requestEstimateEdit({
+      value: currentValue,
+      unit: currentUnit,
+      x,
+      y,
+      onCommit: (v, u) => updateTaskEstimate(featureId, group.id, taskId, v, u),
     });
   }
 
@@ -124,21 +139,37 @@ export function DisciplineGroupCard({ group, layout, featureId, selectedId, onSe
             <Text
               x={PAD}
               y={(TASK_ROW_H - LABEL_FONT) / 2}
-              width={layout.width - PAD * 2 - 44}
+              width={layout.width - PAD * 2 - EST_HIT_W}
               text={task.label || "Double-click to label…"}
               fontSize={LABEL_FONT}
               fill={task.label ? "#1f2937" : "#9ca3af"}
               ellipsis
             />
             <Text
-              x={layout.width - 44}
+              x={layout.width - EST_HIT_W}
               y={(TASK_ROW_H - EST_FONT) / 2}
-              width={38}
+              width={EST_HIT_W - PAD}
               text={estText}
               fontSize={EST_FONT}
               fontStyle="italic"
-              fill="#374151"
+              fill={isSelected ? "#1d4ed8" : "#374151"}
               align="right"
+            />
+            {/* Invisible hit area over estimate — double-click opens estimate editor */}
+            <Rect
+              x={layout.width - EST_HIT_W}
+              y={0}
+              width={EST_HIT_W}
+              height={TASK_ROW_H}
+              fill="transparent"
+              onDblClick={(e) => {
+                e.cancelBubble = true;
+                openEstimateEdit(task.id, task.estimate.value, task.estimate.unit, ty);
+              }}
+              onDblTap={(e) => {
+                e.cancelBubble = true;
+                openEstimateEdit(task.id, task.estimate.value, task.estimate.unit, ty);
+              }}
             />
           </Group>
         );
