@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { EstimationsPage } from "./features/phase1-estimations/EstimationsPage.js";
 import { SchedulingPage } from "./features/phase2-scheduling/SchedulingPage.js";
+import { ExportMenu } from "./features/phase2-scheduling/components/ExportMenu.js";
 
 type Phase = 1 | 2;
 
@@ -37,8 +38,13 @@ export function App() {
           </button>
         ))}
 
+        {/* Nav actions */}
+        <div className="flex items-center ml-auto gap-3 pr-2">
+          {activePhase === 2 && <ExportMenu />}
+        </div>
+
         {/* Future phase tabs */}
-        <div className="flex items-stretch ml-auto gap-1">
+        <div className="flex items-stretch gap-1">
           {([3, 4] as const).map((phase) => (
             <button
               key={phase}

@@ -12,10 +12,9 @@ const CURRENCIES: { value: Currency; label: string }[] = [
 interface Props {
   settings: ScheduleSettings;
   onChange: (patch: Partial<ScheduleSettings>) => void;
-  actions?: React.ReactNode;
 }
 
-export function SettingsPanel({ settings, onChange, actions }: Props) {
+export function SettingsPanel({ settings, onChange }: Props) {
   const symbol = CURRENCY_SYMBOLS[settings.currency];
   const [dayDraft, setDayDraft] = useState(settings.defaultDailyRate > 0 ? String(settings.defaultDailyRate) : "");
   const [monthDraft, setMonthDraft] = useState(settings.defaultDailyRate > 0 ? String(settings.defaultDailyRate * 20) : "");
@@ -159,11 +158,6 @@ export function SettingsPanel({ settings, onChange, actions }: Props) {
         </div>
       </Field>
 
-      {actions && (
-        <div className="ml-auto flex items-end pb-0.5">
-          {actions}
-        </div>
-      )}
     </div>
   );
 }

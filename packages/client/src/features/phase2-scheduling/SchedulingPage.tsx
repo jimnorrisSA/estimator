@@ -6,7 +6,6 @@ import { SettingsPanel } from "./components/SettingsPanel.js";
 import { Timeline } from "./components/Timeline.js";
 import { SpecsTable } from "./components/SpecsTable.js";
 import { TeamSidebar } from "./components/TeamSidebar.js";
-import { ExportMenu } from "./components/ExportMenu.js";
 
 export function SchedulingPage() {
   const features = useEstimationsStore((s) => s.features);
@@ -35,7 +34,6 @@ export function SchedulingPage() {
         <SettingsPanel
           settings={settings}
           onChange={updateSettings}
-          actions={<ExportMenu tasks={result.tasks} settings={settings} result={result} />}
         />
 
         <div className="flex-1 flex flex-col gap-6 p-6">

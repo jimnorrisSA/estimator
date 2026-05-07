@@ -1,8 +1,7 @@
-import { useState } from "react";
-import type { ScheduledTask, ScheduleResult } from "../utils/scheduler.js";
-import type { ScheduleSettings } from "../store/schedulingStore.js";
+import { useMemo, useState } from "react";
 import { useEstimationsStore } from "../../phase1-estimations/store/estimationsStore.js";
 import { useSchedulingStore } from "../store/schedulingStore.js";
+import { runScheduler } from "../utils/scheduler.js";
 import {
   exportTimelinePng,
   exportCsv,
@@ -11,25 +10,24 @@ import {
   exportDocx,
 } from "../utils/exports.js";
 
-interface Props {
-  tasks: ScheduledTask[];
-  settings: ScheduleSettings;
-  result: ScheduleResult;
-}
-
 interface ExportItem {
   label: string;
   sub: string;
   action: () => void | Promise<void>;
 }
 
-export function ExportMenu({ tasks, settings, result }: Props) {
+export function ExportMenu() {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
 
   const features = useEstimationsStore((s) => s.features);
-  const overrides = useSchedulingStore((s) => s.overrides);
-  const resources = useSchedulingStore((s) => s.resources);
+  const { settings, overrides, resources } = useSchedulingStore();
+
+  const result = useMemo(
+    () => runScheduler(features, settings.contingencyPct, overrides, resources, settings.defaultDailyRate),
+    [features, settings.contingencyPct, overrides, resources, settings.defaultDailyRate]
+  );
+  const tasks = result.tasks;
 
   async function run(label: string, fn: () => void | Promise<void>) {
     setBusy(label);
