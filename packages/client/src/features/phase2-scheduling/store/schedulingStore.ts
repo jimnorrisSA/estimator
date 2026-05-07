@@ -14,10 +14,12 @@ export const CURRENCY_SYMBOLS: Record<Currency, string> = {
 
 export interface ScheduleSettings {
   projectName: string;
-  startDate: string; // YYYY-MM-DD
+  startDate: string;    // YYYY-MM-DD
+  targetEndDate: string; // YYYY-MM-DD, empty = no target
   calendarMode: CalendarMode;
   contingencyPct: number;
   currency: Currency;
+  defaultDailyRate: number; // fallback rate when task has no assigned resource
 }
 
 export interface TaskOverride {
@@ -72,9 +74,11 @@ export const useSchedulingStore = create<SchedulingStore>()(
       settings: {
         projectName: "New Project",
         startDate: nextMonday(),
+        targetEndDate: "",
         calendarMode: "four-week",
         contingencyPct: 15,
         currency: "GBP",
+        defaultDailyRate: 0,
       },
       overrides: {},
       resources: [],

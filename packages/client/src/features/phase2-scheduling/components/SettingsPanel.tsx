@@ -1,4 +1,6 @@
+import { useState } from "react";
 import type { Currency, ScheduleSettings } from "../store/schedulingStore.js";
+import { CURRENCY_SYMBOLS } from "../store/schedulingStore.js";
 
 const CURRENCIES: { value: Currency; label: string }[] = [
   { value: "GBP", label: "£ GBP" },
@@ -13,6 +15,9 @@ interface Props {
 }
 
 export function SettingsPanel({ settings, onChange }: Props) {
+  const [rateDraft, setRateDraft] = useState(settings.defaultDailyRate > 0 ? String(settings.defaultDailyRate) : "");
+  const symbol = CURRENCY_SYMBOLS[settings.currency];
+
   return (
     <div className="flex items-end gap-6 px-6 py-3 bg-white border-b border-gray-200 flex-shrink-0 flex-wrap">
       <Field label="Project name">
@@ -41,16 +46,34 @@ export function SettingsPanel({ settings, onChange }: Props) {
         </div>
       </Field>
 
-      {settings.calendarMode === "actual" && (
-        <Field label="Start date">
+      <Field label="Start date">
+        <input
+          type="date"
+          className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          value={settings.startDate}
+          onChange={(e) => onChange({ startDate: e.target.value })}
+        />
+      </Field>
+
+      <Field label="Target end date">
+        <div className="flex items-center gap-1.5">
           <input
             type="date"
             className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            value={settings.startDate}
-            onChange={(e) => onChange({ startDate: e.target.value })}
+            value={settings.targetEndDate}
+            onChange={(e) => onChange({ targetEndDate: e.target.value })}
           />
-        </Field>
-      )}
+          {settings.targetEndDate && (
+            <button
+              className="text-gray-300 hover:text-gray-500 text-lg leading-none"
+              title="Clear target"
+              onClick={() => onChange({ targetEndDate: "" })}
+            >
+              ×
+            </button>
+          )}
+        </div>
+      </Field>
 
       <Field label="Contingency">
         <div className="flex items-center gap-1.5">
@@ -79,6 +102,26 @@ export function SettingsPanel({ settings, onChange }: Props) {
             <option key={c.value} value={c.value}>{c.label}</option>
           ))}
         </select>
+      </Field>
+
+      <Field label={`Default day rate (${symbol})`}>
+        <div className="flex items-center gap-1.5">
+          <span className="text-sm text-gray-400">{symbol}</span>
+          <input
+            type="number"
+            min={0}
+            step={50}
+            placeholder="e.g. 400"
+            className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm w-28 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            value={rateDraft}
+            onChange={(e) => setRateDraft(e.target.value)}
+            onBlur={() => {
+              const v = parseFloat(rateDraft);
+              onChange({ defaultDailyRate: isNaN(v) || v < 0 ? 0 : v });
+            }}
+            onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
+          />
+        </div>
       </Field>
     </div>
   );

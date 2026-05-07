@@ -13,8 +13,8 @@ export function SchedulingPage() {
     useSchedulingStore();
 
   const result = useMemo(
-    () => runScheduler(features, settings.contingencyPct, overrides, resources),
-    [features, settings.contingencyPct, overrides, resources]
+    () => runScheduler(features, settings.contingencyPct, overrides, resources, settings.defaultDailyRate),
+    [features, settings.contingencyPct, overrides, resources, settings.defaultDailyRate]
   );
 
   const symbol = CURRENCY_SYMBOLS[settings.currency];

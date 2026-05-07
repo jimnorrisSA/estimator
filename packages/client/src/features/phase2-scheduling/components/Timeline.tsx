@@ -1,7 +1,9 @@
-import { useMemo } from "react";
-import type { Feature } from "@estimator/shared";
+import { useMemo, useRef, useState } from "react";
+import type { Feature, EstimateUnit } from "@estimator/shared";
 import type { ScheduleResult, ScheduledTask } from "../utils/scheduler.js";
 import type { ScheduleSettings } from "../store/schedulingStore.js";
+import { useSchedulingStore } from "../store/schedulingStore.js";
+import { useEstimationsStore } from "../../phase1-estimations/store/estimationsStore.js";
 import {
   buildWorkingDayCalendar,
   formatDateShort,
@@ -38,6 +40,125 @@ interface RowLayout {
   capacity: number;
 }
 
+const RESIZE_HANDLE_W = 8;
+
+function daysToEstimate(days: number, preferred: EstimateUnit): { value: number; unit: EstimateUnit } {
+  const perUnit: Record<EstimateUnit, number> = { half_day: 0.5, day: 1, week: 5, month: 20 };
+  const ratio = days / perUnit[preferred];
+  if (ratio >= 0.5 && Math.abs(Math.round(ratio * 2) - ratio * 2) < 0.001) {
+    return { value: Math.round(ratio * 2) / 2, unit: preferred };
+  }
+  return { value: Math.max(0.5, Math.round(days * 2) / 2), unit: "day" };
+}
+
+interface TaskBarProps {
+  task: ScheduledTask;
+  y: number;
+  barH: number;
+  color: string;
+  onMove: (taskId: string, startDay: number, endDay: number) => void;
+  onResize: (taskId: string, startDay: number, endDay: number, newDays: number) => void;
+  onClearPin: (taskId: string) => void;
+}
+
+function DraggableTaskBar({ task, y, barH, color, onMove, onResize, onClearPin }: TaskBarProps) {
+  const [preview, setPreview] = useState<{ startDay: number; endDay: number } | null>(null);
+  const [dragType, setDragType] = useState<"move" | "resize" | null>(null);
+
+  const callbacksRef = useRef({ onMove, onResize, onClearPin });
+  callbacksRef.current = { onMove, onResize, onClearPin };
+
+  function startDrag(type: "move" | "resize", clientX: number) {
+    const origStart = task.startDay;
+    const origEnd = task.endDay;
+    setDragType(type);
+
+    function onMouseMove(e: MouseEvent) {
+      const dx = e.clientX - clientX;
+      const snap = Math.round((dx / DAY_W) * 2) / 2;
+      if (type === "move") {
+        const dur = origEnd - origStart;
+        const s = Math.max(0, origStart + snap);
+        setPreview({ startDay: s, endDay: s + dur });
+      } else {
+        setPreview({ startDay: origStart, endDay: Math.max(origStart + 0.5, origEnd + snap) });
+      }
+    }
+
+    function onMouseUp() {
+      setPreview((p) => {
+        if (p) {
+          if (type === "move") callbacksRef.current.onMove(task.taskId, p.startDay, p.endDay);
+          else callbacksRef.current.onResize(task.taskId, p.startDay, p.endDay, p.endDay - p.startDay);
+        }
+        return null;
+      });
+      setDragType(null);
+      window.removeEventListener("mousemove", onMouseMove);
+      window.removeEventListener("mouseup", onMouseUp);
+    }
+
+    window.addEventListener("mousemove", onMouseMove);
+    window.addEventListener("mouseup", onMouseUp);
+  }
+
+  const dispStart = preview?.startDay ?? task.startDay;
+  const dispEnd   = preview?.endDay   ?? task.endDay;
+  const x    = dispStart * DAY_W;
+  const barW = Math.max(2, (dispEnd - dispStart) * DAY_W - 2);
+  const maxChars = Math.floor((barW - 10) / 5.5);
+  const isDragging = dragType !== null;
+
+  return (
+    <g>
+      <title>{task.featureName} — {task.label}{task.isPinned ? " · pinned" : ""}</title>
+
+      {/* Bar body — drag to move */}
+      <rect
+        x={x} y={y} width={barW} height={barH} rx={3}
+        fill={color}
+        opacity={isDragging ? 0.65 : 0.88}
+        style={{ cursor: isDragging ? "grabbing" : "grab" }}
+        onMouseDown={(e) => { if (e.button !== 0) return; e.stopPropagation(); startDrag("move", e.clientX); }}
+        onDoubleClick={(e) => { e.stopPropagation(); onClearPin(task.taskId); }}
+      />
+
+      {/* Label */}
+      {barW > 32 && (
+        <text x={x + 5} y={y + barH / 2} dominantBaseline="middle" fontSize={9} fill="white"
+          style={{ pointerEvents: "none", userSelect: "none" }}>
+          {task.label.length > maxChars ? task.label.slice(0, maxChars) + "…" : task.label}
+        </text>
+      )}
+
+      {/* Resize handle — right edge */}
+      {barW > 16 && (
+        <rect
+          x={x + barW - RESIZE_HANDLE_W} y={y}
+          width={RESIZE_HANDLE_W} height={barH}
+          fill={isDragging && dragType === "resize" ? "rgba(255,255,255,0.25)" : "transparent"}
+          style={{ cursor: "ew-resize" }}
+          onMouseDown={(e) => { if (e.button !== 0) return; e.stopPropagation(); startDrag("resize", e.clientX); }}
+        />
+      )}
+
+      {/* Pin dot — top-left corner when pinned */}
+      {task.isPinned && !isDragging && (
+        <circle cx={x + 5} cy={y + 4} r={2.5} fill="white" opacity={0.8}
+          style={{ pointerEvents: "none" }} />
+      )}
+
+      {/* Duration label above bar while dragging */}
+      {isDragging && preview && (
+        <text x={x + barW / 2} y={y - 5} textAnchor="middle" fontSize={9} fill="#374151" fontWeight="600"
+          style={{ pointerEvents: "none", userSelect: "none" }}>
+          {String(Math.round((preview.endDay - preview.startDay) * 2) / 2)}d
+        </text>
+      )}
+    </g>
+  );
+}
+
 interface Props {
   result: ScheduleResult;
   features: Feature[];
@@ -46,6 +167,26 @@ interface Props {
 
 export function Timeline({ result, features, settings }: Props) {
   const { tasks, disciplines, capacities, totalDays, contingencyDays, projectEndDay } = result;
+
+  const { setOverride, clearOverride } = useSchedulingStore();
+  const updateTaskEstimate = useEstimationsStore((s) => s.updateTaskEstimate);
+
+  function handleMove(taskId: string, startDay: number, endDay: number) {
+    setOverride(taskId, { startDay, endDay });
+  }
+
+  function handleResize(taskId: string, startDay: number, endDay: number, newDays: number) {
+    const t = tasks.find((t) => t.taskId === taskId);
+    if (t) {
+      const { value, unit } = daysToEstimate(newDays, t.estimateUnit);
+      updateTaskEstimate(t.featureId, t.groupId, taskId, value, unit);
+    }
+    setOverride(taskId, { startDay, endDay });
+  }
+
+  function handleClearPin(taskId: string) {
+    clearOverride(taskId);
+  }
 
   const featureColors = useMemo(
     () => new Map(features.map((f, i) => [f.id, FEATURE_PALETTE[i % FEATURE_PALETTE.length]])),
@@ -83,7 +224,7 @@ export function Timeline({ result, features, settings }: Props) {
   }
 
   const svgH = HEADER_H + contY + CONT_ROW_H + BOTTOM_PAD;
-  const chartW = Math.max(projectEndDay * DAY_W, 480);
+  const chartW = Math.max(projectEndDay * DAY_W + 20 * DAY_W, 480);
 
   return (
     <div className="flex flex-col gap-3">
@@ -172,34 +313,63 @@ export function Timeline({ result, features, settings }: Props) {
               {tasks.map((task) => {
                 const layout = rowLayouts.find((r) => r.discipline === task.discipline);
                 if (!layout) return null;
-                const x = task.startDay * DAY_W;
-                const barW = Math.max(2, (task.endDay - task.startDay) * DAY_W - 2);
                 const barH = SLOT_H - 4;
-                const y =
-                  HEADER_H + layout.rowY + ROW_VPAD + task.slotIndex * SLOT_H;
+                const y = HEADER_H + layout.rowY + ROW_VPAD + task.slotIndex * SLOT_H;
                 const color = featureColors.get(task.featureId) ?? "#3b82f6";
-                const maxChars = Math.floor((barW - 10) / 5.5);
                 return (
-                  <g key={task.taskId}>
-                    <title>{task.featureName} — {task.label}</title>
-                    <rect x={x} y={y} width={barW} height={barH} rx={3} fill={color} opacity={0.88} />
-                    {barW > 32 && (
-                      <text
-                        x={x + 5}
-                        y={y + barH / 2}
-                        dominantBaseline="middle"
-                        fontSize={9}
-                        fill="white"
-                        style={{ pointerEvents: "none", userSelect: "none" }}
-                      >
-                        {task.label.length > maxChars
-                          ? task.label.slice(0, maxChars) + "…"
-                          : task.label}
-                      </text>
-                    )}
-                  </g>
+                  <DraggableTaskBar
+                    key={task.taskId}
+                    task={task}
+                    y={y}
+                    barH={barH}
+                    color={color}
+                    onMove={handleMove}
+                    onResize={handleResize}
+                    onClearPin={handleClearPin}
+                  />
                 );
               })}
+
+              {/* Target end date deadline line */}
+              {settings.targetEndDate && (() => {
+                let deadlineDay: number | null = null;
+                if (settings.calendarMode === "actual" && cal.length > 0) {
+                  const target = parseISODate(settings.targetEndDate);
+                  const idx = cal.findIndex(
+                    (d) => d.getFullYear() === target.getFullYear() &&
+                            d.getMonth() === target.getMonth() &&
+                            d.getDate() === target.getDate()
+                  );
+                  deadlineDay = idx >= 0 ? idx : null;
+                } else if (settings.calendarMode === "four-week" && settings.startDate) {
+                  const start = parseISODate(settings.startDate);
+                  const target = parseISODate(settings.targetEndDate);
+                  const msPerDay = 86400000;
+                  const calDays = Math.round((target.getTime() - start.getTime()) / msPerDay);
+                  // Rough working-day estimate: 5/7 of calendar days
+                  deadlineDay = Math.round(calDays * 5 / 7);
+                }
+                if (deadlineDay === null || deadlineDay <= 0) return null;
+                const dx = deadlineDay * DAY_W;
+                const isOverrun = deadlineDay < projectEndDay;
+                const lineColor = isOverrun ? "#ef4444" : "#22c55e";
+                return (
+                  <g>
+                    <line x1={dx} y1={HEADER_H} x2={dx} y2={svgH - BOTTOM_PAD}
+                      stroke={lineColor} strokeWidth={2} strokeDasharray="4 3" />
+                    <rect x={dx - 1} y={HEADER_H} width={isOverrun ? dx - 1 : chartW - dx}
+                      height={svgH - HEADER_H - BOTTOM_PAD}
+                      fill={isOverrun ? "#ef4444" : "#22c55e"} opacity={0.04} />
+                    <rect x={dx - 28} y={HEADER_H + 4} width={56} height={16} rx={3}
+                      fill={lineColor} />
+                    <text x={dx} y={HEADER_H + 12} textAnchor="middle" dominantBaseline="middle"
+                      fontSize={9} fill="white" fontWeight="600"
+                      style={{ pointerEvents: "none" }}>
+                      {isOverrun ? "OVERRUN" : "TARGET"}
+                    </text>
+                  </g>
+                );
+              })()}
 
               {/* Contingency block */}
               {contingencyDays > 0 && (

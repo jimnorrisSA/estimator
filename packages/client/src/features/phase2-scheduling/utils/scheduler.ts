@@ -37,7 +37,8 @@ export function runScheduler(
   features: Feature[],
   contingencyPct: number,
   overrides: Overrides,
-  resources: Resource[]
+  resources: Resource[],
+  defaultDailyRate = 0
 ): ScheduleResult {
   const disciplineSet = new Set<Discipline>();
   for (const f of features)
@@ -96,7 +97,7 @@ export function runScheduler(
         const assignedResource = assignedResourceId
           ? resources.find((r) => r.id === assignedResourceId)
           : undefined;
-        const rate = assignedResource?.dailyRate ?? ratesByDiscipline[discipline][slotIndex] ?? 0;
+        const rate = assignedResource?.dailyRate ?? ratesByDiscipline[discipline][slotIndex] ?? defaultDailyRate;
 
         tasks.push({
           taskId: task.id,
