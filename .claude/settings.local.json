@@ -20,7 +20,15 @@
       "Bash(python notify_slack.py blocked \"Two-way test — reply yes or no\")",
       "Bash(python *)",
       "Bash(pip install *)",
-      "Bash(pnpm --filter @estimator/client build)"
+      "Bash(pnpm --filter @estimator/client build)",
+      "Bash(pnpm *)",
+      "Bash(echo \"EXIT:$?\")",
+      "Bash(netstat -ano)",
+      "Bash(taskkill /F /PID 59124 /PID 38148 /PID 39152)",
+      "PowerShell(Stop-Process *)",
+      "Bash(powershell \"Get-Process -Id \\(Get-NetTCPConnection -LocalPort 3000\\).OwningProcess | Select-Object Id, ProcessName, MainWindowTitle\")",
+      "Bash(curl *)",
+      "PowerShell(Get-NetTCPConnection *)"
     ]
   }
 }

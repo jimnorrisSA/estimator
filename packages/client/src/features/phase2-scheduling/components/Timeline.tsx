@@ -270,7 +270,7 @@ export function Timeline({ result, features, settings, viewMode, onToggleView }:
       <div className="overflow-hidden rounded-xl border border-[#2e2848] shadow-sm shadow-black/40">
         <div className="flex items-stretch">
           {/* Fixed label column */}
-          <svg width={LABEL_W} height={svgH} className="flex-shrink-0 border-r border-[#2e2848]" style={{ background: "#14112a" }}>
+          <svg data-label-svg width={LABEL_W} height={svgH} className="flex-shrink-0 border-r border-[#2e2848]" style={{ background: "#14112a" }}>
             {viewMode === "detailed"
               ? rowLayouts.map((layout) => (
                   <g key={layout.discipline}>
@@ -313,7 +313,7 @@ export function Timeline({ result, features, settings, viewMode, onToggleView }:
 
           {/* Scrollable chart */}
           <div className="overflow-x-auto flex-1" style={{ background: "#14112a" }}>
-            <svg width={chartW} height={svgH}>
+            <svg data-chart-svg width={chartW} height={svgH}>
               {/* Row backgrounds */}
               {viewMode === "detailed"
                 ? rowLayouts.map((layout, i) => (

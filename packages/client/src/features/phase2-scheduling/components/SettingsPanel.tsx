@@ -12,9 +12,10 @@ const CURRENCIES: { value: Currency; label: string }[] = [
 interface Props {
   settings: ScheduleSettings;
   onChange: (patch: Partial<ScheduleSettings>) => void;
+  actions?: React.ReactNode;
 }
 
-export function SettingsPanel({ settings, onChange }: Props) {
+export function SettingsPanel({ settings, onChange, actions }: Props) {
   const symbol = CURRENCY_SYMBOLS[settings.currency];
   const [dayDraft, setDayDraft] = useState(settings.defaultDailyRate > 0 ? String(settings.defaultDailyRate) : "");
   const [monthDraft, setMonthDraft] = useState(settings.defaultDailyRate > 0 ? String(settings.defaultDailyRate * 20) : "");
@@ -37,7 +38,7 @@ export function SettingsPanel({ settings, onChange }: Props) {
   }
 
   return (
-    <div className="flex items-end gap-6 px-6 py-3 bg-[#14112a] border-b border-[#2e2848] flex-shrink-0 flex-wrap">
+    <div className="flex items-end gap-6 px-6 py-3 bg-[#14112a] border-b border-[#2e2848] flex-shrink-0 flex-wrap relative">
       <Field label="Project name">
         <input
           className="border border-[#2e2848] bg-[#1a1628] text-[#ece7ff] rounded-lg px-3 py-1.5 text-sm w-52 focus:outline-none focus:ring-2 focus:ring-[#7c3aed] placeholder:text-[#3a3456]"
@@ -157,6 +158,12 @@ export function SettingsPanel({ settings, onChange }: Props) {
           </div>
         </div>
       </Field>
+
+      {actions && (
+        <div className="ml-auto flex items-end pb-0.5">
+          {actions}
+        </div>
+      )}
     </div>
   );
 }
