@@ -35,7 +35,6 @@ export function EstimateOverlay({ edit, onDone }: Props) {
     if (e.key === "Escape") onDone();
   }
 
-  // OVERLAY_W must be wide enough for the input + 4 unit buttons
   const OVERLAY_W = 168;
 
   return (
@@ -49,7 +48,7 @@ export function EstimateOverlay({ edit, onDone }: Props) {
       onMouseDown={(e) => e.stopPropagation()}
     >
       <div
-        className="flex items-center gap-1 bg-white border-2 border-blue-500 rounded-lg shadow-lg px-2 py-1"
+        className="flex items-center gap-1 bg-[#1d1930] border-2 border-[#7c3aed] rounded-lg shadow-xl px-2 py-1"
         style={{ width: OVERLAY_W }}
       >
         <input
@@ -61,7 +60,7 @@ export function EstimateOverlay({ edit, onDone }: Props) {
           onChange={(e) => setValue(e.target.value)}
           onKeyDown={onKeyDown}
           onBlur={commit}
-          className="w-12 text-right text-sm font-mono border-none outline-none bg-transparent"
+          className="w-12 text-right text-sm font-mono border-none outline-none bg-transparent text-[#ece7ff]"
         />
         <div className="flex gap-0.5">
           {UNITS.map(({ unit: u, label }) => (
@@ -71,8 +70,8 @@ export function EstimateOverlay({ edit, onDone }: Props) {
               onMouseDown={(e) => { e.preventDefault(); setUnit(u); }}
               className={`px-1.5 py-0.5 rounded text-xs font-medium transition-colors ${
                 unit === u
-                  ? "bg-blue-500 text-white"
-                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                  ? "bg-[#7c3aed] text-white"
+                  : "bg-[#252041] text-[#9b93ba] hover:bg-[#2e2848]"
               }`}
             >
               {label}

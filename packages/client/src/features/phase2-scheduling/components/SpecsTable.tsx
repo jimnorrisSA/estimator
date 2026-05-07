@@ -47,7 +47,6 @@ export function SpecsTable({ tasks, features, settings, currencySymbol, continge
     [features]
   );
 
-  // Group tasks by feature (preserving scheduler order)
   const featureGroups = useMemo(() => {
     const groups: { featureId: string; featureName: string; tasks: ScheduledTask[] }[] = [];
     const idx = new Map<string, number>();
@@ -71,11 +70,11 @@ export function SpecsTable({ tasks, features, settings, currencySymbol, continge
 
   return (
     <div className="flex flex-col gap-2">
-      <h3 className="text-base font-semibold text-gray-700">Task specifications</h3>
-      <div className="overflow-x-auto rounded-xl border border-gray-200 shadow-sm">
+      <h3 className="text-base font-semibold text-[#9b93ba] uppercase tracking-wide">Task specifications</h3>
+      <div className="overflow-x-auto rounded-xl border border-[#2e2848] shadow-sm shadow-black/30">
         <table className="w-full border-collapse">
           <thead>
-            <tr className="bg-gray-50 border-b border-gray-200">
+            <tr className="bg-[#1a1628] border-b border-[#2e2848]">
               <Th>Feature</Th>
               <Th>Task</Th>
               <Th>Discipline</Th>
@@ -97,23 +96,23 @@ export function SpecsTable({ tasks, features, settings, currencySymbol, continge
                   {group.tasks.map((task) => {
                     const meta = taskMeta.get(task.taskId);
                     return (
-                      <tr key={task.taskId} className="hover:bg-blue-50/30 transition-colors bg-white">
-                        <td className="px-3 py-2 text-sm text-gray-400 whitespace-nowrap border-b border-gray-100">
+                      <tr key={task.taskId} className="hover:bg-[#1e1548]/30 transition-colors bg-[#1d1930]">
+                        <td className="px-3 py-2 text-sm text-[#5c5575] whitespace-nowrap border-b border-[#2e2848]">
                           {task.featureName}
                         </td>
 
-                        <td className="px-3 py-2 border-b border-gray-100 min-w-[140px]">
+                        <td className="px-3 py-2 border-b border-[#2e2848] min-w-[140px]">
                           <EditableText
                             value={task.label}
                             onCommit={(v) => { if (meta && v.trim()) updateTaskLabel(meta.featureId, meta.groupId, task.taskId, v.trim()); }}
                           />
                         </td>
 
-                        <td className="px-3 py-2 border-b border-gray-100">
+                        <td className="px-3 py-2 border-b border-[#2e2848]">
                           <DisciplineBadge discipline={task.discipline} />
                         </td>
 
-                        <td className="px-3 py-2 border-b border-gray-100">
+                        <td className="px-3 py-2 border-b border-[#2e2848]">
                           <div className="flex items-center gap-1">
                             <EstimateValueInput
                               value={task.estimateValue}
@@ -121,7 +120,7 @@ export function SpecsTable({ tasks, features, settings, currencySymbol, continge
                             />
                             <select
                               value={task.estimateUnit}
-                              className="border border-gray-200 rounded px-1 py-0.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
+                              className="border border-[#2e2848] bg-[#1a1628] text-[#9b93ba] rounded px-1 py-0.5 text-sm focus:outline-none focus:ring-1 focus:ring-[#7c3aed]"
                               onChange={(e) => { if (meta) updateTaskEstimate(meta.featureId, meta.groupId, task.taskId, task.estimateValue, e.target.value as EstimateUnit); }}
                             >
                               {UNITS.map((u) => <option key={u} value={u}>{UNIT_LABELS[u]}</option>)}
@@ -129,11 +128,11 @@ export function SpecsTable({ tasks, features, settings, currencySymbol, continge
                           </div>
                         </td>
 
-                        <td className="px-3 py-2 text-sm text-gray-500 border-b border-gray-100 tabular-nums text-right">
+                        <td className="px-3 py-2 text-sm text-[#9b93ba] border-b border-[#2e2848] tabular-nums text-right">
                           {task.workingDays % 1 === 0 ? task.workingDays : task.workingDays.toFixed(1)}d
                         </td>
 
-                        <td className="px-3 py-2 border-b border-gray-100 whitespace-nowrap">
+                        <td className="px-3 py-2 border-b border-[#2e2848] whitespace-nowrap">
                           <EditableDayCell
                             day={task.startDay}
                             settings={settings}
@@ -142,7 +141,7 @@ export function SpecsTable({ tasks, features, settings, currencySymbol, continge
                           />
                         </td>
 
-                        <td className="px-3 py-2 border-b border-gray-100 whitespace-nowrap">
+                        <td className="px-3 py-2 border-b border-[#2e2848] whitespace-nowrap">
                           <EditableDayCell
                             day={task.endDay}
                             settings={settings}
@@ -151,7 +150,7 @@ export function SpecsTable({ tasks, features, settings, currencySymbol, continge
                           />
                         </td>
 
-                        <td className="px-3 py-2 border-b border-gray-100">
+                        <td className="px-3 py-2 border-b border-[#2e2848]">
                           <ResourcePicker
                             taskId={task.taskId}
                             discipline={task.discipline}
@@ -162,14 +161,14 @@ export function SpecsTable({ tasks, features, settings, currencySymbol, continge
                         </td>
 
                         {hasCosts && (
-                          <td className="px-3 py-2 text-sm border-b border-gray-100 tabular-nums text-right">
+                          <td className="px-3 py-2 text-sm border-b border-[#2e2848] tabular-nums text-right">
                             {task.cost > 0
-                              ? <span className="text-gray-700">{currencySymbol}{Math.round(task.cost).toLocaleString()}</span>
-                              : <span className="text-gray-300">—</span>}
+                              ? <span className="text-[#a78bfa]">{currencySymbol}{Math.round(task.cost).toLocaleString()}</span>
+                              : <span className="text-[#3a3456]">—</span>}
                           </td>
                         )}
 
-                        <td className="px-3 py-2 border-b border-gray-100 min-w-[160px]">
+                        <td className="px-3 py-2 border-b border-[#2e2848] min-w-[160px]">
                           <EditableText
                             value={overrides[task.taskId]?.notes ?? ""}
                             placeholder="Add note…"
@@ -181,16 +180,16 @@ export function SpecsTable({ tasks, features, settings, currencySymbol, continge
                   })}
 
                   {/* Feature subtotal row */}
-                  <tr key={`subtotal-${group.featureId}`} className="bg-gray-50/80 border-t border-gray-200">
-                    <td colSpan={4} className="px-3 py-1.5 text-sm font-semibold text-gray-600 italic">
+                  <tr key={`subtotal-${group.featureId}`} className="bg-[#1a1628] border-t border-[#2e2848]">
+                    <td colSpan={4} className="px-3 py-1.5 text-sm font-semibold text-[#9b93ba] italic">
                       {group.featureName}
                     </td>
-                    <td className="px-3 py-1.5 text-sm font-semibold text-gray-600 tabular-nums text-right">
+                    <td className="px-3 py-1.5 text-sm font-semibold text-[#9b93ba] tabular-nums text-right">
                       {groupWd % 1 === 0 ? groupWd : groupWd.toFixed(1)}d
                     </td>
-                    <td colSpan={hasCosts ? 3 : 3} />
+                    <td colSpan={3} />
                     {hasCosts && (
-                      <td className="px-3 py-1.5 text-sm font-semibold text-gray-600 tabular-nums text-right">
+                      <td className="px-3 py-1.5 text-sm font-semibold text-[#a78bfa] tabular-nums text-right">
                         {groupCost > 0 ? `${currencySymbol}${Math.round(groupCost).toLocaleString()}` : "—"}
                       </td>
                     )}
@@ -201,32 +200,32 @@ export function SpecsTable({ tasks, features, settings, currencySymbol, continge
             })}
           </tbody>
           <tfoot>
-            <tr className="bg-gray-50 border-t-2 border-gray-300">
-              <td colSpan={4} className="px-3 py-2 text-sm font-semibold text-gray-600">Base total</td>
-              <td className="px-3 py-2 text-sm font-semibold text-gray-700 tabular-nums text-right">
+            <tr className="bg-[#1a1628] border-t-2 border-[#3d366a]">
+              <td colSpan={4} className="px-3 py-2 text-sm font-semibold text-[#9b93ba]">Base total</td>
+              <td className="px-3 py-2 text-sm font-semibold text-[#ece7ff] tabular-nums text-right">
                 {totalWd % 1 === 0 ? totalWd : totalWd.toFixed(1)}d
               </td>
               <td colSpan={3} />
-              {hasCosts && <td className="px-3 py-2 text-sm font-semibold text-gray-700 tabular-nums text-right">{currencySymbol}{Math.round(baseCost).toLocaleString()}</td>}
+              {hasCosts && <td className="px-3 py-2 text-sm font-semibold text-[#ece7ff] tabular-nums text-right">{currencySymbol}{Math.round(baseCost).toLocaleString()}</td>}
               <td />
             </tr>
             {hasCosts && contingencyPct > 0 && (
-              <tr className="bg-gray-50">
-                <td colSpan={4} className="px-3 py-2 text-sm text-gray-500 italic">
+              <tr className="bg-[#1a1628]">
+                <td colSpan={4} className="px-3 py-2 text-sm text-[#5c5575] italic">
                   Contingency ({contingencyPct}%)
                 </td>
                 <td colSpan={4} />
-                <td className="px-3 py-2 text-sm text-gray-500 tabular-nums text-right italic">
+                <td className="px-3 py-2 text-sm text-[#5c5575] tabular-nums text-right italic">
                   +{currencySymbol}{Math.round(contCost).toLocaleString()}
                 </td>
                 <td />
               </tr>
             )}
             {hasCosts && contingencyPct > 0 && (
-              <tr className="bg-gray-100 border-t border-gray-200">
-                <td colSpan={4} className="px-3 py-2 text-sm font-bold text-gray-700">Project total</td>
+              <tr className="bg-[#252041] border-t border-[#3d366a]">
+                <td colSpan={4} className="px-3 py-2 text-sm font-bold text-[#ece7ff]">Project total</td>
                 <td colSpan={4} />
-                <td className="px-3 py-2 text-sm font-bold text-gray-800 tabular-nums text-right">
+                <td className="px-3 py-2 text-sm font-bold text-[#a78bfa] tabular-nums text-right">
                   {currencySymbol}{Math.round(totalCost).toLocaleString()}
                 </td>
                 <td />
@@ -244,7 +243,7 @@ export function SpecsTable({ tasks, features, settings, currencySymbol, continge
 function Th({ children, align }: { children: React.ReactNode; align?: "right" }) {
   return (
     <th
-      className={`px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap ${align === "right" ? "text-right" : ""}`}
+      className={`px-3 py-2 text-left text-xs font-semibold text-[#5c5575] uppercase tracking-wide whitespace-nowrap ${align === "right" ? "text-right" : ""}`}
     >
       {children}
     </th>
@@ -253,11 +252,11 @@ function Th({ children, align }: { children: React.ReactNode; align?: "right" })
 
 function DisciplineBadge({ discipline }: { discipline: string }) {
   const colors: Record<string, string> = {
-    Art: "bg-orange-100 text-orange-700",
-    Design: "bg-purple-100 text-purple-700",
-    Code: "bg-sky-100 text-sky-700",
-    Production: "bg-green-100 text-green-700",
-    Custom: "bg-gray-100 text-gray-600",
+    Art:        "bg-amber-900/40 text-amber-400",
+    Design:     "bg-purple-900/40 text-purple-400",
+    Code:       "bg-sky-900/40 text-sky-400",
+    Production: "bg-green-900/40 text-green-400",
+    Custom:     "bg-gray-800 text-gray-400",
   };
   return (
     <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${colors[discipline] ?? colors.Custom}`}>
@@ -281,7 +280,7 @@ function EstimateValueInput({
       type="number"
       min={0.5}
       step={0.5}
-      className="w-16 border border-gray-200 rounded px-1.5 py-0.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+      className="w-16 border border-[#2e2848] bg-[#1a1628] text-[#ece7ff] rounded px-1.5 py-0.5 text-sm focus:outline-none focus:ring-1 focus:ring-[#7c3aed]"
       value={draft}
       onChange={(e) => setDraft(e.target.value)}
       onBlur={() => {
@@ -317,7 +316,7 @@ function EditableDayCell({
   if (!editing) {
     return (
       <span
-        className="cursor-text text-sm text-gray-500 hover:bg-gray-100 rounded px-1 -mx-1 block whitespace-nowrap tabular-nums"
+        className="cursor-text text-sm text-[#9b93ba] hover:bg-[#252041] rounded px-1 -mx-1 block whitespace-nowrap tabular-nums transition-colors"
         title="Click to override"
         onClick={() => setEditing(true)}
       >
@@ -332,7 +331,7 @@ function EditableDayCell({
         type="date"
         autoFocus
         defaultValue={cal[day] ? cal[day].toISOString().slice(0, 10) : ""}
-        className="border border-blue-400 rounded px-1 py-0.5 text-sm focus:outline-none"
+        className="border border-[#7c3aed] bg-[#1a1628] text-[#ece7ff] rounded px-1 py-0.5 text-sm focus:outline-none"
         onBlur={(e) => {
           if (e.target.value) {
             const target = parseISODate(e.target.value);
@@ -359,7 +358,7 @@ function EditableDayCell({
       autoFocus
       min={0}
       defaultValue={day}
-      className="border border-blue-400 rounded px-1.5 py-0.5 text-sm focus:outline-none w-20"
+      className="border border-[#7c3aed] bg-[#1a1628] text-[#ece7ff] rounded px-1.5 py-0.5 text-sm focus:outline-none w-20"
       onBlur={(e) => {
         const v = parseInt(e.target.value);
         if (!isNaN(v) && v >= 0) onCommit(v);
@@ -389,13 +388,13 @@ function ResourcePicker({
   const matching = resources.filter((r) => r.role === discipline);
 
   if (matching.length === 0) {
-    return <span className="text-sm text-gray-300">—</span>;
+    return <span className="text-sm text-[#3a3456]">—</span>;
   }
 
   return (
     <select
       value={assignedResourceId ?? ""}
-      className="text-sm border border-gray-200 rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white text-gray-700 max-w-[150px]"
+      className="text-sm border border-[#2e2848] bg-[#1a1628] text-[#ece7ff] rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-[#7c3aed] max-w-[150px]"
       onChange={(e) => onAssign(taskId, e.target.value || null)}
     >
       <option value="">Unassigned</option>
@@ -423,10 +422,10 @@ function EditableText({
   if (!editing) {
     return (
       <span
-        className="cursor-text text-sm text-gray-700 hover:bg-gray-100 rounded px-1 -mx-1 block min-w-[60px] leading-5"
+        className="cursor-text text-sm text-[#ece7ff] hover:bg-[#252041] rounded px-1 -mx-1 block min-w-[60px] leading-5 transition-colors"
         onClick={() => { setDraft(value); setEditing(true); }}
       >
-        {value || <span className="text-gray-300">{placeholder}</span>}
+        {value || <span className="text-[#3a3456]">{placeholder}</span>}
       </span>
     );
   }
@@ -434,7 +433,7 @@ function EditableText({
   return (
     <input
       autoFocus
-      className="border border-blue-400 rounded px-1.5 py-0.5 text-sm focus:outline-none w-full"
+      className="border border-[#7c3aed] bg-[#1a1628] text-[#ece7ff] rounded px-1.5 py-0.5 text-sm focus:outline-none w-full"
       value={draft}
       onChange={(e) => setDraft(e.target.value)}
       onBlur={() => { onCommit(draft); setEditing(false); }}

@@ -30,7 +30,7 @@ export function SchedulingPage() {
   return (
     <div className="flex h-full overflow-hidden">
       {/* Main scrollable area */}
-      <div className="flex-1 flex flex-col overflow-y-auto bg-gray-50 min-w-0">
+      <div className="flex-1 flex flex-col overflow-y-auto bg-[#0d0b16] min-w-0">
         <SettingsPanel settings={settings} onChange={updateSettings} />
 
         <div className="flex-1 flex flex-col gap-6 p-6">
@@ -50,7 +50,7 @@ export function SchedulingPage() {
 
           {/* Timeline */}
           <section className="flex flex-col gap-3">
-            <h2 className="text-sm font-semibold text-gray-700">Schedule</h2>
+            <h2 className="text-sm font-semibold text-[#9b93ba] uppercase tracking-wide">Schedule</h2>
             <Timeline
               result={result}
               features={features}
@@ -85,10 +85,10 @@ export function SchedulingPage() {
 
 function Stat({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
-    <div className="bg-white rounded-xl border border-gray-200 px-4 py-3 flex flex-col gap-0.5 shadow-sm min-w-[100px]">
-      <span className="text-xs text-gray-400 font-medium uppercase tracking-wide">{label}</span>
-      <span className="text-xl font-bold text-gray-800 tabular-nums">{value}</span>
-      {sub && <span className="text-xs text-gray-400">{sub}</span>}
+    <div className="bg-[#1d1930] rounded-xl border border-[#2e2848] px-4 py-3 flex flex-col gap-0.5 shadow-sm min-w-[100px]">
+      <span className="text-xs text-[#5c5575] font-medium uppercase tracking-wide">{label}</span>
+      <span className="text-xl font-bold text-[#ece7ff] tabular-nums">{value}</span>
+      {sub && <span className="text-xs text-[#5c5575]">{sub}</span>}
     </div>
   );
 }

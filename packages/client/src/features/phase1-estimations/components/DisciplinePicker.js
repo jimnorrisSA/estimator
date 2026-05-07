@@ -12,7 +12,7 @@ export function DisciplinePicker({ req, onPick, onDone }) {
         return () => document.removeEventListener("mousedown", onMouseDown);
     }, [onDone]);
     const options = [...DEFAULT_DISCIPLINES, "Custom"];
-    return (_jsxs("div", { ref: ref, style: { position: "fixed", left: req.x, top: req.y, zIndex: 1100 }, className: "bg-white border border-gray-200 rounded-lg shadow-lg p-2 flex flex-col gap-1 min-w-36", children: [_jsx("p", { className: "text-xs font-semibold text-gray-500 px-1 pb-1", children: "Add discipline" }), options.map((d) => (_jsxs("button", { className: "flex items-center gap-2 text-sm text-left px-2 py-1.5 rounded hover:bg-gray-50 transition-colors", onClick: () => {
+    return (_jsxs("div", { ref: ref, style: { position: "fixed", left: req.x, top: req.y, zIndex: 1100 }, className: "bg-[#1d1930] border border-[#2e2848] rounded-lg shadow-2xl p-2 flex flex-col gap-1 min-w-36", children: [_jsx("p", { className: "text-xs font-semibold text-[#5c5575] px-1 pb-1 uppercase tracking-wide", children: "Add discipline" }), options.map((d) => (_jsxs("button", { className: "flex items-center gap-2 text-sm text-[#ece7ff] text-left px-2 py-1.5 rounded hover:bg-[#252041] transition-colors", onClick: () => {
                     onPick(req.featureId, d);
                     onDone();
                 }, children: [_jsx("span", { className: "w-3 h-3 rounded-sm shrink-0", style: { background: DISCIPLINE_COLORS[d] } }), d] }, d)))] }));

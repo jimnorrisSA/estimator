@@ -22,7 +22,6 @@ export function EstimationList() {
   const deleteGroup = useEstimationsStore((s) => s.deleteGroup);
   const setSelected = useEstimationsStore((s) => s.setSelected);
 
-  // Find the selected task and its context
   const selection = (() => {
     for (const f of features) {
       for (const g of f.groups) {
@@ -39,23 +38,23 @@ export function EstimationList() {
   }
 
   return (
-    <aside className="w-72 h-full flex flex-col bg-white border-r border-gray-200 shrink-0">
+    <aside className="w-72 h-full flex flex-col bg-[#14112a] border-r border-[#2e2848] shrink-0">
       {/* Header */}
-      <div className="px-4 py-3 border-b border-gray-200">
-        <h1 className="text-sm font-bold text-gray-900 uppercase tracking-wide">Estimation List</h1>
+      <div className="px-4 py-3 border-b border-[#2e2848]">
+        <h1 className="text-sm font-bold text-[#a78bfa] uppercase tracking-wide">Estimation List</h1>
       </div>
 
       {/* Feature input */}
-      <div className="px-4 py-3 border-b border-gray-200 flex flex-col gap-2">
-        <label className="text-xs font-medium text-gray-600">Feature names (one per line)</label>
+      <div className="px-4 py-3 border-b border-[#2e2848] flex flex-col gap-2">
+        <label className="text-xs font-medium text-[#9b93ba]">Feature names (one per line)</label>
         <textarea
-          className="w-full h-28 text-sm border border-gray-300 rounded p-2 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full h-28 text-sm border border-[#2e2848] bg-[#1a1628] text-[#ece7ff] rounded p-2 resize-none focus:outline-none focus:ring-2 focus:ring-[#7c3aed] placeholder:text-[#3a3456]"
           placeholder={"User login\nDashboard\nSettings page"}
           value={text}
           onChange={(e) => setText(e.target.value)}
         />
         <button
-          className="w-full bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium py-1.5 rounded transition-colors"
+          className="w-full bg-[#7c3aed] hover:bg-[#6d28d9] text-white text-sm font-medium py-1.5 rounded transition-colors"
           onClick={onGenerate}
         >
           Generate feature boxes
@@ -65,13 +64,13 @@ export function EstimationList() {
       {/* Feature / group / task tree */}
       <div className="flex-1 overflow-y-auto">
         {features.length === 0 && (
-          <p className="text-xs text-gray-400 px-4 py-3">No features yet.</p>
+          <p className="text-sm text-[#5c5575] px-4 py-3">No features yet.</p>
         )}
         {features.map((f) => (
-          <div key={f.id} className="border-b border-gray-100">
+          <div key={f.id} className="border-b border-[#2e2848]">
             {/* Feature row */}
             <button
-              className="w-full text-left px-4 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50"
+              className="w-full text-left px-4 py-2 text-sm font-semibold text-[#ece7ff] hover:bg-[#252041] transition-colors"
               onClick={() => setSelected(f.id)}
             >
               {f.name}
@@ -85,9 +84,9 @@ export function EstimationList() {
                     className="w-2.5 h-2.5 rounded-sm shrink-0"
                     style={{ background: DISCIPLINE_COLORS[g.discipline] }}
                   />
-                  <span className="text-xs font-medium text-gray-500 flex-1">{g.discipline}</span>
+                  <span className="text-xs font-medium text-[#9b93ba] flex-1">{g.discipline}</span>
                   <button
-                    className="text-xs text-gray-300 hover:text-red-400 transition-colors"
+                    className="text-xs text-[#3a3456] hover:text-red-400 transition-colors"
                     title="Remove discipline"
                     onClick={() => {
                       deleteGroup(f.id, g.id);
@@ -102,13 +101,13 @@ export function EstimationList() {
                 {g.tasks.map((t) => (
                   <button
                     key={t.id}
-                    className={`w-full text-left px-8 py-1 flex items-center gap-2 text-xs hover:bg-gray-50 ${
-                      selectedId === t.id ? "bg-blue-50" : ""
+                    className={`w-full text-left px-8 py-1 flex items-center gap-2 text-sm hover:bg-[#252041] transition-colors ${
+                      selectedId === t.id ? "bg-[#1e1548]" : ""
                     }`}
                     onClick={() => setSelected(t.id)}
                   >
-                    <span className="flex-1 text-gray-700 truncate">{t.label || "—"}</span>
-                    <span className="text-gray-400 shrink-0">
+                    <span className="flex-1 text-[#ece7ff] truncate">{t.label || "—"}</span>
+                    <span className="text-[#5c5575] shrink-0">
                       {t.estimate.value}{UNIT_LABELS[t.estimate.unit][0]}
                     </span>
                   </button>
@@ -121,13 +120,13 @@ export function EstimationList() {
 
       {/* Inspector — shown when a task is selected */}
       {selection && (
-        <div className="border-t border-gray-200 px-4 py-3 flex flex-col gap-3">
+        <div className="border-t border-[#2e2848] px-4 py-3 flex flex-col gap-3">
           <div className="flex items-center justify-between">
-            <p className="text-xs font-bold text-gray-500 uppercase tracking-wide">
+            <p className="text-xs font-bold text-[#9b93ba] uppercase tracking-wide">
               {selection.group.discipline}
             </p>
             <button
-              className="text-xs text-red-400 hover:text-red-600 transition-colors"
+              className="text-xs text-red-400 hover:text-red-300 transition-colors"
               onClick={() => {
                 deleteTask(selection.feature.id, selection.group.id, selection.task.id);
                 setSelected(null);
@@ -137,19 +136,19 @@ export function EstimationList() {
             </button>
           </div>
 
-          <p className="text-sm font-medium text-gray-800 truncate">
-            {selection.task.label || <span className="text-gray-400 italic">Unlabelled task</span>}
+          <p className="text-sm font-medium text-[#ece7ff] truncate">
+            {selection.task.label || <span className="text-[#5c5575] italic">Unlabelled task</span>}
           </p>
 
           {/* Estimate editor */}
           <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-gray-600">Estimate</label>
+            <label className="text-xs font-medium text-[#9b93ba]">Estimate</label>
             <div className="flex gap-2">
               <input
                 type="number"
                 min={0.5}
                 step={0.5}
-                className="w-20 text-sm border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-20 text-sm border border-[#2e2848] bg-[#1a1628] text-[#ece7ff] rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-[#7c3aed]"
                 value={selection.task.estimate.value}
                 onChange={(e) =>
                   updateTaskEstimate(
@@ -162,7 +161,7 @@ export function EstimationList() {
                 }
               />
               <select
-                className="flex-1 text-sm border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="flex-1 text-sm border border-[#2e2848] bg-[#1a1628] text-[#ece7ff] rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-[#7c3aed]"
                 value={selection.task.estimate.unit}
                 onChange={(e) =>
                   updateTaskEstimate(
@@ -181,7 +180,7 @@ export function EstimationList() {
                 ))}
               </select>
             </div>
-            <p className="text-xs text-gray-400">
+            <p className="text-xs text-[#5c5575]">
               = {WORKING_DAYS[selection.task.estimate.unit] * selection.task.estimate.value} working days
             </p>
           </div>

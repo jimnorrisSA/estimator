@@ -32,8 +32,6 @@ export function DisciplineGroupCard({ group, layout, featureId, selectedId, onSe
   const updateTaskLabel = useEstimationsStore((s) => s.updateTaskLabel);
   const updateTaskEstimate = useEstimationsStore((s) => s.updateTaskEstimate);
 
-  // Get the screen-space position of a point (offsetX, offsetY) within this card.
-  // getAbsolutePosition() returns canvas-element-pixel coords (stage scale + pan already applied).
   function screenPos(offsetX: number, offsetY: number) {
     const node = cardRef.current;
     if (!node) return { x: 0, y: 0 };
@@ -63,7 +61,6 @@ export function DisciplineGroupCard({ group, layout, featureId, selectedId, onSe
   const EST_HIT_W = 44;
 
   function openEstimateEdit(taskId: string, currentValue: number, currentUnit: EstimateUnit, taskY: number) {
-    // Position the overlay so its right edge aligns with the right edge of the estimate text
     const { x, y } = screenPos(layout.width, taskY + (TASK_ROW_H - EST_FONT) / 2);
     requestEstimateEdit({
       value: currentValue,
@@ -74,7 +71,6 @@ export function DisciplineGroupCard({ group, layout, featureId, selectedId, onSe
     });
   }
 
-  // Don't add task to store until the user actually commits a label
   function handleAddTask() {
     const newTaskY = GROUP_HEADER_H + group.tasks.length * TASK_ROW_H;
     const { x, y } = screenPos(PAD, newTaskY + (TASK_ROW_H - LABEL_FONT) / 2 - 2);
@@ -91,7 +87,7 @@ export function DisciplineGroupCard({ group, layout, featureId, selectedId, onSe
     });
   }
 
-  const headerColor = darken(group.color, 0.15);
+  const headerColor = darken(group.color, 0.12);
 
   return (
     <Group ref={cardRef} x={layout.x} y={layout.y}>
@@ -101,9 +97,9 @@ export function DisciplineGroupCard({ group, layout, featureId, selectedId, onSe
         height={layout.height}
         fill={group.color}
         cornerRadius={4}
-        shadowBlur={3}
-        shadowColor="rgba(0,0,0,0.1)"
-        shadowOffsetY={1}
+        shadowBlur={4}
+        shadowColor="rgba(0,0,0,0.3)"
+        shadowOffsetY={2}
       />
 
       {/* Header */}
@@ -115,7 +111,7 @@ export function DisciplineGroupCard({ group, layout, featureId, selectedId, onSe
         text={group.discipline.toUpperCase()}
         fontSize={HEADER_FONT}
         fontStyle="bold"
-        fill="rgba(0,0,0,0.65)"
+        fill="rgba(255,255,255,0.85)"
         letterSpacing={0.8}
       />
 
@@ -134,15 +130,15 @@ export function DisciplineGroupCard({ group, layout, featureId, selectedId, onSe
             onDblClick={() => openTaskEdit(task.id, task.label, ty)}
             onDblTap={() => openTaskEdit(task.id, task.label, ty)}
           >
-            {isSelected && <Rect width={layout.width} height={TASK_ROW_H} fill="rgba(255,255,255,0.5)" />}
-            <Rect y={0} width={layout.width} height={1} fill="rgba(0,0,0,0.06)" />
+            {isSelected && <Rect width={layout.width} height={TASK_ROW_H} fill="rgba(255,255,255,0.25)" />}
+            <Rect y={0} width={layout.width} height={1} fill="rgba(0,0,0,0.15)" />
             <Text
               x={PAD}
               y={(TASK_ROW_H - LABEL_FONT) / 2}
               width={layout.width - PAD * 2 - EST_HIT_W}
               text={task.label || "Double-click to label…"}
               fontSize={LABEL_FONT}
-              fill={task.label ? "#1f2937" : "#9ca3af"}
+              fill={task.label ? "rgba(255,255,255,0.95)" : "rgba(255,255,255,0.35)"}
               ellipsis
             />
             <Text
@@ -152,10 +148,10 @@ export function DisciplineGroupCard({ group, layout, featureId, selectedId, onSe
               text={estText}
               fontSize={EST_FONT}
               fontStyle="italic"
-              fill={isSelected ? "#1d4ed8" : "#374151"}
+              fill={isSelected ? "#f0d9ff" : "rgba(255,255,255,0.65)"}
               align="right"
             />
-            {/* Invisible hit area over estimate — double-click opens estimate editor */}
+            {/* Invisible hit area over estimate */}
             <Rect
               x={layout.width - EST_HIT_W}
               y={0}
@@ -187,7 +183,7 @@ export function DisciplineGroupCard({ group, layout, featureId, selectedId, onSe
           y={(ADD_TASK_H - LABEL_FONT) / 2}
           text="+ Add task"
           fontSize={LABEL_FONT}
-          fill="rgba(0,0,0,0.35)"
+          fill="rgba(255,255,255,0.4)"
         />
       </Group>
     </Group>

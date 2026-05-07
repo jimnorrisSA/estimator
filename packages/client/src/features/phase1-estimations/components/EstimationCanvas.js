@@ -34,7 +34,6 @@ export function EstimationCanvas() {
         setSize({ w: el.clientWidth, h: el.clientHeight });
         return () => ro.disconnect();
     }, []);
-    // Only attach Transformer to feature-level nodes (horizontal resize only)
     useEffect(() => {
         const tr = transformerRef.current;
         if (!tr)
@@ -80,8 +79,8 @@ export function EstimationCanvas() {
     function handleDisciplinePick(featureId, discipline) {
         addGroup(featureId, discipline);
     }
-    return (_jsx(CanvasContext.Provider, { value: { registerNode, unregisterNode, requestTextEdit, requestEstimateEdit, requestDisciplinePick, requestConfirm }, children: _jsxs("div", { ref: containerRef, className: "w-full h-full relative overflow-hidden bg-gray-100", children: [_jsx("div", { className: "absolute inset-0 pointer-events-none", style: {
-                        backgroundImage: "radial-gradient(circle, #d1d5db 1px, transparent 1px)",
+    return (_jsx(CanvasContext.Provider, { value: { registerNode, unregisterNode, requestTextEdit, requestEstimateEdit, requestDisciplinePick, requestConfirm }, children: _jsxs("div", { ref: containerRef, className: "w-full h-full relative overflow-hidden bg-[#0d0b16]", children: [_jsx("div", { className: "absolute inset-0 pointer-events-none", style: {
+                        backgroundImage: "radial-gradient(circle, #231d3a 1px, transparent 1px)",
                         backgroundSize: "24px 24px",
                     } }), _jsx(Stage, { width: size.w, height: size.h, scaleX: scale, scaleY: scale, x: pos.x, y: pos.y, draggable: true, onWheel: onWheel, onDragEnd: (e) => {
                         const stage = e.target;

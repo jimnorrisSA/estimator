@@ -11,4 +11,13 @@ body,
   margin: 0;
   padding: 0;
   overflow: hidden;
+  background: #0d0b16;
+  color: #ece7ff;
+  color-scheme: dark;
+}
+
+/* Thin purple-tinted scrollbars */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #3d366a transparent;
 }

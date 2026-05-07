@@ -17,8 +17,8 @@ const DAY_W = 22;
 const MONTH_H = 22;
 const WEEK_H = 20;
 const HEADER_H = MONTH_H + WEEK_H;
-const SLOT_H = 28;       // pixels per resource slot
-const ROW_VPAD = 5;      // top + bottom padding inside a row
+const SLOT_H = 28;
+const ROW_VPAD = 5;
 const ROW_GAP = 6;
 const CONT_ROW_H = 34;
 const BOTTOM_PAD = 16;
@@ -28,8 +28,8 @@ function rowHeight(cap: number) {
 }
 
 const FEATURE_PALETTE = [
-  "#3b82f6", "#f59e0b", "#10b981", "#ef4444",
-  "#8b5cf6", "#06b6d4", "#f97316", "#84cc16",
+  "#7c3aed", "#f59e0b", "#10b981", "#ef4444",
+  "#3b82f6", "#06b6d4", "#f97316", "#a78bfa",
   "#ec4899", "#14b8a6",
 ];
 
@@ -113,17 +113,15 @@ function DraggableTaskBar({ task, y, barH, color, onMove, onResize, onClearPin }
     <g>
       <title>{task.featureName} — {task.label}{task.isPinned ? " · pinned" : ""}</title>
 
-      {/* Bar body — drag to move */}
       <rect
         x={x} y={y} width={barW} height={barH} rx={3}
         fill={color}
-        opacity={isDragging ? 0.65 : 0.88}
+        opacity={isDragging ? 0.55 : 0.9}
         style={{ cursor: isDragging ? "grabbing" : "grab" }}
         onMouseDown={(e) => { if (e.button !== 0) return; e.stopPropagation(); startDrag("move", e.clientX); }}
         onDoubleClick={(e) => { e.stopPropagation(); onClearPin(task.taskId); }}
       />
 
-      {/* Label */}
       {barW > 32 && (
         <text x={x + 5} y={y + barH / 2} dominantBaseline="middle" fontSize={11} fill="white"
           style={{ pointerEvents: "none", userSelect: "none" }}>
@@ -131,7 +129,6 @@ function DraggableTaskBar({ task, y, barH, color, onMove, onResize, onClearPin }
         </text>
       )}
 
-      {/* Resize handle — right edge */}
       {barW > 16 && (
         <rect
           x={x + barW - RESIZE_HANDLE_W} y={y}
@@ -142,15 +139,13 @@ function DraggableTaskBar({ task, y, barH, color, onMove, onResize, onClearPin }
         />
       )}
 
-      {/* Pin dot — top-left corner when pinned */}
       {task.isPinned && !isDragging && (
         <circle cx={x + 5} cy={y + 4} r={2.5} fill="white" opacity={0.8}
           style={{ pointerEvents: "none" }} />
       )}
 
-      {/* Duration label above bar while dragging */}
       {isDragging && preview && (
-        <text x={x + barW / 2} y={y - 5} textAnchor="middle" fontSize={11} fill="#374151" fontWeight="600"
+        <text x={x + barW / 2} y={y - 5} textAnchor="middle" fontSize={11} fill="#a78bfa" fontWeight="600"
           style={{ pointerEvents: "none", userSelect: "none" }}>
           {String(Math.round((preview.endDay - preview.startDay) * 2) / 2)}d
         </text>
@@ -197,7 +192,6 @@ export function Timeline({ result, features, settings, viewMode, onToggleView }:
     [features]
   );
 
-  // Summary view: one row per feature spanning earliest start → latest end
   const summaryRows = useMemo(() => {
     let y = 0;
     return features
@@ -211,7 +205,7 @@ export function Timeline({ result, features, settings, viewMode, onToggleView }:
           featureName: f.name,
           startDay: Math.min(...ft.map((t) => t.startDay)),
           endDay: Math.max(...ft.map((t) => t.endDay)),
-          color: featureColors.get(f.id) ?? "#3b82f6",
+          color: featureColors.get(f.id) ?? "#7c3aed",
           rowY,
         };
       })
@@ -223,7 +217,6 @@ export function Timeline({ result, features, settings, viewMode, onToggleView }:
     return buildWorkingDayCalendar(parseISODate(settings.startDate), projectEndDay + 1);
   }, [settings.calendarMode, settings.startDate, projectEndDay]);
 
-  // Compute row layouts
   const rowLayouts = useMemo<RowLayout[]>(() => {
     let y = 0;
     return disciplines.map((d) => {
@@ -244,7 +237,7 @@ export function Timeline({ result, features, settings, viewMode, onToggleView }:
 
   if (tasks.length === 0) {
     return (
-      <div className="flex items-center justify-center h-36 text-sm text-gray-400 border border-dashed border-gray-200 rounded-xl">
+      <div className="flex items-center justify-center h-36 text-sm text-[#5c5575] border border-dashed border-[#2e2848] rounded-xl">
         No tasks yet — add discipline cards and tasks in Phase 1 to see the schedule.
       </div>
     );
@@ -257,12 +250,14 @@ export function Timeline({ result, features, settings, viewMode, onToggleView }:
     <div className="flex flex-col gap-3">
       {/* View toggle */}
       <div className="flex justify-end">
-        <div className="flex rounded-lg border border-gray-200 overflow-hidden text-xs shadow-sm">
+        <div className="flex rounded-lg border border-[#2e2848] overflow-hidden text-xs shadow-sm">
           {(["detailed", "summary"] as const).map((mode) => (
             <button
               key={mode}
               className={`px-3 py-1.5 transition-colors ${
-                viewMode === mode ? "bg-blue-600 text-white font-medium" : "bg-white text-gray-500 hover:bg-gray-50"
+                viewMode === mode
+                  ? "bg-[#7c3aed] text-white font-medium"
+                  : "bg-[#1d1930] text-[#5c5575] hover:bg-[#252041]"
               }`}
               onClick={onToggleView}
             >
@@ -272,17 +267,17 @@ export function Timeline({ result, features, settings, viewMode, onToggleView }:
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-gray-200 shadow-sm">
+      <div className="overflow-hidden rounded-xl border border-[#2e2848] shadow-sm shadow-black/40">
         <div className="flex items-stretch">
           {/* Fixed label column */}
-          <svg width={LABEL_W} height={svgH} className="flex-shrink-0 border-r border-gray-200 bg-white">
+          <svg width={LABEL_W} height={svgH} className="flex-shrink-0 border-r border-[#2e2848]" style={{ background: "#14112a" }}>
             {viewMode === "detailed"
               ? rowLayouts.map((layout) => (
                   <g key={layout.discipline}>
                     <text
                       x={LABEL_W - 12}
                       y={HEADER_H + layout.rowY + layout.height / 2 - (layout.capacity > 1 ? 8 : 0)}
-                      textAnchor="end" dominantBaseline="middle" fontSize={13} fill="#374151" fontWeight="600"
+                      textAnchor="end" dominantBaseline="middle" fontSize={13} fill="#c5bedf" fontWeight="600"
                     >
                       {layout.discipline}
                     </text>
@@ -290,7 +285,7 @@ export function Timeline({ result, features, settings, viewMode, onToggleView }:
                       <text
                         x={LABEL_W - 12}
                         y={HEADER_H + layout.rowY + layout.height / 2 + 9}
-                        textAnchor="end" dominantBaseline="middle" fontSize={11} fill="#9ca3af"
+                        textAnchor="end" dominantBaseline="middle" fontSize={11} fill="#5c5575"
                       >
                         ×{layout.capacity} people
                       </text>
@@ -302,7 +297,7 @@ export function Timeline({ result, features, settings, viewMode, onToggleView }:
                     key={row.featureId}
                     x={LABEL_W - 12}
                     y={HEADER_H + row.rowY + SUMMARY_ROW_H / 2}
-                    textAnchor="end" dominantBaseline="middle" fontSize={12} fill="#374151" fontWeight="600"
+                    textAnchor="end" dominantBaseline="middle" fontSize={12} fill="#c5bedf" fontWeight="600"
                   >
                     {row.featureName.length > 12 ? row.featureName.slice(0, 11) + "…" : row.featureName}
                   </text>
@@ -310,33 +305,33 @@ export function Timeline({ result, features, settings, viewMode, onToggleView }:
             <text
               x={LABEL_W - 12}
               y={HEADER_H + contY + CONT_ROW_H / 2}
-              textAnchor="end" dominantBaseline="middle" fontSize={12} fill="#9ca3af" fontStyle="italic"
+              textAnchor="end" dominantBaseline="middle" fontSize={12} fill="#5c5575" fontStyle="italic"
             >
               Contingency
             </text>
           </svg>
 
           {/* Scrollable chart */}
-          <div className="overflow-x-auto flex-1 bg-white">
+          <div className="overflow-x-auto flex-1" style={{ background: "#14112a" }}>
             <svg width={chartW} height={svgH}>
               {/* Row backgrounds */}
               {viewMode === "detailed"
                 ? rowLayouts.map((layout, i) => (
                     <rect key={`bg-${layout.discipline}`}
                       x={0} y={HEADER_H + layout.rowY} width={chartW} height={layout.height}
-                      fill={i % 2 === 0 ? "#f9fafb" : "#ffffff"} />
+                      fill={i % 2 === 0 ? "#1d1930" : "#201c32"} />
                   ))
                 : summaryRows.map((row, i) => (
                     <rect key={`bg-${row.featureId}`}
                       x={0} y={HEADER_H + row.rowY} width={chartW} height={SUMMARY_ROW_H}
-                      fill={i % 2 === 0 ? "#f9fafb" : "#ffffff"} />
+                      fill={i % 2 === 0 ? "#1d1930" : "#201c32"} />
                   ))}
               <rect
                 x={0}
                 y={HEADER_H + contY}
                 width={chartW}
                 height={CONT_ROW_H}
-                fill="#fafafa"
+                fill="#18152a"
               />
 
               {/* Date headers */}
@@ -361,7 +356,7 @@ export function Timeline({ result, features, settings, viewMode, onToggleView }:
                     if (!layout) return null;
                     const barH = SLOT_H - 4;
                     const y = HEADER_H + layout.rowY + ROW_VPAD + task.slotIndex * SLOT_H;
-                    const color = featureColors.get(task.featureId) ?? "#3b82f6";
+                    const color = featureColors.get(task.featureId) ?? "#7c3aed";
                     return (
                       <DraggableTaskBar key={task.taskId} task={task} y={y} barH={barH} color={color}
                         onMove={handleMove} onResize={handleResize} onClearPin={handleClearPin} />
@@ -376,7 +371,7 @@ export function Timeline({ result, features, settings, viewMode, onToggleView }:
                     return (
                       <g key={row.featureId}>
                         <title>{row.featureName}</title>
-                        <rect x={x} y={y} width={barW} height={barH} rx={4} fill={row.color} opacity={0.85} />
+                        <rect x={x} y={y} width={barW} height={barH} rx={4} fill={row.color} opacity={0.9} />
                         {barW > 40 && (
                           <text x={x + 8} y={y + barH / 2} dominantBaseline="middle"
                             fontSize={11} fontWeight="600" fill="white"
@@ -404,7 +399,6 @@ export function Timeline({ result, features, settings, viewMode, onToggleView }:
                   const target = parseISODate(settings.targetEndDate);
                   const msPerDay = 86400000;
                   const calDays = Math.round((target.getTime() - start.getTime()) / msPerDay);
-                  // Rough working-day estimate: 5/7 of calendar days
                   deadlineDay = Math.round(calDays * 5 / 7);
                 }
                 if (deadlineDay === null || deadlineDay <= 0) return null;
@@ -417,7 +411,7 @@ export function Timeline({ result, features, settings, viewMode, onToggleView }:
                       stroke={lineColor} strokeWidth={2} strokeDasharray="4 3" />
                     <rect x={dx - 1} y={HEADER_H} width={isOverrun ? dx - 1 : chartW - dx}
                       height={svgH - HEADER_H - BOTTOM_PAD}
-                      fill={isOverrun ? "#ef4444" : "#22c55e"} opacity={0.04} />
+                      fill={isOverrun ? "#ef4444" : "#22c55e"} opacity={0.05} />
                     <rect x={dx - 28} y={HEADER_H + 4} width={56} height={16} rx={3}
                       fill={lineColor} />
                     <text x={dx} y={HEADER_H + 12} textAnchor="middle" dominantBaseline="middle"
@@ -439,8 +433,8 @@ export function Timeline({ result, features, settings, viewMode, onToggleView }:
                     width={Math.max(2, contingencyDays * DAY_W - 2)}
                     height={CONT_ROW_H - 10}
                     rx={3}
-                    fill="#e5e7eb"
-                    stroke="#d1d5db"
+                    fill="#252041"
+                    stroke="#3d366a"
                     strokeWidth={1}
                   />
                   {contingencyDays * DAY_W > 60 && (
@@ -450,7 +444,7 @@ export function Timeline({ result, features, settings, viewMode, onToggleView }:
                       textAnchor="middle"
                       dominantBaseline="middle"
                       fontSize={11}
-                      fill="#6b7280"
+                      fill="#5c5575"
                     >
                       {settings.contingencyPct}% contingency
                     </text>
@@ -480,8 +474,8 @@ function FourWeekHeader({ projectEndDay, chartW }: { projectEndDay: number; char
     const w = (mEnd - mStart) * DAY_W;
     els.push(
       <g key={`m-${m}`}>
-        <rect x={x} y={0} width={w} height={MONTH_H} fill={m % 2 === 0 ? "#f3f4f6" : "#eaecef"} />
-        <text x={x + w / 2} y={MONTH_H / 2} textAnchor="middle" dominantBaseline="middle" fontSize={12} fill="#374151" fontWeight="600">
+        <rect x={x} y={0} width={w} height={MONTH_H} fill={m % 2 === 0 ? "#1a1628" : "#211d38"} />
+        <text x={x + w / 2} y={MONTH_H / 2} textAnchor="middle" dominantBaseline="middle" fontSize={12} fill="#c5bedf" fontWeight="600">
           Month {m + 1}
         </text>
       </g>
@@ -494,8 +488,8 @@ function FourWeekHeader({ projectEndDay, chartW }: { projectEndDay: number; char
       const ww = (wEnd - wStart) * DAY_W;
       els.push(
         <g key={`w-${m}-${w4}`}>
-          <rect x={wx} y={MONTH_H} width={ww} height={WEEK_H} fill={(m + w4) % 2 === 0 ? "#f9fafb" : "#ffffff"} />
-          <text x={wx + ww / 2} y={MONTH_H + WEEK_H / 2} textAnchor="middle" dominantBaseline="middle" fontSize={11} fill="#9ca3af">
+          <rect x={wx} y={MONTH_H} width={ww} height={WEEK_H} fill={(m + w4) % 2 === 0 ? "#1d1930" : "#201c32"} />
+          <text x={wx + ww / 2} y={MONTH_H + WEEK_H / 2} textAnchor="middle" dominantBaseline="middle" fontSize={11} fill="#5c5575">
             W{w4 + 1}
           </text>
         </g>
@@ -503,7 +497,7 @@ function FourWeekHeader({ projectEndDay, chartW }: { projectEndDay: number; char
     }
   }
 
-  els.push(<line key="hdr-border" x1={0} y1={HEADER_H} x2={chartW} y2={HEADER_H} stroke="#e5e7eb" strokeWidth={1} />);
+  els.push(<line key="hdr-border" x1={0} y1={HEADER_H} x2={chartW} y2={HEADER_H} stroke="#2e2848" strokeWidth={1} />);
   return <>{els}</>;
 }
 
@@ -521,8 +515,8 @@ function ActualDateHeader({ projectEndDay, cal, chartW }: { projectEndDay: numbe
     if (w <= 0) return;
     els.push(
       <g key={`month-${monthKey}`}>
-        <rect x={x} y={0} width={w} height={MONTH_H} fill={monthIdx % 2 === 0 ? "#f3f4f6" : "#eaecef"} />
-        <text x={x + w / 2} y={MONTH_H / 2} textAnchor="middle" dominantBaseline="middle" fontSize={12} fill="#374151" fontWeight="600">
+        <rect x={x} y={0} width={w} height={MONTH_H} fill={monthIdx % 2 === 0 ? "#1a1628" : "#211d38"} />
+        <text x={x + w / 2} y={MONTH_H / 2} textAnchor="middle" dominantBaseline="middle" fontSize={12} fill="#c5bedf" fontWeight="600">
           {formatMonthYear(cal[monthStart])}
         </text>
       </g>
@@ -541,14 +535,14 @@ function ActualDateHeader({ projectEndDay, cal, chartW }: { projectEndDay: numbe
     }
     if (date.getDay() === 1) {
       els.push(
-        <text key={`wk-${d}`} x={d * DAY_W + 3} y={MONTH_H + WEEK_H / 2} dominantBaseline="middle" fontSize={10} fill="#9ca3af">
+        <text key={`wk-${d}`} x={d * DAY_W + 3} y={MONTH_H + WEEK_H / 2} dominantBaseline="middle" fontSize={10} fill="#5c5575">
           {formatDateShort(date)}
         </text>
       );
     }
   }
   flushMonth(projectEndDay);
-  els.push(<line key="hdr-border" x1={0} y1={HEADER_H} x2={chartW} y2={HEADER_H} stroke="#e5e7eb" strokeWidth={1} />);
+  els.push(<line key="hdr-border" x1={0} y1={HEADER_H} x2={chartW} y2={HEADER_H} stroke="#2e2848" strokeWidth={1} />);
   return <>{els}</>;
 }
 
@@ -559,7 +553,8 @@ function GridLines({ projectEndDay, calendarMode, cal, svgH }: { projectEndDay: 
     for (let d = 5; d <= projectEndDay; d += 5) {
       const isMonth = d % 20 === 0;
       lines.push(
-        <line key={`gl-${d}`} x1={d * DAY_W} y1={HEADER_H} x2={d * DAY_W} y2={bottom} stroke={isMonth ? "#d1d5db" : "#f3f4f6"} strokeWidth={isMonth ? 1.5 : 1} />
+        <line key={`gl-${d}`} x1={d * DAY_W} y1={HEADER_H} x2={d * DAY_W} y2={bottom}
+          stroke={isMonth ? "#2e2848" : "#1e1a2e"} strokeWidth={isMonth ? 1.5 : 1} />
       );
     }
   } else {
@@ -568,7 +563,8 @@ function GridLines({ projectEndDay, calendarMode, cal, svgH }: { projectEndDay: 
       if (!date || date.getDay() !== 1) continue;
       const isMonthStart = date.getDate() <= 7;
       lines.push(
-        <line key={`gl-${d}`} x1={d * DAY_W} y1={HEADER_H} x2={d * DAY_W} y2={bottom} stroke={isMonthStart ? "#d1d5db" : "#f3f4f6"} strokeWidth={isMonthStart ? 1.5 : 1} />
+        <line key={`gl-${d}`} x1={d * DAY_W} y1={HEADER_H} x2={d * DAY_W} y2={bottom}
+          stroke={isMonthStart ? "#2e2848" : "#1e1a2e"} strokeWidth={isMonthStart ? 1.5 : 1} />
       );
     }
   }
@@ -582,8 +578,8 @@ function FeatureLegend({ features, featureColors, tasks }: { features: Feature[]
   return (
     <div className="flex flex-wrap gap-4">
       {active.map((f) => (
-        <div key={f.id} className="flex items-center gap-1.5 text-sm text-gray-600">
-          <span className="inline-block w-3 h-3 rounded-sm flex-shrink-0" style={{ background: featureColors.get(f.id) ?? "#3b82f6" }} />
+        <div key={f.id} className="flex items-center gap-1.5 text-sm text-[#9b93ba]">
+          <span className="inline-block w-3 h-3 rounded-sm flex-shrink-0" style={{ background: featureColors.get(f.id) ?? "#7c3aed" }} />
           {f.name}
         </div>
       ))}

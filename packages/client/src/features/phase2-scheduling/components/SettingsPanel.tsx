@@ -37,24 +37,24 @@ export function SettingsPanel({ settings, onChange }: Props) {
   }
 
   return (
-    <div className="flex items-end gap-6 px-6 py-3 bg-white border-b border-gray-200 flex-shrink-0 flex-wrap">
+    <div className="flex items-end gap-6 px-6 py-3 bg-[#14112a] border-b border-[#2e2848] flex-shrink-0 flex-wrap">
       <Field label="Project name">
         <input
-          className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm w-52 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="border border-[#2e2848] bg-[#1a1628] text-[#ece7ff] rounded-lg px-3 py-1.5 text-sm w-52 focus:outline-none focus:ring-2 focus:ring-[#7c3aed] placeholder:text-[#3a3456]"
           value={settings.projectName}
           onChange={(e) => onChange({ projectName: e.target.value })}
         />
       </Field>
 
       <Field label="Calendar mode">
-        <div className="flex rounded-lg border border-gray-300 overflow-hidden text-sm">
+        <div className="flex rounded-lg border border-[#2e2848] overflow-hidden text-sm">
           {(["four-week", "actual"] as const).map((mode) => (
             <button
               key={mode}
               className={`px-3 py-1.5 transition-colors ${
                 settings.calendarMode === mode
-                  ? "bg-blue-600 text-white font-medium"
-                  : "bg-white text-gray-600 hover:bg-gray-50"
+                  ? "bg-[#7c3aed] text-white font-medium"
+                  : "bg-[#1a1628] text-[#9b93ba] hover:bg-[#252041]"
               }`}
               onClick={() => onChange({ calendarMode: mode })}
             >
@@ -67,7 +67,7 @@ export function SettingsPanel({ settings, onChange }: Props) {
       <Field label="Start date">
         <input
           type="date"
-          className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="border border-[#2e2848] bg-[#1a1628] text-[#ece7ff] rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#7c3aed]"
           value={settings.startDate}
           onChange={(e) => onChange({ startDate: e.target.value })}
         />
@@ -77,13 +77,13 @@ export function SettingsPanel({ settings, onChange }: Props) {
         <div className="flex items-center gap-1.5">
           <input
             type="date"
-            className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="border border-[#2e2848] bg-[#1a1628] text-[#ece7ff] rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#7c3aed]"
             value={settings.targetEndDate}
             onChange={(e) => onChange({ targetEndDate: e.target.value })}
           />
           {settings.targetEndDate && (
             <button
-              className="text-gray-300 hover:text-gray-500 text-lg leading-none"
+              className="text-[#3a3456] hover:text-[#9b93ba] text-lg leading-none transition-colors"
               title="Clear target"
               onClick={() => onChange({ targetEndDate: "" })}
             >
@@ -100,19 +100,19 @@ export function SettingsPanel({ settings, onChange }: Props) {
             min={0}
             max={100}
             step={5}
-            className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm w-20 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="border border-[#2e2848] bg-[#1a1628] text-[#ece7ff] rounded-lg px-3 py-1.5 text-sm w-20 focus:outline-none focus:ring-2 focus:ring-[#7c3aed]"
             value={settings.contingencyPct}
             onChange={(e) =>
               onChange({ contingencyPct: Math.max(0, Math.min(100, Number(e.target.value))) })
             }
           />
-          <span className="text-sm text-gray-500">%</span>
+          <span className="text-sm text-[#5c5575]">%</span>
         </div>
       </Field>
 
       <Field label="Currency">
         <select
-          className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+          className="border border-[#2e2848] bg-[#1a1628] text-[#ece7ff] rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#7c3aed]"
           value={settings.currency}
           onChange={(e) => onChange({ currency: e.target.value as Currency })}
         >
@@ -125,30 +125,30 @@ export function SettingsPanel({ settings, onChange }: Props) {
       <Field label={`Default rate (${symbol})`}>
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-1">
-            <span className="text-xs text-gray-400">Day</span>
-            <span className="text-sm text-gray-400">{symbol}</span>
+            <span className="text-xs text-[#5c5575]">Day</span>
+            <span className="text-sm text-[#5c5575]">{symbol}</span>
             <input
               type="number"
               min={0}
               step={50}
               placeholder="400"
-              className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm w-24 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="border border-[#2e2848] bg-[#1a1628] text-[#ece7ff] rounded-lg px-2 py-1.5 text-sm w-24 focus:outline-none focus:ring-2 focus:ring-[#7c3aed] placeholder:text-[#3a3456]"
               value={dayDraft}
               onChange={(e) => setDayDraft(e.target.value)}
               onBlur={() => commitDayRate(dayDraft)}
               onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
             />
           </div>
-          <span className="text-gray-300 text-sm">·</span>
+          <span className="text-[#3a3456] text-sm">·</span>
           <div className="flex items-center gap-1">
-            <span className="text-xs text-gray-400">Month</span>
-            <span className="text-sm text-gray-400">{symbol}</span>
+            <span className="text-xs text-[#5c5575]">Month</span>
+            <span className="text-sm text-[#5c5575]">{symbol}</span>
             <input
               type="number"
               min={0}
               step={500}
               placeholder="8000"
-              className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm w-28 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="border border-[#2e2848] bg-[#1a1628] text-[#ece7ff] rounded-lg px-2 py-1.5 text-sm w-28 focus:outline-none focus:ring-2 focus:ring-[#7c3aed] placeholder:text-[#3a3456]"
               value={monthDraft}
               onChange={(e) => setMonthDraft(e.target.value)}
               onBlur={() => commitMonthRate(monthDraft)}
@@ -164,7 +164,7 @@ export function SettingsPanel({ settings, onChange }: Props) {
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex flex-col gap-1">
-      <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">{label}</label>
+      <label className="text-xs font-semibold text-[#5c5575] uppercase tracking-wide">{label}</label>
       {children}
     </div>
   );

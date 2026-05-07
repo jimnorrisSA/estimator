@@ -18,7 +18,7 @@ import {
 
 const TITLE_FONT = 15;
 const COUNTER_FONT = 12;
-const COUNTER_W = 110; // reserved width on the right for the counter
+const COUNTER_W = 110;
 
 interface Props {
   feature: Feature;
@@ -42,7 +42,6 @@ export function FeatureBox({ feature, selectedId, onSelect, stageScale }: Props)
   const groupLayouts = computeGroupLayouts(feature);
   const addBtnY = addGroupButtonY(feature);
 
-  // Compute summary counts
   const allTasks = feature.groups.flatMap((g) => g.tasks);
   const totalTasks = allTasks.length;
   const totalDays = allTasks.reduce(
@@ -130,26 +129,26 @@ export function FeatureBox({ feature, selectedId, onSelect, stageScale }: Props)
       <Rect
         width={feature.width}
         height={boxH}
-        fill="#f9fafb"
-        stroke={isSelected ? "#3b82f6" : "#d1d5db"}
+        fill="#1d1930"
+        stroke={isSelected ? "#8b5cf6" : "#2e2848"}
         strokeWidth={isSelected ? 2 : 1}
         cornerRadius={6}
-        shadowBlur={8}
-        shadowColor="rgba(0,0,0,0.08)"
-        shadowOffsetY={2}
+        shadowBlur={12}
+        shadowColor="rgba(0,0,0,0.5)"
+        shadowOffsetY={3}
       />
 
       {/* Header bar */}
       <Rect
         width={feature.width}
         height={FEATURE_HEADER_H}
-        fill="#e5e7eb"
+        fill="#252041"
         cornerRadius={[6, 6, 0, 0]}
         onDblClick={handleRename}
         onDblTap={handleRename}
       />
 
-      {/* Feature name — double-click to rename */}
+      {/* Feature name */}
       <Text
         x={10}
         y={(FEATURE_HEADER_H - TITLE_FONT) / 2}
@@ -157,13 +156,13 @@ export function FeatureBox({ feature, selectedId, onSelect, stageScale }: Props)
         text={feature.name}
         fontSize={TITLE_FONT}
         fontStyle="bold"
-        fill="#111827"
+        fill="#ece7ff"
         ellipsis
         onDblClick={handleRename}
         onDblTap={handleRename}
       />
 
-      {/* Task / day counter — top-right of header (hidden when selected to make room for delete button) */}
+      {/* Task / day counter */}
       {counterText !== "" && !isSelected && (
         <Text
           x={feature.width - COUNTER_W - 8}
@@ -171,12 +170,12 @@ export function FeatureBox({ feature, selectedId, onSelect, stageScale }: Props)
           width={COUNTER_W}
           text={counterText}
           fontSize={COUNTER_FONT}
-          fill="#6b7280"
+          fill="#5c5575"
           align="right"
         />
       )}
 
-      {/* Delete button — visible only when selected */}
+      {/* Delete button */}
       {isSelected && (
         <Group
           x={feature.width - 28}
@@ -190,7 +189,7 @@ export function FeatureBox({ feature, selectedId, onSelect, stageScale }: Props)
             width={20}
             height={20}
             cornerRadius={4}
-            fill={deleteHover ? "#ef4444" : "#fee2e2"}
+            fill={deleteHover ? "#ef4444" : "#4b1c1c"}
           />
           <Text
             width={20}
@@ -212,7 +211,7 @@ export function FeatureBox({ feature, selectedId, onSelect, stageScale }: Props)
           width={feature.width - FEATURE_PAD * 2}
           text="Add a discipline to get started"
           fontSize={11}
-          fill="#9ca3af"
+          fill="#3a3456"
           align="center"
           fontStyle="italic"
         />
@@ -238,9 +237,9 @@ export function FeatureBox({ feature, selectedId, onSelect, stageScale }: Props)
           x={10}
           width={feature.width - 20}
           height={ADD_GROUP_H}
-          fill="#f3f4f6"
+          fill="#1a1628"
           cornerRadius={4}
-          stroke="#e5e7eb"
+          stroke="#2e2848"
           strokeWidth={1}
         />
         <Text
@@ -249,7 +248,7 @@ export function FeatureBox({ feature, selectedId, onSelect, stageScale }: Props)
           width={feature.width - 20}
           text="+ Add discipline"
           fontSize={12}
-          fill="#6b7280"
+          fill="#5c5575"
           align="center"
         />
       </Group>

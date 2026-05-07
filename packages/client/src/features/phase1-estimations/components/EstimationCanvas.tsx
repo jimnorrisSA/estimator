@@ -40,7 +40,6 @@ export function EstimationCanvas() {
     return () => ro.disconnect();
   }, []);
 
-  // Only attach Transformer to feature-level nodes (horizontal resize only)
   useEffect(() => {
     const tr = transformerRef.current;
     if (!tr) return;
@@ -96,11 +95,11 @@ export function EstimationCanvas() {
 
   return (
     <CanvasContext.Provider value={{ registerNode, unregisterNode, requestTextEdit, requestEstimateEdit, requestDisciplinePick, requestConfirm }}>
-      <div ref={containerRef} className="w-full h-full relative overflow-hidden bg-gray-100">
+      <div ref={containerRef} className="w-full h-full relative overflow-hidden bg-[#0d0b16]">
         <div
           className="absolute inset-0 pointer-events-none"
           style={{
-            backgroundImage: "radial-gradient(circle, #d1d5db 1px, transparent 1px)",
+            backgroundImage: "radial-gradient(circle, #231d3a 1px, transparent 1px)",
             backgroundSize: "24px 24px",
           }}
         />
@@ -132,7 +131,6 @@ export function EstimationCanvas() {
                 stageScale={scale}
               />
             ))}
-            {/* Horizontal-only resize for feature boxes */}
             <Transformer
               ref={transformerRef}
               rotateEnabled={false}
