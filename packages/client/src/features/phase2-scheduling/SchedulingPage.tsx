@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useEstimationsStore } from "../phase1-estimations/store/estimationsStore.js";
 import { useSchedulingStore, CURRENCY_SYMBOLS } from "./store/schedulingStore.js";
 import { runScheduler } from "./utils/scheduler.js";
@@ -12,6 +12,8 @@ export function SchedulingPage() {
   const { settings, overrides, resources, updateSettings, addResource, updateResource, deleteResource } =
     useSchedulingStore();
 
+  const [viewMode, setViewMode] = useState<"detailed" | "summary">("detailed");
+
   const result = useMemo(
     () => runScheduler(features, settings.contingencyPct, overrides, resources, settings.defaultDailyRate),
     [features, settings.contingencyPct, overrides, resources, settings.defaultDailyRate]
@@ -20,8 +22,10 @@ export function SchedulingPage() {
   const symbol = CURRENCY_SYMBOLS[settings.currency];
   const totalTasks = result.tasks.length;
   const totalFeatures = new Set(result.tasks.map((t) => t.featureId)).size;
-  const totalCost = result.tasks.reduce((s, t) => s + t.cost, 0);
-  const hasCosts = totalCost > 0;
+  const baseCost = result.tasks.reduce((s, t) => s + t.cost, 0);
+  const projectCost = baseCost * (1 + settings.contingencyPct / 100);
+  const contingencyCost = projectCost - baseCost;
+  const hasCosts = baseCost > 0;
 
   return (
     <div className="flex h-full overflow-hidden">
@@ -38,20 +42,22 @@ export function SchedulingPage() {
               <Stat label="Team" value={String(resources.length)} sub={resources.length === 0 ? "add in sidebar →" : "members"} />
               <Stat label="Duration" value={`${result.totalDays}d`} sub="excl. contingency" />
               <Stat label="With contingency" value={`${result.projectEndDay}d`} sub={`+${result.contingencyDays}d`} />
-              {hasCosts && (
-                <Stat
-                  label="Est. cost"
-                  value={`${symbol}${Math.round(totalCost).toLocaleString()}`}
-                  sub="sum of all tasks"
-                />
-              )}
+              {hasCosts && <Stat label="Base cost" value={`${symbol}${Math.round(baseCost).toLocaleString()}`} sub="excl. contingency" />}
+              {hasCosts && contingencyCost > 0 && <Stat label="Contingency" value={`+${symbol}${Math.round(contingencyCost).toLocaleString()}`} sub={`${settings.contingencyPct}%`} />}
+              {hasCosts && contingencyCost > 0 && <Stat label="Total cost" value={`${symbol}${Math.round(projectCost).toLocaleString()}`} />}
             </div>
           )}
 
           {/* Timeline */}
           <section className="flex flex-col gap-3">
             <h2 className="text-sm font-semibold text-gray-700">Schedule</h2>
-            <Timeline result={result} features={features} settings={settings} />
+            <Timeline
+              result={result}
+              features={features}
+              settings={settings}
+              viewMode={viewMode}
+              onToggleView={() => setViewMode((v) => (v === "detailed" ? "summary" : "detailed"))}
+            />
           </section>
 
           {/* Specs table */}
@@ -60,6 +66,7 @@ export function SchedulingPage() {
             features={features}
             settings={settings}
             currencySymbol={symbol}
+            contingencyPct={settings.contingencyPct}
           />
         </div>
       </div>

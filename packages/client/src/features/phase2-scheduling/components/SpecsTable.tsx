@@ -19,9 +19,10 @@ interface Props {
   features: Feature[];
   settings: ScheduleSettings;
   currencySymbol: string;
+  contingencyPct: number;
 }
 
-export function SpecsTable({ tasks, features, settings, currencySymbol }: Props) {
+export function SpecsTable({ tasks, features, settings, currencySymbol, contingencyPct }: Props) {
   const updateTaskLabel = useEstimationsStore((s) => s.updateTaskLabel);
   const updateTaskEstimate = useEstimationsStore((s) => s.updateTaskEstimate);
   const overrides = useSchedulingStore((s) => s.overrides);
@@ -32,9 +33,9 @@ export function SpecsTable({ tasks, features, settings, currencySymbol }: Props)
   const maxDay = tasks.length > 0 ? Math.max(...tasks.map((t) => t.endDay)) : 0;
 
   const cal = useMemo(() => {
-    if (settings.calendarMode !== "actual" || maxDay === 0) return [];
+    if (maxDay === 0) return [];
     return buildWorkingDayCalendar(parseISODate(settings.startDate), maxDay + 2);
-  }, [settings.calendarMode, settings.startDate, maxDay]);
+  }, [settings.startDate, maxDay]);
 
   const taskMeta = useMemo(
     () =>
@@ -46,20 +47,27 @@ export function SpecsTable({ tasks, features, settings, currencySymbol }: Props)
     [features]
   );
 
+  // Group tasks by feature (preserving scheduler order)
+  const featureGroups = useMemo(() => {
+    const groups: { featureId: string; featureName: string; tasks: ScheduledTask[] }[] = [];
+    const idx = new Map<string, number>();
+    for (const task of tasks) {
+      if (!idx.has(task.featureId)) {
+        idx.set(task.featureId, groups.length);
+        groups.push({ featureId: task.featureId, featureName: task.featureName, tasks: [] });
+      }
+      groups[idx.get(task.featureId)!].tasks.push(task);
+    }
+    return groups;
+  }, [tasks]);
+
   if (tasks.length === 0) return null;
 
-  function dayLabel(day: number) {
-    if (settings.calendarMode === "actual" && cal[day]) {
-      return formatDateShort(cal[day]);
-    }
-    const m = Math.floor(day / 20) + 1;
-    const w = Math.floor((day % 20) / 5) + 1;
-    return `M${m} W${w}`;
-  }
-
-  const totalWd = tasks.reduce((s, t) => s + t.workingDays, 0);
-  const totalCost = tasks.reduce((s, t) => s + t.cost, 0);
-  const hasCosts = tasks.some((t) => t.cost > 0);
+  const totalWd   = tasks.reduce((s, t) => s + t.workingDays, 0);
+  const baseCost  = tasks.reduce((s, t) => s + t.cost, 0);
+  const contCost  = baseCost * contingencyPct / 100;
+  const totalCost = baseCost + contCost;
+  const hasCosts  = baseCost > 0;
 
   return (
     <div className="flex flex-col gap-2">
@@ -81,122 +89,149 @@ export function SpecsTable({ tasks, features, settings, currencySymbol }: Props)
             </tr>
           </thead>
           <tbody>
-            {tasks.map((task, idx) => {
-              const meta = taskMeta.get(task.taskId);
+            {featureGroups.map((group) => {
+              const groupWd   = group.tasks.reduce((s, t) => s + t.workingDays, 0);
+              const groupCost = group.tasks.reduce((s, t) => s + t.cost, 0);
               return (
-                <tr
-                  key={task.taskId}
-                  className={`hover:bg-blue-50/30 transition-colors ${idx % 2 === 0 ? "bg-white" : "bg-gray-50/40"}`}
-                >
-                  <td className="px-3 py-2 text-xs text-gray-500 whitespace-nowrap border-b border-gray-100">
-                    {task.featureName}
-                  </td>
+                <>
+                  {group.tasks.map((task) => {
+                    const meta = taskMeta.get(task.taskId);
+                    return (
+                      <tr key={task.taskId} className="hover:bg-blue-50/30 transition-colors bg-white">
+                        <td className="px-3 py-2 text-xs text-gray-400 whitespace-nowrap border-b border-gray-100">
+                          {task.featureName}
+                        </td>
 
-                  <td className="px-3 py-2 border-b border-gray-100 min-w-[140px]">
-                    <EditableText
-                      value={task.label}
-                      onCommit={(v) => {
-                        if (!meta || !v.trim()) return;
-                        updateTaskLabel(meta.featureId, meta.groupId, task.taskId, v.trim());
-                      }}
-                    />
-                  </td>
+                        <td className="px-3 py-2 border-b border-gray-100 min-w-[140px]">
+                          <EditableText
+                            value={task.label}
+                            onCommit={(v) => { if (meta && v.trim()) updateTaskLabel(meta.featureId, meta.groupId, task.taskId, v.trim()); }}
+                          />
+                        </td>
 
-                  <td className="px-3 py-2 border-b border-gray-100">
-                    <DisciplineBadge discipline={task.discipline} />
-                  </td>
+                        <td className="px-3 py-2 border-b border-gray-100">
+                          <DisciplineBadge discipline={task.discipline} />
+                        </td>
 
-                  <td className="px-3 py-2 border-b border-gray-100">
-                    <div className="flex items-center gap-1">
-                      <EstimateValueInput
-                        value={task.estimateValue}
-                        onCommit={(v) => {
-                          if (!meta) return;
-                          updateTaskEstimate(meta.featureId, meta.groupId, task.taskId, v, task.estimateUnit);
-                        }}
-                      />
-                      <select
-                        value={task.estimateUnit}
-                        className="border border-gray-200 rounded px-1 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
-                        onChange={(e) => {
-                          if (!meta) return;
-                          updateTaskEstimate(
-                            meta.featureId,
-                            meta.groupId,
-                            task.taskId,
-                            task.estimateValue,
-                            e.target.value as EstimateUnit
-                          );
-                        }}
-                      >
-                        {UNITS.map((u) => (
-                          <option key={u} value={u}>
-                            {UNIT_LABELS[u]}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  </td>
+                        <td className="px-3 py-2 border-b border-gray-100">
+                          <div className="flex items-center gap-1">
+                            <EstimateValueInput
+                              value={task.estimateValue}
+                              onCommit={(v) => { if (meta) updateTaskEstimate(meta.featureId, meta.groupId, task.taskId, v, task.estimateUnit); }}
+                            />
+                            <select
+                              value={task.estimateUnit}
+                              className="border border-gray-200 rounded px-1 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
+                              onChange={(e) => { if (meta) updateTaskEstimate(meta.featureId, meta.groupId, task.taskId, task.estimateValue, e.target.value as EstimateUnit); }}
+                            >
+                              {UNITS.map((u) => <option key={u} value={u}>{UNIT_LABELS[u]}</option>)}
+                            </select>
+                          </div>
+                        </td>
 
-                  <td className="px-3 py-2 text-xs text-gray-500 border-b border-gray-100 tabular-nums text-right">
-                    {task.workingDays % 1 === 0 ? task.workingDays : task.workingDays.toFixed(1)}d
-                  </td>
+                        <td className="px-3 py-2 text-xs text-gray-500 border-b border-gray-100 tabular-nums text-right">
+                          {task.workingDays % 1 === 0 ? task.workingDays : task.workingDays.toFixed(1)}d
+                        </td>
 
-                  <td className="px-3 py-2 text-xs text-gray-500 border-b border-gray-100 whitespace-nowrap tabular-nums">
-                    {dayLabel(task.startDay)}
-                  </td>
+                        <td className="px-3 py-2 border-b border-gray-100 whitespace-nowrap">
+                          <EditableDayCell
+                            day={task.startDay}
+                            settings={settings}
+                            cal={cal}
+                            onCommit={(d) => setOverride(task.taskId, { startDay: d, endDay: task.endDay })}
+                          />
+                        </td>
 
-                  <td className="px-3 py-2 text-xs text-gray-500 border-b border-gray-100 whitespace-nowrap tabular-nums">
-                    {dayLabel(task.endDay)}
-                  </td>
+                        <td className="px-3 py-2 border-b border-gray-100 whitespace-nowrap">
+                          <EditableDayCell
+                            day={task.endDay}
+                            settings={settings}
+                            cal={cal}
+                            onCommit={(d) => setOverride(task.taskId, { startDay: task.startDay, endDay: d })}
+                          />
+                        </td>
 
-                  <td className="px-3 py-2 border-b border-gray-100">
-                    <ResourcePicker
-                      taskId={task.taskId}
-                      discipline={task.discipline}
-                      assignedResourceId={task.assignedResourceId}
-                      resources={resources}
-                      onAssign={assignResource}
-                    />
-                  </td>
+                        <td className="px-3 py-2 border-b border-gray-100">
+                          <ResourcePicker
+                            taskId={task.taskId}
+                            discipline={task.discipline}
+                            assignedResourceId={task.assignedResourceId}
+                            resources={resources}
+                            onAssign={assignResource}
+                          />
+                        </td>
 
-                  {hasCosts && (
-                    <td className="px-3 py-2 text-xs border-b border-gray-100 tabular-nums text-right">
-                      {task.cost > 0 ? (
-                        <span className="text-gray-700">{currencySymbol}{Math.round(task.cost).toLocaleString()}</span>
-                      ) : (
-                        <span className="text-gray-300">—</span>
-                      )}
+                        {hasCosts && (
+                          <td className="px-3 py-2 text-xs border-b border-gray-100 tabular-nums text-right">
+                            {task.cost > 0
+                              ? <span className="text-gray-700">{currencySymbol}{Math.round(task.cost).toLocaleString()}</span>
+                              : <span className="text-gray-300">—</span>}
+                          </td>
+                        )}
+
+                        <td className="px-3 py-2 border-b border-gray-100 min-w-[160px]">
+                          <EditableText
+                            value={overrides[task.taskId]?.notes ?? ""}
+                            placeholder="Add note…"
+                            onCommit={(v) => setOverride(task.taskId, { notes: v })}
+                          />
+                        </td>
+                      </tr>
+                    );
+                  })}
+
+                  {/* Feature subtotal row */}
+                  <tr key={`subtotal-${group.featureId}`} className="bg-gray-50/80 border-t border-gray-200">
+                    <td colSpan={4} className="px-3 py-1.5 text-xs font-semibold text-gray-600 italic">
+                      {group.featureName}
                     </td>
-                  )}
-
-                  <td className="px-3 py-2 border-b border-gray-100 min-w-[160px]">
-                    <EditableText
-                      value={overrides[task.taskId]?.notes ?? ""}
-                      placeholder="Add note…"
-                      onCommit={(v) => setOverride(task.taskId, { notes: v })}
-                    />
-                  </td>
-                </tr>
+                    <td className="px-3 py-1.5 text-xs font-semibold text-gray-600 tabular-nums text-right">
+                      {groupWd % 1 === 0 ? groupWd : groupWd.toFixed(1)}d
+                    </td>
+                    <td colSpan={hasCosts ? 3 : 3} />
+                    {hasCosts && (
+                      <td className="px-3 py-1.5 text-xs font-semibold text-gray-600 tabular-nums text-right">
+                        {groupCost > 0 ? `${currencySymbol}${Math.round(groupCost).toLocaleString()}` : "—"}
+                      </td>
+                    )}
+                    <td />
+                  </tr>
+                </>
               );
             })}
           </tbody>
           <tfoot>
-            <tr className="bg-gray-50 border-t border-gray-200">
-              <td colSpan={4} className="px-3 py-2 text-xs font-semibold text-gray-600">
-                Totals
-              </td>
+            <tr className="bg-gray-50 border-t-2 border-gray-300">
+              <td colSpan={4} className="px-3 py-2 text-xs font-semibold text-gray-600">Base total</td>
               <td className="px-3 py-2 text-xs font-semibold text-gray-700 tabular-nums text-right">
                 {totalWd % 1 === 0 ? totalWd : totalWd.toFixed(1)}d
               </td>
-              <td colSpan={2} />
-              {hasCosts && (
-                <td className="px-3 py-2 text-xs font-semibold text-gray-700 tabular-nums text-right">
-                  {currencySymbol}{Math.round(totalCost).toLocaleString()}
-                </td>
-              )}
+              <td colSpan={3} />
+              {hasCosts && <td className="px-3 py-2 text-xs font-semibold text-gray-700 tabular-nums text-right">{currencySymbol}{Math.round(baseCost).toLocaleString()}</td>}
               <td />
             </tr>
+            {hasCosts && contingencyPct > 0 && (
+              <tr className="bg-gray-50">
+                <td colSpan={4} className="px-3 py-2 text-xs text-gray-500 italic">
+                  Contingency ({contingencyPct}%)
+                </td>
+                <td colSpan={4} />
+                <td className="px-3 py-2 text-xs text-gray-500 tabular-nums text-right italic">
+                  +{currencySymbol}{Math.round(contCost).toLocaleString()}
+                </td>
+                <td />
+              </tr>
+            )}
+            {hasCosts && contingencyPct > 0 && (
+              <tr className="bg-gray-100 border-t border-gray-200">
+                <td colSpan={4} className="px-3 py-2 text-xs font-bold text-gray-700">Project total</td>
+                <td colSpan={4} />
+                <td className="px-3 py-2 text-xs font-bold text-gray-800 tabular-nums text-right">
+                  {currencySymbol}{Math.round(totalCost).toLocaleString()}
+                </td>
+                <td />
+              </tr>
+            )}
           </tfoot>
         </table>
       </div>
@@ -257,6 +292,82 @@ function EstimateValueInput({
       onKeyDown={(e) => {
         if (e.key === "Enter") e.currentTarget.blur();
         if (e.key === "Escape") { setDraft(String(value)); e.currentTarget.blur(); }
+      }}
+    />
+  );
+}
+
+function EditableDayCell({
+  day, settings, cal, onCommit,
+}: {
+  day: number;
+  settings: ScheduleSettings;
+  cal: Date[];
+  onCommit: (day: number) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+
+  function label() {
+    if (settings.calendarMode === "actual" && cal[day]) return formatDateShort(cal[day]);
+    const m = Math.floor(day / 20) + 1;
+    const w = Math.floor((day % 20) / 5) + 1;
+    return `M${m} W${w}`;
+  }
+
+  if (!editing) {
+    return (
+      <span
+        className="cursor-text text-xs text-gray-500 hover:bg-gray-100 rounded px-1 -mx-1 block whitespace-nowrap tabular-nums"
+        title="Click to override"
+        onClick={() => setEditing(true)}
+      >
+        {label()}
+      </span>
+    );
+  }
+
+  if (settings.calendarMode === "actual" && cal.length > 0) {
+    return (
+      <input
+        type="date"
+        autoFocus
+        defaultValue={cal[day] ? cal[day].toISOString().slice(0, 10) : ""}
+        className="border border-blue-400 rounded px-1 py-0.5 text-xs focus:outline-none"
+        onBlur={(e) => {
+          if (e.target.value) {
+            const target = parseISODate(e.target.value);
+            const idx = cal.findIndex(
+              (d) => d.getFullYear() === target.getFullYear() &&
+                     d.getMonth() === target.getMonth() &&
+                     d.getDate() === target.getDate()
+            );
+            if (idx >= 0) onCommit(idx);
+          }
+          setEditing(false);
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") e.currentTarget.blur();
+          if (e.key === "Escape") setEditing(false);
+        }}
+      />
+    );
+  }
+
+  return (
+    <input
+      type="number"
+      autoFocus
+      min={0}
+      defaultValue={day}
+      className="border border-blue-400 rounded px-1.5 py-0.5 text-xs focus:outline-none w-16"
+      onBlur={(e) => {
+        const v = parseInt(e.target.value);
+        if (!isNaN(v) && v >= 0) onCommit(v);
+        setEditing(false);
+      }}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") e.currentTarget.blur();
+        if (e.key === "Escape") setEditing(false);
       }}
     />
   );

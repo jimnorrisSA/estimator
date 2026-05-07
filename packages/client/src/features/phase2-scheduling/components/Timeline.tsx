@@ -159,13 +159,17 @@ function DraggableTaskBar({ task, y, barH, color, onMove, onResize, onClearPin }
   );
 }
 
+const SUMMARY_ROW_H = 36;
+
 interface Props {
   result: ScheduleResult;
   features: Feature[];
   settings: ScheduleSettings;
+  viewMode: "detailed" | "summary";
+  onToggleView: () => void;
 }
 
-export function Timeline({ result, features, settings }: Props) {
+export function Timeline({ result, features, settings, viewMode, onToggleView }: Props) {
   const { tasks, disciplines, capacities, totalDays, contingencyDays, projectEndDay } = result;
 
   const { setOverride, clearOverride } = useSchedulingStore();
@@ -193,6 +197,27 @@ export function Timeline({ result, features, settings }: Props) {
     [features]
   );
 
+  // Summary view: one row per feature spanning earliest start → latest end
+  const summaryRows = useMemo(() => {
+    let y = 0;
+    return features
+      .map((f) => {
+        const ft = tasks.filter((t) => t.featureId === f.id);
+        if (!ft.length) return null;
+        const rowY = y;
+        y += SUMMARY_ROW_H + ROW_GAP;
+        return {
+          featureId: f.id,
+          featureName: f.name,
+          startDay: Math.min(...ft.map((t) => t.startDay)),
+          endDay: Math.max(...ft.map((t) => t.endDay)),
+          color: featureColors.get(f.id) ?? "#3b82f6",
+          rowY,
+        };
+      })
+      .filter(Boolean) as { featureId: string; featureName: string; startDay: number; endDay: number; color: string; rowY: number }[];
+  }, [features, tasks, featureColors]);
+
   const cal = useMemo(() => {
     if (settings.calendarMode !== "actual" || projectEndDay === 0) return [];
     return buildWorkingDayCalendar(parseISODate(settings.startDate), projectEndDay + 1);
@@ -210,10 +235,12 @@ export function Timeline({ result, features, settings }: Props) {
     });
   }, [disciplines, capacities]);
 
-  const contY =
+  const detailedContY =
     rowLayouts.length > 0
       ? rowLayouts[rowLayouts.length - 1].rowY + rowLayouts[rowLayouts.length - 1].height + ROW_GAP
       : 0;
+  const summaryContY = summaryRows.length * (SUMMARY_ROW_H + ROW_GAP);
+  const contY = viewMode === "summary" ? summaryContY : detailedContY;
 
   if (tasks.length === 0) {
     return (
@@ -228,45 +255,62 @@ export function Timeline({ result, features, settings }: Props) {
 
   return (
     <div className="flex flex-col gap-3">
+      {/* View toggle */}
+      <div className="flex justify-end">
+        <div className="flex rounded-lg border border-gray-200 overflow-hidden text-xs shadow-sm">
+          {(["detailed", "summary"] as const).map((mode) => (
+            <button
+              key={mode}
+              className={`px-3 py-1.5 transition-colors ${
+                viewMode === mode ? "bg-blue-600 text-white font-medium" : "bg-white text-gray-500 hover:bg-gray-50"
+              }`}
+              onClick={onToggleView}
+            >
+              {mode === "detailed" ? "Detailed" : "Summary"}
+            </button>
+          ))}
+        </div>
+      </div>
+
       <div className="overflow-hidden rounded-xl border border-gray-200 shadow-sm">
         <div className="flex items-stretch">
           {/* Fixed label column */}
           <svg width={LABEL_W} height={svgH} className="flex-shrink-0 border-r border-gray-200 bg-white">
-            {rowLayouts.map((layout) => (
-              <g key={layout.discipline}>
-                <text
-                  x={LABEL_W - 12}
-                  y={HEADER_H + layout.rowY + layout.height / 2 - (layout.capacity > 1 ? 7 : 0)}
-                  textAnchor="end"
-                  dominantBaseline="middle"
-                  fontSize={12}
-                  fill="#374151"
-                  fontWeight="600"
-                >
-                  {layout.discipline}
-                </text>
-                {layout.capacity > 1 && (
+            {viewMode === "detailed"
+              ? rowLayouts.map((layout) => (
+                  <g key={layout.discipline}>
+                    <text
+                      x={LABEL_W - 12}
+                      y={HEADER_H + layout.rowY + layout.height / 2 - (layout.capacity > 1 ? 7 : 0)}
+                      textAnchor="end" dominantBaseline="middle" fontSize={12} fill="#374151" fontWeight="600"
+                    >
+                      {layout.discipline}
+                    </text>
+                    {layout.capacity > 1 && (
+                      <text
+                        x={LABEL_W - 12}
+                        y={HEADER_H + layout.rowY + layout.height / 2 + 8}
+                        textAnchor="end" dominantBaseline="middle" fontSize={9} fill="#9ca3af"
+                      >
+                        ×{layout.capacity} people
+                      </text>
+                    )}
+                  </g>
+                ))
+              : summaryRows.map((row) => (
                   <text
+                    key={row.featureId}
                     x={LABEL_W - 12}
-                    y={HEADER_H + layout.rowY + layout.height / 2 + 8}
-                    textAnchor="end"
-                    dominantBaseline="middle"
-                    fontSize={9}
-                    fill="#9ca3af"
+                    y={HEADER_H + row.rowY + SUMMARY_ROW_H / 2}
+                    textAnchor="end" dominantBaseline="middle" fontSize={11} fill="#374151" fontWeight="600"
                   >
-                    ×{layout.capacity} people
+                    {row.featureName.length > 12 ? row.featureName.slice(0, 11) + "…" : row.featureName}
                   </text>
-                )}
-              </g>
-            ))}
+                ))}
             <text
               x={LABEL_W - 12}
               y={HEADER_H + contY + CONT_ROW_H / 2}
-              textAnchor="end"
-              dominantBaseline="middle"
-              fontSize={11}
-              fill="#9ca3af"
-              fontStyle="italic"
+              textAnchor="end" dominantBaseline="middle" fontSize={11} fill="#9ca3af" fontStyle="italic"
             >
               Contingency
             </text>
@@ -276,16 +320,17 @@ export function Timeline({ result, features, settings }: Props) {
           <div className="overflow-x-auto flex-1 bg-white">
             <svg width={chartW} height={svgH}>
               {/* Row backgrounds */}
-              {rowLayouts.map((layout, i) => (
-                <rect
-                  key={`bg-${layout.discipline}`}
-                  x={0}
-                  y={HEADER_H + layout.rowY}
-                  width={chartW}
-                  height={layout.height}
-                  fill={i % 2 === 0 ? "#f9fafb" : "#ffffff"}
-                />
-              ))}
+              {viewMode === "detailed"
+                ? rowLayouts.map((layout, i) => (
+                    <rect key={`bg-${layout.discipline}`}
+                      x={0} y={HEADER_H + layout.rowY} width={chartW} height={layout.height}
+                      fill={i % 2 === 0 ? "#f9fafb" : "#ffffff"} />
+                  ))
+                : summaryRows.map((row, i) => (
+                    <rect key={`bg-${row.featureId}`}
+                      x={0} y={HEADER_H + row.rowY} width={chartW} height={SUMMARY_ROW_H}
+                      fill={i % 2 === 0 ? "#f9fafb" : "#ffffff"} />
+                  ))}
               <rect
                 x={0}
                 y={HEADER_H + contY}
@@ -310,25 +355,38 @@ export function Timeline({ result, features, settings }: Props) {
               />
 
               {/* Task bars */}
-              {tasks.map((task) => {
-                const layout = rowLayouts.find((r) => r.discipline === task.discipline);
-                if (!layout) return null;
-                const barH = SLOT_H - 4;
-                const y = HEADER_H + layout.rowY + ROW_VPAD + task.slotIndex * SLOT_H;
-                const color = featureColors.get(task.featureId) ?? "#3b82f6";
-                return (
-                  <DraggableTaskBar
-                    key={task.taskId}
-                    task={task}
-                    y={y}
-                    barH={barH}
-                    color={color}
-                    onMove={handleMove}
-                    onResize={handleResize}
-                    onClearPin={handleClearPin}
-                  />
-                );
-              })}
+              {viewMode === "detailed"
+                ? tasks.map((task) => {
+                    const layout = rowLayouts.find((r) => r.discipline === task.discipline);
+                    if (!layout) return null;
+                    const barH = SLOT_H - 4;
+                    const y = HEADER_H + layout.rowY + ROW_VPAD + task.slotIndex * SLOT_H;
+                    const color = featureColors.get(task.featureId) ?? "#3b82f6";
+                    return (
+                      <DraggableTaskBar key={task.taskId} task={task} y={y} barH={barH} color={color}
+                        onMove={handleMove} onResize={handleResize} onClearPin={handleClearPin} />
+                    );
+                  })
+                : summaryRows.map((row) => {
+                    const x = row.startDay * DAY_W;
+                    const barW = Math.max(4, (row.endDay - row.startDay) * DAY_W - 2);
+                    const y = HEADER_H + row.rowY + 5;
+                    const barH = SUMMARY_ROW_H - 10;
+                    const maxChars = Math.floor((barW - 10) / 6);
+                    return (
+                      <g key={row.featureId}>
+                        <title>{row.featureName}</title>
+                        <rect x={x} y={y} width={barW} height={barH} rx={4} fill={row.color} opacity={0.85} />
+                        {barW > 40 && (
+                          <text x={x + 8} y={y + barH / 2} dominantBaseline="middle"
+                            fontSize={10} fontWeight="600" fill="white"
+                            style={{ pointerEvents: "none", userSelect: "none" }}>
+                            {row.featureName.length > maxChars ? row.featureName.slice(0, maxChars) + "…" : row.featureName}
+                          </text>
+                        )}
+                      </g>
+                    );
+                  })}
 
               {/* Target end date deadline line */}
               {settings.targetEndDate && (() => {
