@@ -17,7 +17,10 @@
       "Bash(python notify_slack.py blocked \"Testing two-way Slack bridge again — reply yes or no\")",
       "Bash(python notify_slack.py wait 120)",
       "Bash(python -c ' *)",
-      "Bash(python notify_slack.py blocked \"Two-way test — reply yes or no\")"
+      "Bash(python notify_slack.py blocked \"Two-way test — reply yes or no\")",
+      "Bash(python *)",
+      "Bash(pip install *)",
+      "Bash(pnpm --filter @estimator/client build)"
     ]
   }
 }

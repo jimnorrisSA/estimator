@@ -1,0 +1,19 @@
+import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
+import { useEffect, useRef } from "react";
+import { DISCIPLINE_COLORS, DEFAULT_DISCIPLINES } from "../utils/defaults.js";
+export function DisciplinePicker({ req, onPick, onDone }) {
+    const ref = useRef(null);
+    useEffect(() => {
+        function onMouseDown(e) {
+            if (ref.current && !ref.current.contains(e.target))
+                onDone();
+        }
+        document.addEventListener("mousedown", onMouseDown);
+        return () => document.removeEventListener("mousedown", onMouseDown);
+    }, [onDone]);
+    const options = [...DEFAULT_DISCIPLINES, "Custom"];
+    return (_jsxs("div", { ref: ref, style: { position: "fixed", left: req.x, top: req.y, zIndex: 1100 }, className: "bg-white border border-gray-200 rounded-lg shadow-lg p-2 flex flex-col gap-1 min-w-36", children: [_jsx("p", { className: "text-xs font-semibold text-gray-500 px-1 pb-1", children: "Add discipline" }), options.map((d) => (_jsxs("button", { className: "flex items-center gap-2 text-sm text-left px-2 py-1.5 rounded hover:bg-gray-50 transition-colors", onClick: () => {
+                    onPick(req.featureId, d);
+                    onDone();
+                }, children: [_jsx("span", { className: "w-3 h-3 rounded-sm shrink-0", style: { background: DISCIPLINE_COLORS[d] } }), d] }, d)))] }));
+}
