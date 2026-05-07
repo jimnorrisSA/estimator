@@ -15,8 +15,26 @@ interface Props {
 }
 
 export function SettingsPanel({ settings, onChange }: Props) {
-  const [rateDraft, setRateDraft] = useState(settings.defaultDailyRate > 0 ? String(settings.defaultDailyRate) : "");
   const symbol = CURRENCY_SYMBOLS[settings.currency];
+  const [dayDraft, setDayDraft] = useState(settings.defaultDailyRate > 0 ? String(settings.defaultDailyRate) : "");
+  const [monthDraft, setMonthDraft] = useState(settings.defaultDailyRate > 0 ? String(settings.defaultDailyRate * 20) : "");
+
+  function commitDayRate(raw: string) {
+    const v = parseFloat(raw);
+    const rate = isNaN(v) || v < 0 ? 0 : v;
+    onChange({ defaultDailyRate: rate });
+    setDayDraft(rate > 0 ? String(rate) : "");
+    setMonthDraft(rate > 0 ? String(rate * 20) : "");
+  }
+
+  function commitMonthRate(raw: string) {
+    const v = parseFloat(raw);
+    const monthly = isNaN(v) || v < 0 ? 0 : v;
+    const daily = monthly / 20;
+    onChange({ defaultDailyRate: daily });
+    setMonthDraft(monthly > 0 ? String(monthly) : "");
+    setDayDraft(daily > 0 ? String(daily) : "");
+  }
 
   return (
     <div className="flex items-end gap-6 px-6 py-3 bg-white border-b border-gray-200 flex-shrink-0 flex-wrap">
@@ -104,23 +122,39 @@ export function SettingsPanel({ settings, onChange }: Props) {
         </select>
       </Field>
 
-      <Field label={`Default day rate (${symbol})`}>
-        <div className="flex items-center gap-1.5">
-          <span className="text-sm text-gray-400">{symbol}</span>
-          <input
-            type="number"
-            min={0}
-            step={50}
-            placeholder="e.g. 400"
-            className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm w-28 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            value={rateDraft}
-            onChange={(e) => setRateDraft(e.target.value)}
-            onBlur={() => {
-              const v = parseFloat(rateDraft);
-              onChange({ defaultDailyRate: isNaN(v) || v < 0 ? 0 : v });
-            }}
-            onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
-          />
+      <Field label={`Default rate (${symbol})`}>
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1">
+            <span className="text-xs text-gray-400">Day</span>
+            <span className="text-sm text-gray-400">{symbol}</span>
+            <input
+              type="number"
+              min={0}
+              step={50}
+              placeholder="400"
+              className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm w-24 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              value={dayDraft}
+              onChange={(e) => setDayDraft(e.target.value)}
+              onBlur={() => commitDayRate(dayDraft)}
+              onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
+            />
+          </div>
+          <span className="text-gray-300 text-sm">·</span>
+          <div className="flex items-center gap-1">
+            <span className="text-xs text-gray-400">Month</span>
+            <span className="text-sm text-gray-400">{symbol}</span>
+            <input
+              type="number"
+              min={0}
+              step={500}
+              placeholder="8000"
+              className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm w-28 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              value={monthDraft}
+              onChange={(e) => setMonthDraft(e.target.value)}
+              onBlur={() => commitMonthRate(monthDraft)}
+              onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
+            />
+          </div>
         </div>
       </Field>
     </div>
