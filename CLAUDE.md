@@ -68,9 +68,16 @@ python notify_slack.py <status> "<message>" ["<details>"]
 | `done` | Task fully complete |
 | `error` | Unrecoverable error |
 
+**Two-step permission flow** — when you need Jim's approval before proceeding:
+```bash
+python notify_slack.py blocked "What you're about to do and why you need approval"
+python notify_slack.py wait   # blocks until Jim replies; exits 0=yes, 2=no, 1=timeout
+```
+If `wait` exits 0, proceed. If 2 or 1, stop and inform Jim in the next message.
+
 **Rules:**
 - Only notify at meaningful moments — not every file save
-- `blocked` means pause and wait for Jim's reply before continuing
+- Always use the two-step blocked+wait flow when you would otherwise ask for permission in the terminal
 - Keep messages short enough to read on a phone screen
 - Include file names in the details field when relevant
 - Don't stack multiple `blocked` notifications
