@@ -11,7 +11,13 @@
       "Bash(pnpm typecheck *)",
       "PowerShell(Get-Command *)",
       "PowerShell(npm install *)",
-      "Bash(python notify_slack.py start \"Testing Slack notifier from estimator project\")"
+      "Bash(python notify_slack.py start \"Testing Slack notifier from estimator project\")",
+      "Bash(python notify_slack.py blocked \"Testing two-way Slack bridge — reply yes or no to confirm it works\")",
+      "Bash(python notify_slack.py wait 60)",
+      "Bash(python notify_slack.py blocked \"Testing two-way Slack bridge again — reply yes or no\")",
+      "Bash(python notify_slack.py wait 120)",
+      "Bash(python -c ' *)",
+      "Bash(python notify_slack.py blocked \"Two-way test — reply yes or no\")"
     ]
   }
 }
