@@ -125,7 +125,7 @@ function DraggableTaskBar({ task, y, barH, color, onMove, onResize, onClearPin }
 
       {/* Label */}
       {barW > 32 && (
-        <text x={x + 5} y={y + barH / 2} dominantBaseline="middle" fontSize={9} fill="white"
+        <text x={x + 5} y={y + barH / 2} dominantBaseline="middle" fontSize={11} fill="white"
           style={{ pointerEvents: "none", userSelect: "none" }}>
           {task.label.length > maxChars ? task.label.slice(0, maxChars) + "…" : task.label}
         </text>
@@ -150,7 +150,7 @@ function DraggableTaskBar({ task, y, barH, color, onMove, onResize, onClearPin }
 
       {/* Duration label above bar while dragging */}
       {isDragging && preview && (
-        <text x={x + barW / 2} y={y - 5} textAnchor="middle" fontSize={9} fill="#374151" fontWeight="600"
+        <text x={x + barW / 2} y={y - 5} textAnchor="middle" fontSize={11} fill="#374151" fontWeight="600"
           style={{ pointerEvents: "none", userSelect: "none" }}>
           {String(Math.round((preview.endDay - preview.startDay) * 2) / 2)}d
         </text>
@@ -281,16 +281,16 @@ export function Timeline({ result, features, settings, viewMode, onToggleView }:
                   <g key={layout.discipline}>
                     <text
                       x={LABEL_W - 12}
-                      y={HEADER_H + layout.rowY + layout.height / 2 - (layout.capacity > 1 ? 7 : 0)}
-                      textAnchor="end" dominantBaseline="middle" fontSize={12} fill="#374151" fontWeight="600"
+                      y={HEADER_H + layout.rowY + layout.height / 2 - (layout.capacity > 1 ? 8 : 0)}
+                      textAnchor="end" dominantBaseline="middle" fontSize={13} fill="#374151" fontWeight="600"
                     >
                       {layout.discipline}
                     </text>
                     {layout.capacity > 1 && (
                       <text
                         x={LABEL_W - 12}
-                        y={HEADER_H + layout.rowY + layout.height / 2 + 8}
-                        textAnchor="end" dominantBaseline="middle" fontSize={9} fill="#9ca3af"
+                        y={HEADER_H + layout.rowY + layout.height / 2 + 9}
+                        textAnchor="end" dominantBaseline="middle" fontSize={11} fill="#9ca3af"
                       >
                         ×{layout.capacity} people
                       </text>
@@ -302,7 +302,7 @@ export function Timeline({ result, features, settings, viewMode, onToggleView }:
                     key={row.featureId}
                     x={LABEL_W - 12}
                     y={HEADER_H + row.rowY + SUMMARY_ROW_H / 2}
-                    textAnchor="end" dominantBaseline="middle" fontSize={11} fill="#374151" fontWeight="600"
+                    textAnchor="end" dominantBaseline="middle" fontSize={12} fill="#374151" fontWeight="600"
                   >
                     {row.featureName.length > 12 ? row.featureName.slice(0, 11) + "…" : row.featureName}
                   </text>
@@ -310,7 +310,7 @@ export function Timeline({ result, features, settings, viewMode, onToggleView }:
             <text
               x={LABEL_W - 12}
               y={HEADER_H + contY + CONT_ROW_H / 2}
-              textAnchor="end" dominantBaseline="middle" fontSize={11} fill="#9ca3af" fontStyle="italic"
+              textAnchor="end" dominantBaseline="middle" fontSize={12} fill="#9ca3af" fontStyle="italic"
             >
               Contingency
             </text>
@@ -379,7 +379,7 @@ export function Timeline({ result, features, settings, viewMode, onToggleView }:
                         <rect x={x} y={y} width={barW} height={barH} rx={4} fill={row.color} opacity={0.85} />
                         {barW > 40 && (
                           <text x={x + 8} y={y + barH / 2} dominantBaseline="middle"
-                            fontSize={10} fontWeight="600" fill="white"
+                            fontSize={11} fontWeight="600" fill="white"
                             style={{ pointerEvents: "none", userSelect: "none" }}>
                             {row.featureName.length > maxChars ? row.featureName.slice(0, maxChars) + "…" : row.featureName}
                           </text>
@@ -421,7 +421,7 @@ export function Timeline({ result, features, settings, viewMode, onToggleView }:
                     <rect x={dx - 28} y={HEADER_H + 4} width={56} height={16} rx={3}
                       fill={lineColor} />
                     <text x={dx} y={HEADER_H + 12} textAnchor="middle" dominantBaseline="middle"
-                      fontSize={9} fill="white" fontWeight="600"
+                      fontSize={10} fill="white" fontWeight="600"
                       style={{ pointerEvents: "none" }}>
                       {isOverrun ? "OVERRUN" : "TARGET"}
                     </text>
@@ -449,7 +449,7 @@ export function Timeline({ result, features, settings, viewMode, onToggleView }:
                       y={HEADER_H + contY + CONT_ROW_H / 2}
                       textAnchor="middle"
                       dominantBaseline="middle"
-                      fontSize={10}
+                      fontSize={11}
                       fill="#6b7280"
                     >
                       {settings.contingencyPct}% contingency
@@ -481,7 +481,7 @@ function FourWeekHeader({ projectEndDay, chartW }: { projectEndDay: number; char
     els.push(
       <g key={`m-${m}`}>
         <rect x={x} y={0} width={w} height={MONTH_H} fill={m % 2 === 0 ? "#f3f4f6" : "#eaecef"} />
-        <text x={x + w / 2} y={MONTH_H / 2} textAnchor="middle" dominantBaseline="middle" fontSize={11} fill="#374151" fontWeight="600">
+        <text x={x + w / 2} y={MONTH_H / 2} textAnchor="middle" dominantBaseline="middle" fontSize={12} fill="#374151" fontWeight="600">
           Month {m + 1}
         </text>
       </g>
@@ -495,7 +495,7 @@ function FourWeekHeader({ projectEndDay, chartW }: { projectEndDay: number; char
       els.push(
         <g key={`w-${m}-${w4}`}>
           <rect x={wx} y={MONTH_H} width={ww} height={WEEK_H} fill={(m + w4) % 2 === 0 ? "#f9fafb" : "#ffffff"} />
-          <text x={wx + ww / 2} y={MONTH_H + WEEK_H / 2} textAnchor="middle" dominantBaseline="middle" fontSize={10} fill="#9ca3af">
+          <text x={wx + ww / 2} y={MONTH_H + WEEK_H / 2} textAnchor="middle" dominantBaseline="middle" fontSize={11} fill="#9ca3af">
             W{w4 + 1}
           </text>
         </g>
@@ -522,7 +522,7 @@ function ActualDateHeader({ projectEndDay, cal, chartW }: { projectEndDay: numbe
     els.push(
       <g key={`month-${monthKey}`}>
         <rect x={x} y={0} width={w} height={MONTH_H} fill={monthIdx % 2 === 0 ? "#f3f4f6" : "#eaecef"} />
-        <text x={x + w / 2} y={MONTH_H / 2} textAnchor="middle" dominantBaseline="middle" fontSize={11} fill="#374151" fontWeight="600">
+        <text x={x + w / 2} y={MONTH_H / 2} textAnchor="middle" dominantBaseline="middle" fontSize={12} fill="#374151" fontWeight="600">
           {formatMonthYear(cal[monthStart])}
         </text>
       </g>
@@ -541,7 +541,7 @@ function ActualDateHeader({ projectEndDay, cal, chartW }: { projectEndDay: numbe
     }
     if (date.getDay() === 1) {
       els.push(
-        <text key={`wk-${d}`} x={d * DAY_W + 3} y={MONTH_H + WEEK_H / 2} dominantBaseline="middle" fontSize={9} fill="#9ca3af">
+        <text key={`wk-${d}`} x={d * DAY_W + 3} y={MONTH_H + WEEK_H / 2} dominantBaseline="middle" fontSize={10} fill="#9ca3af">
           {formatDateShort(date)}
         </text>
       );
@@ -582,7 +582,7 @@ function FeatureLegend({ features, featureColors, tasks }: { features: Feature[]
   return (
     <div className="flex flex-wrap gap-4">
       {active.map((f) => (
-        <div key={f.id} className="flex items-center gap-1.5 text-xs text-gray-600">
+        <div key={f.id} className="flex items-center gap-1.5 text-sm text-gray-600">
           <span className="inline-block w-3 h-3 rounded-sm flex-shrink-0" style={{ background: featureColors.get(f.id) ?? "#3b82f6" }} />
           {f.name}
         </div>

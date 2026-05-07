@@ -30,12 +30,12 @@ export function TeamSidebar({ resources, currency, onAdd, onUpdate, onDelete }: 
       {/* Header */}
       <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
         <h2 className="text-sm font-semibold text-gray-700">Team</h2>
-        <span className="text-xs text-gray-400">{resources.length} member{resources.length !== 1 ? "s" : ""}</span>
+        <span className="text-sm text-gray-400">{resources.length} member{resources.length !== 1 ? "s" : ""}</span>
       </div>
 
       {/* Rate hint */}
       {!hasRates && resources.length > 0 && (
-        <div className="mx-3 mt-3 px-3 py-2 bg-blue-50 rounded-lg text-xs text-blue-600 leading-snug">
+        <div className="mx-3 mt-3 px-3 py-2 bg-blue-50 rounded-lg text-sm text-blue-600 leading-snug">
           Add daily rates to unlock cost totals.
         </div>
       )}
@@ -94,9 +94,9 @@ function DisciplineSection({
     <div>
       <div className="flex items-center gap-1.5 mb-1.5">
         <span className={`w-2 h-2 rounded-full flex-shrink-0 ${styles.dot}`} />
-        <span className="text-xs font-semibold text-gray-600">{discipline}</span>
+        <span className="text-sm font-semibold text-gray-600">{discipline}</span>
         {members.length > 0 && (
-          <span className="text-xs text-gray-400 ml-auto">{members.length}</span>
+          <span className="text-sm text-gray-400 ml-auto">{members.length}</span>
         )}
       </div>
 
@@ -114,7 +114,7 @@ function DisciplineSection({
         {adding ? (
           <input
             autoFocus
-            className="w-full text-xs border border-blue-400 rounded-lg px-2 py-1.5 focus:outline-none"
+            className="w-full text-sm border border-blue-400 rounded-lg px-2 py-1.5 focus:outline-none"
             placeholder="Name…"
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
@@ -126,7 +126,7 @@ function DisciplineSection({
           />
         ) : (
           <button
-            className="text-xs text-gray-400 hover:text-blue-600 text-left py-0.5 transition-colors"
+            className="text-sm text-gray-400 hover:text-blue-600 text-left py-0.5 transition-colors"
             onClick={() => setAdding(true)}
           >
             + Add {discipline.toLowerCase()}
@@ -169,19 +169,19 @@ function MemberRow({
       <div className="bg-gray-50 rounded-lg p-2 flex flex-col gap-1.5 border border-gray-200">
         <input
           autoFocus
-          className="text-xs border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500 w-full"
+          className="text-sm border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500 w-full"
           value={draftName}
           onChange={(e) => setDraftName(e.target.value)}
           placeholder="Name"
           onKeyDown={(e) => { if (e.key === "Enter") commitEdit(); if (e.key === "Escape") setEditing(false); }}
         />
         <div className="flex items-center gap-1">
-          <span className="text-xs text-gray-400">{symbol}</span>
+          <span className="text-sm text-gray-400">{symbol}</span>
           <input
             type="number"
             min={0}
             step={50}
-            className="flex-1 text-xs border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            className="flex-1 text-sm border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500"
             value={draftRate}
             onChange={(e) => setDraftRate(e.target.value)}
             placeholder="Daily rate"
@@ -190,13 +190,13 @@ function MemberRow({
         </div>
         <div className="flex gap-1 justify-end">
           <button
-            className="text-xs px-2 py-0.5 rounded text-gray-500 hover:bg-gray-200 transition-colors"
+            className="text-sm px-2 py-0.5 rounded text-gray-500 hover:bg-gray-200 transition-colors"
             onClick={() => setEditing(false)}
           >
             Cancel
           </button>
           <button
-            className="text-xs px-2 py-0.5 rounded bg-blue-600 text-white hover:bg-blue-700 transition-colors"
+            className="text-sm px-2 py-0.5 rounded bg-blue-600 text-white hover:bg-blue-700 transition-colors"
             onClick={commitEdit}
           >
             Save
@@ -208,9 +208,9 @@ function MemberRow({
 
   return (
     <div className="flex items-center gap-1.5 group rounded-lg px-1.5 py-1 hover:bg-gray-50">
-      <span className="flex-1 text-xs text-gray-700 truncate">{member.name}</span>
+      <span className="flex-1 text-sm text-gray-700 truncate">{member.name}</span>
       {member.dailyRate > 0 && (
-        <span className="text-xs text-gray-400 tabular-nums">
+        <span className="text-sm text-gray-400 tabular-nums">
           {symbol}{member.dailyRate.toLocaleString()}
         </span>
       )}
@@ -254,7 +254,7 @@ function TotalCostFooter({ resources, symbol }: { resources: Resource[]; symbol:
       {byDiscipline.map(({ discipline, members }) => {
         const total = members.reduce((s, m) => s + m.dailyRate, 0);
         return (
-          <div key={discipline} className="flex justify-between text-xs">
+          <div key={discipline} className="flex justify-between text-sm">
             <span className="text-gray-500">{discipline}</span>
             <span className="text-gray-700 tabular-nums font-medium">
               {symbol}{total.toLocaleString()}
@@ -262,7 +262,7 @@ function TotalCostFooter({ resources, symbol }: { resources: Resource[]; symbol:
           </div>
         );
       })}
-      <div className="flex justify-between text-xs font-semibold pt-1 border-t border-gray-100 mt-0.5">
+      <div className="flex justify-between text-sm font-semibold pt-1 border-t border-gray-100 mt-0.5">
         <span className="text-gray-600">Total / day</span>
         <span className="text-gray-800 tabular-nums">
           {symbol}{resources.filter((r) => r.dailyRate > 0).reduce((s, r) => s + r.dailyRate, 0).toLocaleString()}

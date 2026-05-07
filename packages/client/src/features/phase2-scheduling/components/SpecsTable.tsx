@@ -71,7 +71,7 @@ export function SpecsTable({ tasks, features, settings, currencySymbol, continge
 
   return (
     <div className="flex flex-col gap-2">
-      <h3 className="text-sm font-semibold text-gray-700">Task specifications</h3>
+      <h3 className="text-base font-semibold text-gray-700">Task specifications</h3>
       <div className="overflow-x-auto rounded-xl border border-gray-200 shadow-sm">
         <table className="w-full border-collapse">
           <thead>
@@ -98,7 +98,7 @@ export function SpecsTable({ tasks, features, settings, currencySymbol, continge
                     const meta = taskMeta.get(task.taskId);
                     return (
                       <tr key={task.taskId} className="hover:bg-blue-50/30 transition-colors bg-white">
-                        <td className="px-3 py-2 text-xs text-gray-400 whitespace-nowrap border-b border-gray-100">
+                        <td className="px-3 py-2 text-sm text-gray-400 whitespace-nowrap border-b border-gray-100">
                           {task.featureName}
                         </td>
 
@@ -121,7 +121,7 @@ export function SpecsTable({ tasks, features, settings, currencySymbol, continge
                             />
                             <select
                               value={task.estimateUnit}
-                              className="border border-gray-200 rounded px-1 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
+                              className="border border-gray-200 rounded px-1 py-0.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
                               onChange={(e) => { if (meta) updateTaskEstimate(meta.featureId, meta.groupId, task.taskId, task.estimateValue, e.target.value as EstimateUnit); }}
                             >
                               {UNITS.map((u) => <option key={u} value={u}>{UNIT_LABELS[u]}</option>)}
@@ -129,7 +129,7 @@ export function SpecsTable({ tasks, features, settings, currencySymbol, continge
                           </div>
                         </td>
 
-                        <td className="px-3 py-2 text-xs text-gray-500 border-b border-gray-100 tabular-nums text-right">
+                        <td className="px-3 py-2 text-sm text-gray-500 border-b border-gray-100 tabular-nums text-right">
                           {task.workingDays % 1 === 0 ? task.workingDays : task.workingDays.toFixed(1)}d
                         </td>
 
@@ -162,7 +162,7 @@ export function SpecsTable({ tasks, features, settings, currencySymbol, continge
                         </td>
 
                         {hasCosts && (
-                          <td className="px-3 py-2 text-xs border-b border-gray-100 tabular-nums text-right">
+                          <td className="px-3 py-2 text-sm border-b border-gray-100 tabular-nums text-right">
                             {task.cost > 0
                               ? <span className="text-gray-700">{currencySymbol}{Math.round(task.cost).toLocaleString()}</span>
                               : <span className="text-gray-300">—</span>}
@@ -182,15 +182,15 @@ export function SpecsTable({ tasks, features, settings, currencySymbol, continge
 
                   {/* Feature subtotal row */}
                   <tr key={`subtotal-${group.featureId}`} className="bg-gray-50/80 border-t border-gray-200">
-                    <td colSpan={4} className="px-3 py-1.5 text-xs font-semibold text-gray-600 italic">
+                    <td colSpan={4} className="px-3 py-1.5 text-sm font-semibold text-gray-600 italic">
                       {group.featureName}
                     </td>
-                    <td className="px-3 py-1.5 text-xs font-semibold text-gray-600 tabular-nums text-right">
+                    <td className="px-3 py-1.5 text-sm font-semibold text-gray-600 tabular-nums text-right">
                       {groupWd % 1 === 0 ? groupWd : groupWd.toFixed(1)}d
                     </td>
                     <td colSpan={hasCosts ? 3 : 3} />
                     {hasCosts && (
-                      <td className="px-3 py-1.5 text-xs font-semibold text-gray-600 tabular-nums text-right">
+                      <td className="px-3 py-1.5 text-sm font-semibold text-gray-600 tabular-nums text-right">
                         {groupCost > 0 ? `${currencySymbol}${Math.round(groupCost).toLocaleString()}` : "—"}
                       </td>
                     )}
@@ -202,21 +202,21 @@ export function SpecsTable({ tasks, features, settings, currencySymbol, continge
           </tbody>
           <tfoot>
             <tr className="bg-gray-50 border-t-2 border-gray-300">
-              <td colSpan={4} className="px-3 py-2 text-xs font-semibold text-gray-600">Base total</td>
-              <td className="px-3 py-2 text-xs font-semibold text-gray-700 tabular-nums text-right">
+              <td colSpan={4} className="px-3 py-2 text-sm font-semibold text-gray-600">Base total</td>
+              <td className="px-3 py-2 text-sm font-semibold text-gray-700 tabular-nums text-right">
                 {totalWd % 1 === 0 ? totalWd : totalWd.toFixed(1)}d
               </td>
               <td colSpan={3} />
-              {hasCosts && <td className="px-3 py-2 text-xs font-semibold text-gray-700 tabular-nums text-right">{currencySymbol}{Math.round(baseCost).toLocaleString()}</td>}
+              {hasCosts && <td className="px-3 py-2 text-sm font-semibold text-gray-700 tabular-nums text-right">{currencySymbol}{Math.round(baseCost).toLocaleString()}</td>}
               <td />
             </tr>
             {hasCosts && contingencyPct > 0 && (
               <tr className="bg-gray-50">
-                <td colSpan={4} className="px-3 py-2 text-xs text-gray-500 italic">
+                <td colSpan={4} className="px-3 py-2 text-sm text-gray-500 italic">
                   Contingency ({contingencyPct}%)
                 </td>
                 <td colSpan={4} />
-                <td className="px-3 py-2 text-xs text-gray-500 tabular-nums text-right italic">
+                <td className="px-3 py-2 text-sm text-gray-500 tabular-nums text-right italic">
                   +{currencySymbol}{Math.round(contCost).toLocaleString()}
                 </td>
                 <td />
@@ -224,9 +224,9 @@ export function SpecsTable({ tasks, features, settings, currencySymbol, continge
             )}
             {hasCosts && contingencyPct > 0 && (
               <tr className="bg-gray-100 border-t border-gray-200">
-                <td colSpan={4} className="px-3 py-2 text-xs font-bold text-gray-700">Project total</td>
+                <td colSpan={4} className="px-3 py-2 text-sm font-bold text-gray-700">Project total</td>
                 <td colSpan={4} />
-                <td className="px-3 py-2 text-xs font-bold text-gray-800 tabular-nums text-right">
+                <td className="px-3 py-2 text-sm font-bold text-gray-800 tabular-nums text-right">
                   {currencySymbol}{Math.round(totalCost).toLocaleString()}
                 </td>
                 <td />
@@ -281,7 +281,7 @@ function EstimateValueInput({
       type="number"
       min={0.5}
       step={0.5}
-      className="w-14 border border-gray-200 rounded px-1.5 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
+      className="w-16 border border-gray-200 rounded px-1.5 py-0.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
       value={draft}
       onChange={(e) => setDraft(e.target.value)}
       onBlur={() => {
@@ -317,7 +317,7 @@ function EditableDayCell({
   if (!editing) {
     return (
       <span
-        className="cursor-text text-xs text-gray-500 hover:bg-gray-100 rounded px-1 -mx-1 block whitespace-nowrap tabular-nums"
+        className="cursor-text text-sm text-gray-500 hover:bg-gray-100 rounded px-1 -mx-1 block whitespace-nowrap tabular-nums"
         title="Click to override"
         onClick={() => setEditing(true)}
       >
@@ -332,7 +332,7 @@ function EditableDayCell({
         type="date"
         autoFocus
         defaultValue={cal[day] ? cal[day].toISOString().slice(0, 10) : ""}
-        className="border border-blue-400 rounded px-1 py-0.5 text-xs focus:outline-none"
+        className="border border-blue-400 rounded px-1 py-0.5 text-sm focus:outline-none"
         onBlur={(e) => {
           if (e.target.value) {
             const target = parseISODate(e.target.value);
@@ -359,7 +359,7 @@ function EditableDayCell({
       autoFocus
       min={0}
       defaultValue={day}
-      className="border border-blue-400 rounded px-1.5 py-0.5 text-xs focus:outline-none w-16"
+      className="border border-blue-400 rounded px-1.5 py-0.5 text-sm focus:outline-none w-20"
       onBlur={(e) => {
         const v = parseInt(e.target.value);
         if (!isNaN(v) && v >= 0) onCommit(v);
@@ -389,13 +389,13 @@ function ResourcePicker({
   const matching = resources.filter((r) => r.role === discipline);
 
   if (matching.length === 0) {
-    return <span className="text-xs text-gray-300">—</span>;
+    return <span className="text-sm text-gray-300">—</span>;
   }
 
   return (
     <select
       value={assignedResourceId ?? ""}
-      className="text-xs border border-gray-200 rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white text-gray-700 max-w-[140px]"
+      className="text-sm border border-gray-200 rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white text-gray-700 max-w-[150px]"
       onChange={(e) => onAssign(taskId, e.target.value || null)}
     >
       <option value="">Unassigned</option>
@@ -423,7 +423,7 @@ function EditableText({
   if (!editing) {
     return (
       <span
-        className="cursor-text text-xs text-gray-700 hover:bg-gray-100 rounded px-1 -mx-1 block min-w-[60px] leading-5"
+        className="cursor-text text-sm text-gray-700 hover:bg-gray-100 rounded px-1 -mx-1 block min-w-[60px] leading-5"
         onClick={() => { setDraft(value); setEditing(true); }}
       >
         {value || <span className="text-gray-300">{placeholder}</span>}
@@ -434,7 +434,7 @@ function EditableText({
   return (
     <input
       autoFocus
-      className="border border-blue-400 rounded px-1.5 py-0.5 text-xs focus:outline-none w-full"
+      className="border border-blue-400 rounded px-1.5 py-0.5 text-sm focus:outline-none w-full"
       value={draft}
       onChange={(e) => setDraft(e.target.value)}
       onBlur={() => { onCommit(draft); setEditing(false); }}

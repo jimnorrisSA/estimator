@@ -11,9 +11,9 @@ import {
 } from "../utils/layout.js";
 import type { GroupLayout } from "../utils/layout.js";
 
-const LABEL_FONT = 12;
-const EST_FONT = 11;
-const HEADER_FONT = 11;
+const LABEL_FONT = 13;
+const EST_FONT = 12;
+const HEADER_FONT = 12;
 const PAD = 8;
 
 interface Props {

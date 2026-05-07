@@ -16,8 +16,8 @@ import {
   FEATURE_PAD,
 } from "../utils/layout.js";
 
-const TITLE_FONT = 14;
-const COUNTER_FONT = 10;
+const TITLE_FONT = 15;
+const COUNTER_FONT = 12;
 const COUNTER_W = 110; // reserved width on the right for the counter
 
 interface Props {
