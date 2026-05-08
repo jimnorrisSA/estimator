@@ -26,6 +26,7 @@ interface EstimationsStore {
   deleteGroup: (featureId: string, groupId: string) => void;
 
   addTask: (featureId: string, groupId: string, label: string) => string;
+  duplicateTask: (featureId: string, groupId: string, taskId: string) => string;
   updateTaskLabel: (featureId: string, groupId: string, taskId: string, label: string) => void;
   updateTaskEstimate: (featureId: string, groupId: string, taskId: string, value: number, unit: EstimateUnit) => void;
   deleteTask: (featureId: string, groupId: string, taskId: string) => void;
@@ -170,6 +171,33 @@ export const useEstimationsStore = create<EstimationsStore>()(
           )
         );
         return taskId;
+      },
+
+      duplicateTask(featureId, groupId, taskId) {
+        const newId = crypto.randomUUID();
+        recorded(set, get, (fs) =>
+          fs.map((f) =>
+            f.id !== featureId
+              ? f
+              : {
+                  ...f,
+                  groups: f.groups.map((g) => {
+                    if (g.id !== groupId) return g;
+                    const idx = g.tasks.findIndex((t) => t.id === taskId);
+                    if (idx < 0) return g;
+                    const src = g.tasks[idx];
+                    const copy = { id: newId, label: src.label, estimate: { ...src.estimate } };
+                    return {
+                      ...g,
+                      tasks: [...g.tasks.slice(0, idx + 1), copy, ...g.tasks.slice(idx + 1)],
+                      updatedAt: now(),
+                    };
+                  }),
+                  updatedAt: now(),
+                }
+          )
+        );
+        return newId;
       },
 
       updateTaskLabel(featureId, groupId, taskId, label) {

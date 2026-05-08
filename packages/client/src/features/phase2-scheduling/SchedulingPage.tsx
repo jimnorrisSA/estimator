@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import type { Feature } from "@estimator/shared";
 import { useEstimationsStore } from "../phase1-estimations/store/estimationsStore.js";
-import { useSchedulingStore, CURRENCY_SYMBOLS } from "./store/schedulingStore.js";
+import { useSchedulingStore, CURRENCY_SYMBOLS, getConversionRate } from "./store/schedulingStore.js";
 import { runScheduler } from "./utils/scheduler.js";
 import type { ScheduledTask } from "./utils/scheduler.js";
 import { useMilestonesStore } from "../phase3-milestones/store/milestonesStore.js";
@@ -47,6 +47,7 @@ export function SchedulingPage() {
   );
 
   const symbol = CURRENCY_SYMBOLS[settings.currency];
+  const conversionRate = getConversionRate(settings);
   const totalTasks = result.tasks.length;
   const totalFeatures = new Set(result.tasks.map((t) => t.featureId)).size;
   const baseCost = result.tasks.reduce((s, t) => s + t.cost, 0);
@@ -87,7 +88,7 @@ export function SchedulingPage() {
 
           {/* Cost summary */}
           {hasCosts && (
-            <CostSummary tasks={result.tasks} features={features} symbol={symbol} />
+            <CostSummary tasks={result.tasks} features={features} symbol={symbol} conversionRate={conversionRate} />
           )}
 
           {/* Specs table */}
@@ -126,13 +127,17 @@ function CostSummary({
   tasks,
   features,
   symbol,
+  conversionRate,
 }: {
   tasks: ScheduledTask[];
   features: Feature[];
   symbol: string;
+  conversionRate: number;
 }) {
   const totalCost = tasks.reduce((s, t) => s + t.cost, 0);
   if (totalCost === 0) return null;
+
+  const fmt = (gbp: number) => `${symbol}${Math.round(gbp * conversionRate).toLocaleString()}`;
 
   const featureCosts = features
     .map((f, i) => ({
@@ -158,7 +163,7 @@ function CostSummary({
         <div className="flex flex-col justify-center gap-1 px-8 py-6 md:min-w-[200px]">
           <span className="text-xs text-[#5c5575] font-medium uppercase tracking-wide">Total</span>
           <span className="text-4xl font-bold text-[#ece7ff] tabular-nums leading-none">
-            {symbol}{Math.round(totalCost).toLocaleString()}
+            {fmt(totalCost)}
           </span>
           <span className="text-xs text-[#5c5575] mt-1">
             {featureCosts.length} feature{featureCosts.length !== 1 ? "s" : ""} · {disciplineCosts.length} discipline{disciplineCosts.length !== 1 ? "s" : ""}
@@ -180,7 +185,7 @@ function CostSummary({
                   </div>
                   <span className="text-xs text-[#5c5575] w-7 text-right tabular-nums">{Math.round(pct)}%</span>
                   <span className="text-sm font-semibold text-[#ece7ff] tabular-nums w-24 text-right">
-                    {symbol}{Math.round(f.cost).toLocaleString()}
+                    {fmt(f.cost)}
                   </span>
                 </div>
               </div>
@@ -202,7 +207,7 @@ function CostSummary({
                   </div>
                   <span className="text-xs text-[#5c5575] w-7 text-right tabular-nums">{Math.round(pct)}%</span>
                   <span className="text-sm font-semibold text-[#ece7ff] tabular-nums w-24 text-right">
-                    {symbol}{Math.round(d.cost).toLocaleString()}
+                    {fmt(d.cost)}
                   </span>
                 </div>
               </div>

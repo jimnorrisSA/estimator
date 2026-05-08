@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useMilestonesStore, MILESTONE_COLORS, type Milestone } from "./store/milestonesStore.js";
 import { useEstimationsStore } from "../phase1-estimations/store/estimationsStore.js";
-import { useSchedulingStore, CURRENCY_SYMBOLS } from "../phase2-scheduling/store/schedulingStore.js";
+import { useSchedulingStore, CURRENCY_SYMBOLS, getConversionRate } from "../phase2-scheduling/store/schedulingStore.js";
 import { runScheduler } from "../phase2-scheduling/utils/scheduler.js";
 import { buildWorkingDayCalendar, dateToWorkingDay, parseISODate } from "../phase2-scheduling/utils/calendarUtils.js";
 
@@ -15,6 +15,7 @@ export function MilestonesPage() {
   const features = useEstimationsStore((s) => s.features);
   const { settings, overrides, resources } = useSchedulingStore();
   const symbol = CURRENCY_SYMBOLS[settings.currency];
+  const conversionRate = getConversionRate(settings);
 
   const cal = useMemo(() => {
     if (settings.calendarMode !== "actual") return [];
@@ -106,7 +107,7 @@ export function MilestonesPage() {
                         </td>
                         <td className="py-2.5 pr-4 text-right text-[#9b93ba]">{m.days}d</td>
                         <td className="py-2.5 text-right font-medium text-[#ece7ff]">
-                          {m.cost > 0 ? `${symbol}${Math.round(m.cost).toLocaleString()}` : "—"}
+                          {m.cost > 0 ? `${symbol}${Math.round(m.cost * conversionRate).toLocaleString()}` : "—"}
                         </td>
                       </tr>
                     ))}
@@ -132,7 +133,7 @@ export function MilestonesPage() {
                       <td className="py-2.5 pr-4 text-[#ece7ff]">{discipline}</td>
                       <td className="py-2.5 pr-4 text-right text-[#9b93ba]">{Math.round(days)}d</td>
                       <td className="py-2.5 text-right font-medium text-[#ece7ff]">
-                        {cost > 0 ? `${symbol}${Math.round(cost).toLocaleString()}` : "—"}
+                        {cost > 0 ? `${symbol}${Math.round(cost * conversionRate).toLocaleString()}` : "—"}
                       </td>
                     </tr>
                   ))}
@@ -142,7 +143,7 @@ export function MilestonesPage() {
 
             {/* Totals */}
             <div className="w-full flex flex-wrap gap-3 pt-2 border-t border-[#2e2848]">
-              <Stat label="Total" value={`${symbol}${Math.round(baseCost).toLocaleString()}`} highlight />
+              <Stat label="Total" value={`${symbol}${Math.round(baseCost * conversionRate).toLocaleString()}`} highlight />
             </div>
           </div>
         )}
