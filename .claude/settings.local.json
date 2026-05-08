@@ -8,7 +8,24 @@
       "Bash(npm install *)",
       "Bash(export PATH=\"$PATH:/c/Users/james/AppData/Roaming/npm\")",
       "Bash(pnpm --version)",
-      "Bash(pnpm typecheck *)"
+      "Bash(pnpm typecheck *)",
+      "PowerShell(Get-Command *)",
+      "PowerShell(npm install *)",
+      "Bash(pnpm --filter @estimator/client build)",
+      "Bash(pnpm *)",
+      "Bash(echo \"EXIT:$?\")",
+      "Bash(netstat -ano)",
+      "Bash(taskkill /F /PID 59124 /PID 38148 /PID 39152)",
+      "PowerShell(Stop-Process *)",
+      "Bash(powershell \"Get-Process -Id \\(Get-NetTCPConnection -LocalPort 3000\\).OwningProcess | Select-Object Id, ProcessName, MainWindowTitle\")",
+      "Bash(curl *)",
+      "PowerShell(Get-NetTCPConnection *)",
+      "Bash(git fetch *)",
+      "Bash(npx tsc *)",
+      "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\james\\\\Git\\\\Estimator\\\\packages\\\\client\\\\src\" -Recurse | Where-Object { $_.Extension -eq \".js\" } | Select-Object FullName, LastWriteTime)",
+      "PowerShell(Get-ChildItem \"C:\\\\Users\\\\james\\\\Git\\\\Estimator\\\\packages\\\\client\\\\src\" -Recurse | Where-Object { $_.Extension -in \".js\" } | Select-Object FullName, LastWriteTime | Format-Table -AutoSize)",
+      "PowerShell(Get-ChildItem \"C:\\\\Users\\\\james\\\\Git\\\\Estimator\\\\packages\\\\client\\\\src\" -Recurse | Where-Object { $_.Extension -eq \".js\" } | Select-Object FullName)",
+      "Bash(Get-ChildItem *)"
     ]
   }
 }

@@ -96,17 +96,18 @@ type Milestone struct {
 }
 
 type Resource struct {
-	ID              primitive.ObjectID `bson:"_id"          json:"id"`
-	ProjectID       primitive.ObjectID `bson:"project_id"   json:"projectId"`
-	Name            string             `bson:"name"         json:"name"`
-	Role            Discipline         `bson:"role"         json:"role"`
-	RollOnDate      time.Time          `bson:"roll_on_date" json:"rollOnDate"`
-	RollOffDate     time.Time          `bson:"roll_off_date" json:"rollOffDate"`
-	AllocationPct   float64            `bson:"allocation_pct" json:"allocationPct"`
-	DailyRate       float64            `bson:"daily_rate"   json:"dailyRate"`
-	Currency        string             `bson:"currency"     json:"currency"`
-	Notes           string             `bson:"notes"        json:"notes"`
-	UpdatedAt       time.Time          `bson:"updated_at"   json:"updatedAt"`
+	ID               primitive.ObjectID `bson:"_id"                             json:"id"`
+	ProjectID        primitive.ObjectID `bson:"project_id"                      json:"projectId"`
+	Name             string             `bson:"name"                            json:"name"`
+	Role             Discipline         `bson:"role"                            json:"role"`
+	RollOnDate       time.Time          `bson:"roll_on_date"                    json:"rollOnDate"`
+	RollOffDate      time.Time          `bson:"roll_off_date"                   json:"rollOffDate"`
+	AllocationPct    float64            `bson:"allocation_pct"                  json:"allocationPct"`
+	DailyRate        float64            `bson:"daily_rate"                      json:"dailyRate"`
+	Currency         string             `bson:"currency"                        json:"currency"`
+	Notes            string             `bson:"notes"                           json:"notes"`
+	PlantasticUserID string             `bson:"plantastic_user_id,omitempty"    json:"plantasticUserId,omitempty"`
+	UpdatedAt        time.Time          `bson:"updated_at"                      json:"updatedAt"`
 }
 
 type Project struct {

@@ -26,13 +26,13 @@ export function DisciplinePicker({ req, onPick, onDone }: Props) {
     <div
       ref={ref}
       style={{ position: "fixed", left: req.x, top: req.y, zIndex: 1100 }}
-      className="bg-white border border-gray-200 rounded-lg shadow-lg p-2 flex flex-col gap-1 min-w-36"
+      className="bg-[#1d1930] border border-[#2e2848] rounded-lg shadow-2xl p-2 flex flex-col gap-1 min-w-36"
     >
-      <p className="text-xs font-semibold text-gray-500 px-1 pb-1">Add discipline</p>
+      <p className="text-xs font-semibold text-[#5c5575] px-1 pb-1 uppercase tracking-wide">Add discipline</p>
       {options.map((d) => (
         <button
           key={d}
-          className="flex items-center gap-2 text-sm text-left px-2 py-1.5 rounded hover:bg-gray-50 transition-colors"
+          className="flex items-center gap-2 text-sm text-[#ece7ff] text-left px-2 py-1.5 rounded hover:bg-[#252041] transition-colors"
           onClick={() => {
             onPick(req.featureId, d);
             onDone();

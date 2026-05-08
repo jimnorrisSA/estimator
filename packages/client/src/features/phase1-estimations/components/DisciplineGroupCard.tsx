@@ -1,7 +1,7 @@
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { Group, Rect, Text } from "react-konva";
 import type Konva from "konva";
-import type { DisciplineGroup } from "@estimator/shared";
+import type { DisciplineGroup, EstimateUnit } from "@estimator/shared";
 import { useEstimationsStore } from "../store/estimationsStore.js";
 import { useCanvasContext } from "../context/CanvasContext.js";
 import {
@@ -11,9 +11,9 @@ import {
 } from "../utils/layout.js";
 import type { GroupLayout } from "../utils/layout.js";
 
-const LABEL_FONT = 12;
-const EST_FONT = 11;
-const HEADER_FONT = 11;
+const LABEL_FONT = 13;
+const EST_FONT = 12;
+const HEADER_FONT = 12;
 const PAD = 8;
 
 interface Props {
@@ -27,12 +27,14 @@ interface Props {
 
 export function DisciplineGroupCard({ group, layout, featureId, selectedId, onSelect, stageScale }: Props) {
   const cardRef = useRef<Konva.Group>(null);
-  const { requestTextEdit } = useCanvasContext();
+  const { requestTextEdit, requestEstimateEdit } = useCanvasContext();
   const addTask = useEstimationsStore((s) => s.addTask);
+  const duplicateTask = useEstimationsStore((s) => s.duplicateTask);
+  const deleteTask = useEstimationsStore((s) => s.deleteTask);
   const updateTaskLabel = useEstimationsStore((s) => s.updateTaskLabel);
+  const updateTaskEstimate = useEstimationsStore((s) => s.updateTaskEstimate);
+  const [hoveredTaskId, setHoveredTaskId] = useState<string | null>(null);
 
-  // Get the screen-space position of a point (offsetX, offsetY) within this card.
-  // getAbsolutePosition() returns canvas-element-pixel coords (stage scale + pan already applied).
   function screenPos(offsetX: number, offsetY: number) {
     const node = cardRef.current;
     if (!node) return { x: 0, y: 0 };
@@ -59,7 +61,19 @@ export function DisciplineGroupCard({ group, layout, featureId, selectedId, onSe
     });
   }
 
-  // Don't add task to store until the user actually commits a label
+  const EST_HIT_W = 44;
+
+  function openEstimateEdit(taskId: string, currentValue: number, currentUnit: EstimateUnit, taskY: number) {
+    const { x, y } = screenPos(layout.width, taskY + (TASK_ROW_H - EST_FONT) / 2);
+    requestEstimateEdit({
+      value: currentValue,
+      unit: currentUnit,
+      x,
+      y,
+      onCommit: (v, u) => updateTaskEstimate(featureId, group.id, taskId, v, u),
+    });
+  }
+
   function handleAddTask() {
     const newTaskY = GROUP_HEADER_H + group.tasks.length * TASK_ROW_H;
     const { x, y } = screenPos(PAD, newTaskY + (TASK_ROW_H - LABEL_FONT) / 2 - 2);
@@ -76,7 +90,7 @@ export function DisciplineGroupCard({ group, layout, featureId, selectedId, onSe
     });
   }
 
-  const headerColor = darken(group.color, 0.15);
+  const headerColor = darken(group.color, 0.12);
 
   return (
     <Group ref={cardRef} x={layout.x} y={layout.y}>
@@ -86,9 +100,9 @@ export function DisciplineGroupCard({ group, layout, featureId, selectedId, onSe
         height={layout.height}
         fill={group.color}
         cornerRadius={4}
-        shadowBlur={3}
-        shadowColor="rgba(0,0,0,0.1)"
-        shadowOffsetY={1}
+        shadowBlur={4}
+        shadowColor="rgba(0,0,0,0.3)"
+        shadowOffsetY={2}
       />
 
       {/* Header */}
@@ -100,7 +114,7 @@ export function DisciplineGroupCard({ group, layout, featureId, selectedId, onSe
         text={group.discipline.toUpperCase()}
         fontSize={HEADER_FONT}
         fontStyle="bold"
-        fill="rgba(0,0,0,0.65)"
+        fill="rgba(255,255,255,0.85)"
         letterSpacing={0.8}
       />
 
@@ -110,36 +124,90 @@ export function DisciplineGroupCard({ group, layout, featureId, selectedId, onSe
         const isSelected = selectedId === task.id;
         const estText = `${task.estimate.value}${unitShort(task.estimate.unit)}`;
 
+        const isHovered = hoveredTaskId === task.id;
+        const DUPE_W = 18;
+        const DEL_W = 18;
+        const ACTION_W = isHovered ? DUPE_W + DEL_W : 0;
+
         return (
           <Group
             key={task.id}
             y={ty}
+            onMouseEnter={() => setHoveredTaskId(task.id)}
+            onMouseLeave={() => setHoveredTaskId(null)}
             onClick={() => onSelect(task.id)}
             onTap={() => onSelect(task.id)}
             onDblClick={() => openTaskEdit(task.id, task.label, ty)}
             onDblTap={() => openTaskEdit(task.id, task.label, ty)}
           >
-            {isSelected && <Rect width={layout.width} height={TASK_ROW_H} fill="rgba(255,255,255,0.5)" />}
-            <Rect y={0} width={layout.width} height={1} fill="rgba(0,0,0,0.06)" />
+            {isSelected && <Rect width={layout.width} height={TASK_ROW_H} fill="rgba(255,255,255,0.25)" />}
+            <Rect y={0} width={layout.width} height={1} fill="rgba(0,0,0,0.15)" />
             <Text
               x={PAD}
               y={(TASK_ROW_H - LABEL_FONT) / 2}
-              width={layout.width - PAD * 2 - 44}
+              width={layout.width - PAD * 2 - EST_HIT_W - ACTION_W}
               text={task.label || "Double-click to label…"}
               fontSize={LABEL_FONT}
-              fill={task.label ? "#1f2937" : "#9ca3af"}
+              fill={task.label ? "rgba(255,255,255,0.95)" : "rgba(255,255,255,0.35)"}
               ellipsis
             />
             <Text
-              x={layout.width - 44}
+              x={layout.width - EST_HIT_W}
               y={(TASK_ROW_H - EST_FONT) / 2}
-              width={38}
+              width={EST_HIT_W - PAD}
               text={estText}
               fontSize={EST_FONT}
               fontStyle="italic"
-              fill="#374151"
+              fill={isSelected ? "#f0d9ff" : "rgba(255,255,255,0.65)"}
               align="right"
             />
+            {/* Invisible hit area over estimate */}
+            <Rect
+              x={layout.width - EST_HIT_W}
+              y={0}
+              width={EST_HIT_W}
+              height={TASK_ROW_H}
+              fill="transparent"
+              onDblClick={(e) => {
+                e.cancelBubble = true;
+                openEstimateEdit(task.id, task.estimate.value, task.estimate.unit, ty);
+              }}
+              onDblTap={(e) => {
+                e.cancelBubble = true;
+                openEstimateEdit(task.id, task.estimate.value, task.estimate.unit, ty);
+              }}
+            />
+            {/* Hover action icons: duplicate + delete */}
+            {isHovered && (
+              <>
+                <Group
+                  x={layout.width - EST_HIT_W - ACTION_W}
+                  y={0}
+                  onClick={(e) => { e.cancelBubble = true; duplicateTask(featureId, group.id, task.id); }}
+                  onTap={(e) => { e.cancelBubble = true; duplicateTask(featureId, group.id, task.id); }}
+                >
+                  <Rect width={DUPE_W} height={TASK_ROW_H} fill="rgba(255,255,255,0.12)" cornerRadius={2} />
+                  <Text
+                    x={0} y={(TASK_ROW_H - 11) / 2}
+                    width={DUPE_W} text="⧉" fontSize={11}
+                    fill="rgba(255,255,255,0.8)" align="center"
+                  />
+                </Group>
+                <Group
+                  x={layout.width - EST_HIT_W - DEL_W}
+                  y={0}
+                  onClick={(e) => { e.cancelBubble = true; deleteTask(featureId, group.id, task.id); }}
+                  onTap={(e) => { e.cancelBubble = true; deleteTask(featureId, group.id, task.id); }}
+                >
+                  <Rect width={DEL_W} height={TASK_ROW_H} fill="rgba(239,68,68,0.15)" cornerRadius={2} />
+                  <Text
+                    x={0} y={(TASK_ROW_H - 11) / 2}
+                    width={DEL_W} text="×" fontSize={13}
+                    fill="rgba(239,68,68,0.85)" align="center"
+                  />
+                </Group>
+              </>
+            )}
           </Group>
         );
       })}
@@ -156,7 +224,7 @@ export function DisciplineGroupCard({ group, layout, featureId, selectedId, onSe
           y={(ADD_TASK_H - LABEL_FONT) / 2}
           text="+ Add task"
           fontSize={LABEL_FONT}
-          fill="rgba(0,0,0,0.35)"
+          fill="rgba(255,255,255,0.4)"
         />
       </Group>
     </Group>

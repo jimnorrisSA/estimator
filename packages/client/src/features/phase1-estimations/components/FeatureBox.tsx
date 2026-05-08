@@ -5,6 +5,7 @@ import type { Feature } from "@estimator/shared";
 import { WORKING_DAYS } from "@estimator/shared";
 import { useEstimationsStore } from "../store/estimationsStore.js";
 import { useCanvasContext } from "../context/CanvasContext.js";
+import type { KonvaEventObject } from "konva/lib/Node.js";
 import { DisciplineGroupCard } from "./DisciplineGroupCard.js";
 import {
   featureHeight,
@@ -16,9 +17,9 @@ import {
   FEATURE_PAD,
 } from "../utils/layout.js";
 
-const TITLE_FONT = 14;
-const COUNTER_FONT = 10;
-const COUNTER_W = 110; // reserved width on the right for the counter
+const TITLE_FONT = 15;
+const COUNTER_FONT = 12;
+const COUNTER_W = 110;
 
 interface Props {
   feature: Feature;
@@ -29,20 +30,22 @@ interface Props {
 
 export function FeatureBox({ feature, selectedId, onSelect, stageScale }: Props) {
   const groupRef = useRef<Konva.Group>(null);
-  const { registerNode, unregisterNode, requestTextEdit, requestDisciplinePick, requestConfirm } = useCanvasContext();
+  const { registerNode, unregisterNode, getNode, requestTextEdit, requestDisciplinePick, requestConfirm, selectedIds } = useCanvasContext();
   const updateFeatureName = useEstimationsStore((s) => s.updateFeatureName);
   const updateFeaturePosition = useEstimationsStore((s) => s.updateFeaturePosition);
   const updateFeatureWidth = useEstimationsStore((s) => s.updateFeatureWidth);
+  const batchUpdateFeaturePositions = useEstimationsStore((s) => s.batchUpdateFeaturePositions);
   const deleteFeature = useEstimationsStore((s) => s.deleteFeature);
   const setSelected = useEstimationsStore((s) => s.setSelected);
+  const setSelectedIds = useEstimationsStore((s) => s.setSelectedIds);
   const [deleteHover, setDeleteHover] = useState(false);
+  const dragStartRef = useRef<Map<string, { x: number; y: number }>>(new Map());
 
-  const isSelected = selectedId === feature.id;
+  const isSelected = selectedIds.includes(feature.id) || selectedId === feature.id;
   const boxH = featureHeight(feature.groups);
   const groupLayouts = computeGroupLayouts(feature);
   const addBtnY = addGroupButtonY(feature);
 
-  // Compute summary counts
   const allTasks = feature.groups.flatMap((g) => g.tasks);
   const totalTasks = allTasks.length;
   const totalDays = allTasks.reduce(
@@ -107,17 +110,77 @@ export function FeatureBox({ feature, selectedId, onSelect, stageScale }: Props)
     });
   }
 
+  function handleDragStart() {
+    const idsToTrack = selectedIds.includes(feature.id) ? selectedIds : [feature.id];
+    const starts = new Map<string, { x: number; y: number }>();
+    for (const id of idsToTrack) {
+      const node = getNode(id);
+      if (node) starts.set(id, { x: node.x(), y: node.y() });
+    }
+    dragStartRef.current = starts;
+    // Ensure this feature is in the selection when dragging
+    if (!selectedIds.includes(feature.id)) {
+      setSelectedIds([feature.id]);
+      setSelected(feature.id);
+    }
+  }
+
+  function handleDragMove(e: KonvaEventObject<MouseEvent>) {
+    if (!selectedIds.includes(feature.id) || selectedIds.length <= 1) return;
+    const startSelf = dragStartRef.current.get(feature.id);
+    if (!startSelf) return;
+    const dx = e.target.x() - startSelf.x;
+    const dy = e.target.y() - startSelf.y;
+    for (const id of selectedIds) {
+      if (id === feature.id) continue;
+      const other = getNode(id);
+      const startOther = dragStartRef.current.get(id);
+      if (other && startOther) {
+        other.x(startOther.x + dx);
+        other.y(startOther.y + dy);
+      }
+    }
+  }
+
+  function handleDragEnd(e: KonvaEventObject<MouseEvent>) {
+    const isMulti = selectedIds.includes(feature.id) && selectedIds.length > 1;
+    if (isMulti) {
+      const updates = selectedIds.map((id) => {
+        if (id === feature.id) return { id, pos: { x: e.target.x(), y: e.target.y() } };
+        const node = getNode(id);
+        const start = dragStartRef.current.get(id);
+        return { id, pos: node ? { x: node.x(), y: node.y() } : (start ?? { x: 0, y: 0 }) };
+      });
+      batchUpdateFeaturePositions(updates);
+    } else {
+      updateFeaturePosition(feature.id, { x: e.target.x(), y: e.target.y() });
+    }
+  }
+
+  function handleClick(e: KonvaEventObject<MouseEvent>) {
+    if (e.evt.shiftKey) {
+      const newIds = selectedIds.includes(feature.id)
+        ? selectedIds.filter((id) => id !== feature.id)
+        : [...selectedIds, feature.id];
+      setSelectedIds(newIds);
+      setSelected(newIds.length === 1 ? newIds[0] : null);
+    } else {
+      setSelectedIds([feature.id]);
+      onSelect(feature.id);
+    }
+  }
+
   return (
     <Group
       ref={groupRef}
       x={feature.position.x}
       y={feature.position.y}
       draggable
-      onClick={() => onSelect(feature.id)}
-      onTap={() => onSelect(feature.id)}
-      onDragEnd={(e) => {
-        updateFeaturePosition(feature.id, { x: e.target.x(), y: e.target.y() });
-      }}
+      onClick={handleClick}
+      onTap={() => { setSelectedIds([feature.id]); onSelect(feature.id); }}
+      onDragStart={handleDragStart}
+      onDragMove={handleDragMove}
+      onDragEnd={handleDragEnd}
       onTransformEnd={() => {
         const node = groupRef.current!;
         const scaleX = node.scaleX();
@@ -130,26 +193,26 @@ export function FeatureBox({ feature, selectedId, onSelect, stageScale }: Props)
       <Rect
         width={feature.width}
         height={boxH}
-        fill="#f9fafb"
-        stroke={isSelected ? "#3b82f6" : "#d1d5db"}
+        fill="#1d1930"
+        stroke={isSelected ? "#8b5cf6" : "#2e2848"}
         strokeWidth={isSelected ? 2 : 1}
         cornerRadius={6}
-        shadowBlur={8}
-        shadowColor="rgba(0,0,0,0.08)"
-        shadowOffsetY={2}
+        shadowBlur={12}
+        shadowColor="rgba(0,0,0,0.5)"
+        shadowOffsetY={3}
       />
 
       {/* Header bar */}
       <Rect
         width={feature.width}
         height={FEATURE_HEADER_H}
-        fill="#e5e7eb"
+        fill="#252041"
         cornerRadius={[6, 6, 0, 0]}
         onDblClick={handleRename}
         onDblTap={handleRename}
       />
 
-      {/* Feature name — double-click to rename */}
+      {/* Feature name */}
       <Text
         x={10}
         y={(FEATURE_HEADER_H - TITLE_FONT) / 2}
@@ -157,13 +220,13 @@ export function FeatureBox({ feature, selectedId, onSelect, stageScale }: Props)
         text={feature.name}
         fontSize={TITLE_FONT}
         fontStyle="bold"
-        fill="#111827"
+        fill="#ece7ff"
         ellipsis
         onDblClick={handleRename}
         onDblTap={handleRename}
       />
 
-      {/* Task / day counter — top-right of header (hidden when selected to make room for delete button) */}
+      {/* Task / day counter */}
       {counterText !== "" && !isSelected && (
         <Text
           x={feature.width - COUNTER_W - 8}
@@ -171,12 +234,12 @@ export function FeatureBox({ feature, selectedId, onSelect, stageScale }: Props)
           width={COUNTER_W}
           text={counterText}
           fontSize={COUNTER_FONT}
-          fill="#6b7280"
+          fill="#5c5575"
           align="right"
         />
       )}
 
-      {/* Delete button — visible only when selected */}
+      {/* Delete button */}
       {isSelected && (
         <Group
           x={feature.width - 28}
@@ -190,7 +253,7 @@ export function FeatureBox({ feature, selectedId, onSelect, stageScale }: Props)
             width={20}
             height={20}
             cornerRadius={4}
-            fill={deleteHover ? "#ef4444" : "#fee2e2"}
+            fill={deleteHover ? "#ef4444" : "#4b1c1c"}
           />
           <Text
             width={20}
@@ -212,7 +275,7 @@ export function FeatureBox({ feature, selectedId, onSelect, stageScale }: Props)
           width={feature.width - FEATURE_PAD * 2}
           text="Add a discipline to get started"
           fontSize={11}
-          fill="#9ca3af"
+          fill="#3a3456"
           align="center"
           fontStyle="italic"
         />
@@ -238,9 +301,9 @@ export function FeatureBox({ feature, selectedId, onSelect, stageScale }: Props)
           x={10}
           width={feature.width - 20}
           height={ADD_GROUP_H}
-          fill="#f3f4f6"
+          fill="#1a1628"
           cornerRadius={4}
-          stroke="#e5e7eb"
+          stroke="#2e2848"
           strokeWidth={1}
         />
         <Text
@@ -249,7 +312,7 @@ export function FeatureBox({ feature, selectedId, onSelect, stageScale }: Props)
           width={feature.width - 20}
           text="+ Add discipline"
           fontSize={12}
-          fill="#6b7280"
+          fill="#5c5575"
           align="center"
         />
       </Group>

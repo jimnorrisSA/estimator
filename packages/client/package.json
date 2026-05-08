@@ -12,12 +12,15 @@
   },
   "dependencies": {
     "@estimator/shared": "workspace:*",
+    "docx": "^9.6.1",
+    "jspdf": "^4.2.1",
+    "jspdf-autotable": "^5.0.7",
     "konva": "^9.3.0",
     "react": "^18.3.0",
     "react-dom": "^18.3.0",
     "react-konva": "^18.2.10",
-    "yjs": "^13.6.18",
     "y-websocket": "^2.0.4",
+    "yjs": "^13.6.18",
     "zustand": "^4.5.0"
   },
   "devDependencies": {

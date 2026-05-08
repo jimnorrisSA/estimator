@@ -14,16 +14,25 @@ export const CURRENCY_SYMBOLS: Record<Currency, string> = {
 
 export interface ScheduleSettings {
   projectName: string;
-  startDate: string; // YYYY-MM-DD
+  startDate: string;    // YYYY-MM-DD
+  targetEndDate: string; // YYYY-MM-DD, empty = no target
   calendarMode: CalendarMode;
   contingencyPct: number;
   currency: Currency;
+  defaultDailyRate: number; // fallback rate when task has no assigned resource
+  exchangeRates: Record<string, number>; // GBP → X conversion rates
+}
+
+export function getConversionRate(settings: ScheduleSettings): number {
+  if (settings.currency === "GBP") return 1;
+  return settings.exchangeRates?.[settings.currency] ?? 1;
 }
 
 export interface TaskOverride {
   startDay?: number;
   endDay?: number;
   notes: string;
+  assignedResourceId?: string;
 }
 
 interface SchedulingStore {
@@ -34,6 +43,7 @@ interface SchedulingStore {
   updateSettings: (patch: Partial<ScheduleSettings>) => void;
   setOverride: (taskId: string, patch: Partial<TaskOverride>) => void;
   clearOverride: (taskId: string) => void;
+  assignResource: (taskId: string, resourceId: string | null) => void;
 
   addResource: (role: Discipline, name: string) => void;
   updateResource: (id: string, patch: Partial<Pick<Resource, "name" | "dailyRate" | "allocationPct">>) => void;
@@ -70,9 +80,12 @@ export const useSchedulingStore = create<SchedulingStore>()(
       settings: {
         projectName: "New Project",
         startDate: nextMonday(),
+        targetEndDate: "",
         calendarMode: "four-week",
         contingencyPct: 15,
         currency: "GBP",
+        defaultDailyRate: 0,
+        exchangeRates: { USD: 1.27, EUR: 1.17, AUD: 1.94 },
       },
       overrides: {},
       resources: [],
@@ -96,6 +109,19 @@ export const useSchedulingStore = create<SchedulingStore>()(
           delete next[taskId];
           return { overrides: next };
         });
+      },
+
+      assignResource(taskId, resourceId) {
+        set((s) => ({
+          overrides: {
+            ...s.overrides,
+            [taskId]: {
+              ...{ notes: "" },
+              ...s.overrides[taskId],
+              assignedResourceId: resourceId ?? undefined,
+            },
+          },
+        }));
       },
 
       addResource(role, name) {

@@ -17,26 +17,60 @@ export interface ScheduledTask {
   isPinned: boolean;
   notes: string;
   cost: number;
+  assignedResourceId?: string;
+}
+
+export interface BlockedPeriod {
+  start: number;  // working day index (inclusive)
+  end: number;    // working day index (exclusive)
+  label: string;
+  color: string;
+}
+
+export interface SlotContingency {
+  discipline: Discipline;
+  slotIndex: number;
+  lastTaskEndDay: number;
+  contingencyDays: number;
 }
 
 export interface ScheduleResult {
   tasks: ScheduledTask[];
   capacities: Record<string, number>; // discipline → slot count
   totalDays: number;
-  contingencyDays: number;
+  contingencyDays: number; // net buffer beyond totalDays (for display)
   projectEndDay: number;
   disciplines: Discipline[];
+  slotContingency: SlotContingency[];
+  blockedPeriods: BlockedPeriod[];
 }
 
 const DISCIPLINE_ORDER: Discipline[] = ["Art", "Design", "Code", "Production", "Custom"];
 
-type Overrides = Record<string, { startDay?: number; endDay?: number; notes?: string }>;
+type Overrides = Record<string, { startDay?: number; endDay?: number; notes?: string; assignedResourceId?: string }>;
+
+function firstFreeStart(start: number, duration: number, blocks: BlockedPeriod[]): number {
+  let s = start;
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const b of blocks) {
+      if (s < b.end && s + duration > b.start) {
+        s = b.end;
+        changed = true;
+      }
+    }
+  }
+  return s;
+}
 
 export function runScheduler(
   features: Feature[],
   contingencyPct: number,
   overrides: Overrides,
-  resources: Resource[]
+  resources: Resource[],
+  defaultDailyRate = 0,
+  blockedPeriods: BlockedPeriod[] = []
 ): ScheduleResult {
   const disciplineSet = new Set<Discipline>();
   for (const f of features)
@@ -86,12 +120,16 @@ export function runScheduler(
           endDay = ov.endDay ?? startDay + wd;
           slots[slotIndex] = Math.max(slots[slotIndex], endDay);
         } else {
-          startDay = slots[slotIndex];
+          startDay = firstFreeStart(slots[slotIndex], wd, blockedPeriods);
           endDay = startDay + wd;
           slots[slotIndex] = endDay;
         }
 
-        const rate = ratesByDiscipline[discipline][slotIndex] ?? 0;
+        const assignedResourceId = ov?.assignedResourceId;
+        const assignedResource = assignedResourceId
+          ? resources.find((r) => r.id === assignedResourceId)
+          : undefined;
+        const rate = assignedResource?.dailyRate ?? ratesByDiscipline[discipline][slotIndex] ?? defaultDailyRate;
 
         tasks.push({
           taskId: task.id,
@@ -109,20 +147,46 @@ export function runScheduler(
           isPinned,
           notes: ov?.notes ?? "",
           cost: wd * rate,
+          assignedResourceId,
         });
       }
     }
   }
 
   const totalDays = tasks.length > 0 ? Math.max(...tasks.map((t) => t.endDay)) : 0;
-  const contingencyDays = Math.ceil((totalDays * contingencyPct) / 100);
+
+  // Per-slot contingency: each team member's buffer = their own working days × pct
+  const slotMap = new Map<string, { discipline: Discipline; slotIndex: number; endDay: number; workDays: number }>();
+  for (const task of tasks) {
+    const key = `${task.discipline}:${task.slotIndex}`;
+    const s = slotMap.get(key) ?? { discipline: task.discipline, slotIndex: task.slotIndex, endDay: 0, workDays: 0 };
+    s.endDay = Math.max(s.endDay, task.endDay);
+    s.workDays += task.workingDays;
+    slotMap.set(key, s);
+  }
+
+  const slotContingency: SlotContingency[] = Array.from(slotMap.values()).map((s) => ({
+    discipline: s.discipline,
+    slotIndex: s.slotIndex,
+    lastTaskEndDay: s.endDay,
+    contingencyDays: Math.ceil((s.workDays * contingencyPct) / 100),
+  }));
+
+  const projectEndDay =
+    slotContingency.length > 0
+      ? Math.max(...slotContingency.map((s) => s.lastTaskEndDay + s.contingencyDays))
+      : totalDays;
+
+  const contingencyDays = projectEndDay - totalDays;
 
   return {
     tasks,
     capacities,
     totalDays,
     contingencyDays,
-    projectEndDay: totalDays + contingencyDays,
+    projectEndDay,
     disciplines,
+    slotContingency,
+    blockedPeriods,
   };
 }

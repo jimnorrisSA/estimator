@@ -2,11 +2,11 @@ import type { Discipline, DisciplineGroup, Feature } from "@estimator/shared";
 import { FEATURE_MIN_W } from "./layout.js";
 
 export const DISCIPLINE_COLORS: Record<Discipline, string> = {
-  Art: "#FFB347",
-  Design: "#DDA0DD",
-  Code: "#87CEEB",
-  Production: "#90EE90",
-  Custom: "#E0E0E0",
+  Art:        "#c05621",
+  Design:     "#9333ea",
+  Code:       "#0369a1",
+  Production: "#15803d",
+  Custom:     "#374151",
 };
 
 export const DEFAULT_DISCIPLINES: Discipline[] = ["Art", "Design", "Code", "Production"];
@@ -39,7 +39,7 @@ export function makeFeature(name: string, index: number): Feature {
     name,
     position: { x, y },
     width: FEATURE_MIN_W,
-    color: "#FFFFFF",
+    color: "#1d1930",
     groups,
     updatedAt: new Date().toISOString(),
   };
