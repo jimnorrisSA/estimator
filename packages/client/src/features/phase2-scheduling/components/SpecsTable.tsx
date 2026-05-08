@@ -25,6 +25,7 @@ export function SpecsTable({ tasks, features, settings, currencySymbol }: Props)
   const updateTaskLabel = useEstimationsStore((s) => s.updateTaskLabel);
   const updateTaskEstimate = useEstimationsStore((s) => s.updateTaskEstimate);
   const duplicateTask = useEstimationsStore((s) => s.duplicateTask);
+  const deleteTask = useEstimationsStore((s) => s.deleteTask);
   const overrides = useSchedulingStore((s) => s.overrides);
   const setOverride = useSchedulingStore((s) => s.setOverride);
   const assignResource = useSchedulingStore((s) => s.assignResource);
@@ -179,13 +180,22 @@ export function SpecsTable({ tasks, features, settings, currencySymbol }: Props)
 
                         <td className="px-2 py-2 border-b border-[#2e2848]">
                           {meta && (
-                            <button
-                              title="Duplicate task"
-                              className="text-[#3a3456] hover:text-[#a78bfa] transition-colors text-base leading-none"
-                              onClick={() => duplicateTask(meta.featureId, meta.groupId, task.taskId)}
-                            >
-                              ⧉
-                            </button>
+                            <div className="flex items-center gap-2">
+                              <button
+                                title="Duplicate task"
+                                className="text-[#3a3456] hover:text-[#a78bfa] transition-colors text-base leading-none"
+                                onClick={() => duplicateTask(meta.featureId, meta.groupId, task.taskId)}
+                              >
+                                ⧉
+                              </button>
+                              <button
+                                title="Delete task"
+                                className="text-[#3a3456] hover:text-[#ef4444] transition-colors text-lg leading-none"
+                                onClick={() => deleteTask(meta.featureId, meta.groupId, task.taskId)}
+                              >
+                                ×
+                              </button>
+                            </div>
                           )}
                         </td>
                       </tr>
