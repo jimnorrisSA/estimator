@@ -5,6 +5,7 @@ import type { Feature } from "@estimator/shared";
 import { WORKING_DAYS } from "@estimator/shared";
 import { useEstimationsStore } from "../store/estimationsStore.js";
 import { useCanvasContext } from "../context/CanvasContext.js";
+import type { KonvaEventObject } from "konva/lib/Node.js";
 import { DisciplineGroupCard } from "./DisciplineGroupCard.js";
 import {
   featureHeight,
@@ -29,15 +30,18 @@ interface Props {
 
 export function FeatureBox({ feature, selectedId, onSelect, stageScale }: Props) {
   const groupRef = useRef<Konva.Group>(null);
-  const { registerNode, unregisterNode, requestTextEdit, requestDisciplinePick, requestConfirm } = useCanvasContext();
+  const { registerNode, unregisterNode, getNode, requestTextEdit, requestDisciplinePick, requestConfirm, selectedIds } = useCanvasContext();
   const updateFeatureName = useEstimationsStore((s) => s.updateFeatureName);
   const updateFeaturePosition = useEstimationsStore((s) => s.updateFeaturePosition);
   const updateFeatureWidth = useEstimationsStore((s) => s.updateFeatureWidth);
+  const batchUpdateFeaturePositions = useEstimationsStore((s) => s.batchUpdateFeaturePositions);
   const deleteFeature = useEstimationsStore((s) => s.deleteFeature);
   const setSelected = useEstimationsStore((s) => s.setSelected);
+  const setSelectedIds = useEstimationsStore((s) => s.setSelectedIds);
   const [deleteHover, setDeleteHover] = useState(false);
+  const dragStartRef = useRef<Map<string, { x: number; y: number }>>(new Map());
 
-  const isSelected = selectedId === feature.id;
+  const isSelected = selectedIds.includes(feature.id) || selectedId === feature.id;
   const boxH = featureHeight(feature.groups);
   const groupLayouts = computeGroupLayouts(feature);
   const addBtnY = addGroupButtonY(feature);
@@ -106,17 +110,77 @@ export function FeatureBox({ feature, selectedId, onSelect, stageScale }: Props)
     });
   }
 
+  function handleDragStart() {
+    const idsToTrack = selectedIds.includes(feature.id) ? selectedIds : [feature.id];
+    const starts = new Map<string, { x: number; y: number }>();
+    for (const id of idsToTrack) {
+      const node = getNode(id);
+      if (node) starts.set(id, { x: node.x(), y: node.y() });
+    }
+    dragStartRef.current = starts;
+    // Ensure this feature is in the selection when dragging
+    if (!selectedIds.includes(feature.id)) {
+      setSelectedIds([feature.id]);
+      setSelected(feature.id);
+    }
+  }
+
+  function handleDragMove(e: KonvaEventObject<MouseEvent>) {
+    if (!selectedIds.includes(feature.id) || selectedIds.length <= 1) return;
+    const startSelf = dragStartRef.current.get(feature.id);
+    if (!startSelf) return;
+    const dx = e.target.x() - startSelf.x;
+    const dy = e.target.y() - startSelf.y;
+    for (const id of selectedIds) {
+      if (id === feature.id) continue;
+      const other = getNode(id);
+      const startOther = dragStartRef.current.get(id);
+      if (other && startOther) {
+        other.x(startOther.x + dx);
+        other.y(startOther.y + dy);
+      }
+    }
+  }
+
+  function handleDragEnd(e: KonvaEventObject<MouseEvent>) {
+    const isMulti = selectedIds.includes(feature.id) && selectedIds.length > 1;
+    if (isMulti) {
+      const updates = selectedIds.map((id) => {
+        if (id === feature.id) return { id, pos: { x: e.target.x(), y: e.target.y() } };
+        const node = getNode(id);
+        const start = dragStartRef.current.get(id);
+        return { id, pos: node ? { x: node.x(), y: node.y() } : (start ?? { x: 0, y: 0 }) };
+      });
+      batchUpdateFeaturePositions(updates);
+    } else {
+      updateFeaturePosition(feature.id, { x: e.target.x(), y: e.target.y() });
+    }
+  }
+
+  function handleClick(e: KonvaEventObject<MouseEvent>) {
+    if (e.evt.shiftKey) {
+      const newIds = selectedIds.includes(feature.id)
+        ? selectedIds.filter((id) => id !== feature.id)
+        : [...selectedIds, feature.id];
+      setSelectedIds(newIds);
+      setSelected(newIds.length === 1 ? newIds[0] : null);
+    } else {
+      setSelectedIds([feature.id]);
+      onSelect(feature.id);
+    }
+  }
+
   return (
     <Group
       ref={groupRef}
       x={feature.position.x}
       y={feature.position.y}
       draggable
-      onClick={() => onSelect(feature.id)}
-      onTap={() => onSelect(feature.id)}
-      onDragEnd={(e) => {
-        updateFeaturePosition(feature.id, { x: e.target.x(), y: e.target.y() });
-      }}
+      onClick={handleClick}
+      onTap={() => { setSelectedIds([feature.id]); onSelect(feature.id); }}
+      onDragStart={handleDragStart}
+      onDragMove={handleDragMove}
+      onDragEnd={handleDragEnd}
       onTransformEnd={() => {
         const node = groupRef.current!;
         const scaleX = node.scaleX();

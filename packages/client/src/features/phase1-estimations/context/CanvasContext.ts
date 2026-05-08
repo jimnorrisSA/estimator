@@ -34,10 +34,12 @@ export interface ConfirmRequest {
 export interface CanvasContextValue {
   registerNode: (id: string, node: Konva.Node) => void;
   unregisterNode: (id: string) => void;
+  getNode: (id: string) => Konva.Node | undefined;
   requestTextEdit: (req: TextEditRequest) => void;
   requestEstimateEdit: (req: EstimateEditRequest) => void;
   requestDisciplinePick: (req: DisciplinePickRequest) => void;
   requestConfirm: (req: ConfirmRequest) => void;
+  selectedIds: string[];
 }
 
 export const CanvasContext = createContext<CanvasContextValue | null>(null);

@@ -3,49 +3,42 @@ import { useMilestonesStore, MILESTONE_COLORS, type Milestone } from "./store/mi
 import { useEstimationsStore } from "../phase1-estimations/store/estimationsStore.js";
 import { useSchedulingStore, CURRENCY_SYMBOLS } from "../phase2-scheduling/store/schedulingStore.js";
 import { runScheduler } from "../phase2-scheduling/utils/scheduler.js";
-import { buildWorkingDayCalendar, parseISODate } from "../phase2-scheduling/utils/calendarUtils.js";
+import { buildWorkingDayCalendar, dateToWorkingDay, parseISODate } from "../phase2-scheduling/utils/calendarUtils.js";
 
-function dateToWorkingDay(
-  dateStr: string,
-  calendarMode: string,
-  startDate: string,
-  cal: Date[]
-): number {
-  const date = parseISODate(dateStr);
-  if (calendarMode === "actual" && cal.length > 0) {
-    const idx = cal.findIndex((d) => d >= date);
-    return idx >= 0 ? idx : cal.length;
-  }
-  const start = parseISODate(startDate);
-  const calDays = Math.round((date.getTime() - start.getTime()) / 86400000);
-  return Math.max(0, Math.round(calDays * 5 / 7));
-}
-
-function formatDate(dateStr: string) {
-  if (!dateStr) return "—";
-  const d = parseISODate(dateStr);
-  return d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
-}
 
 export function MilestonesPage() {
-  const { milestones, addMilestone, updateMilestone, deleteMilestone } = useMilestonesStore();
+  const { milestones: rawMilestones, addMilestone, updateMilestone, deleteMilestone } = useMilestonesStore();
+  const milestones = useMemo(
+    () => [...rawMilestones].sort((a, b) => a.startDate.localeCompare(b.startDate)),
+    [rawMilestones]
+  );
   const features = useEstimationsStore((s) => s.features);
   const { settings, overrides, resources } = useSchedulingStore();
   const symbol = CURRENCY_SYMBOLS[settings.currency];
 
-  const result = useMemo(
-    () => runScheduler(features, settings.contingencyPct, overrides, resources, settings.defaultDailyRate),
-    [features, settings.contingencyPct, overrides, resources, settings.defaultDailyRate]
+  const cal = useMemo(() => {
+    if (settings.calendarMode !== "actual") return [];
+    return buildWorkingDayCalendar(parseISODate(settings.startDate), 500);
+  }, [settings.calendarMode, settings.startDate]);
+
+  const blockedPeriods = useMemo(() =>
+    milestones
+      .filter((m) => (m.hardeningDays ?? 0) > 0)
+      .map((m) => {
+        const endDay = dateToWorkingDay(m.endDate, settings.calendarMode, settings.startDate, cal);
+        const startDay = Math.max(0, endDay - (m.hardeningDays ?? 0));
+        return { start: startDay, end: endDay, label: `${m.title} Hardening`, color: m.color };
+      }),
+    [milestones, settings.calendarMode, settings.startDate, cal]
   );
 
-  const cal = useMemo(() => {
-    if (settings.calendarMode !== "actual" || result.projectEndDay === 0) return [];
-    return buildWorkingDayCalendar(parseISODate(settings.startDate), result.projectEndDay + 10);
-  }, [settings.calendarMode, settings.startDate, result.projectEndDay]);
+  const result = useMemo(
+    () => runScheduler(features, settings.contingencyPct, overrides, resources, settings.defaultDailyRate, blockedPeriods),
+    [features, settings.contingencyPct, overrides, resources, settings.defaultDailyRate, blockedPeriods]
+  );
 
   const hasCosts = result.tasks.some((t) => t.cost > 0);
   const baseCost = result.tasks.reduce((s, t) => s + t.cost, 0);
-  const projectCost = baseCost * (1 + settings.contingencyPct / 100);
 
   const milestoneCosts = useMemo(() =>
     milestones.map((m) => {
@@ -149,9 +142,7 @@ export function MilestonesPage() {
 
             {/* Totals */}
             <div className="w-full flex flex-wrap gap-3 pt-2 border-t border-[#2e2848]">
-              <Stat label="Base cost" value={`${symbol}${Math.round(baseCost).toLocaleString()}`} />
-              <Stat label={`Contingency (${settings.contingencyPct}%)`} value={`+${symbol}${Math.round(projectCost - baseCost).toLocaleString()}`} />
-              <Stat label="Total" value={`${symbol}${Math.round(projectCost).toLocaleString()}`} highlight />
+              <Stat label="Total" value={`${symbol}${Math.round(baseCost).toLocaleString()}`} highlight />
             </div>
           </div>
         )}
@@ -173,7 +164,7 @@ interface MilestoneListProps {
   milestones: Milestone[];
   settings: { startDate: string };
   onAdd: (title: string, startDate: string, endDate: string) => void;
-  onUpdate: (id: string, patch: Partial<Pick<Milestone, "title" | "startDate" | "endDate" | "color">>) => void;
+  onUpdate: (id: string, patch: Partial<Pick<Milestone, "title" | "startDate" | "endDate" | "color" | "hardeningDays">>) => void;
   onDelete: (id: string) => void;
 }
 
@@ -217,11 +208,12 @@ function MilestoneList({ milestones, settings, onAdd, onUpdate, onDelete }: Mile
                 <th className="px-4 py-2.5 font-medium">Title</th>
                 <th className="px-4 py-2.5 font-medium">Start</th>
                 <th className="px-4 py-2.5 font-medium">End</th>
+                <th className="px-4 py-2.5 font-medium">Hardening</th>
                 <th className="px-4 py-2.5 font-medium w-8" />
               </tr>
             </thead>
             <tbody>
-              {milestones.map((m, i) => (
+              {milestones.map((m) => (
                 <MilestoneRow key={m.id} milestone={m} onUpdate={onUpdate} onDelete={onDelete} />
               ))}
             </tbody>
@@ -287,9 +279,10 @@ function MilestoneRow({
   onDelete,
 }: {
   milestone: Milestone;
-  onUpdate: (id: string, patch: Partial<Pick<Milestone, "title" | "startDate" | "endDate" | "color">>) => void;
+  onUpdate: (id: string, patch: Partial<Pick<Milestone, "title" | "startDate" | "endDate" | "color" | "hardeningDays">>) => void;
   onDelete: (id: string) => void;
 }) {
+  const hardening = milestone.hardeningDays ?? 0;
   return (
     <tr className="border-t border-[#2e2848] bg-[#0d0b16] hover:bg-[#14112a] transition-colors">
       <td className="px-4 py-2">
@@ -332,6 +325,22 @@ function MilestoneRow({
           value={milestone.endDate}
           onChange={(e) => onUpdate(milestone.id, { endDate: e.target.value })}
         />
+      </td>
+      <td className="px-4 py-2">
+        <div className="flex items-center gap-1">
+          <input
+            type="number"
+            min={0}
+            step={1}
+            className="w-14 bg-[#1a1628] border border-[#2e2848] text-[#ece7ff] text-sm rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-[#7c3aed] tabular-nums"
+            value={hardening}
+            onChange={(e) => {
+              const v = parseInt(e.target.value, 10);
+              onUpdate(milestone.id, { hardeningDays: isNaN(v) || v < 0 ? 0 : v });
+            }}
+          />
+          <span className="text-xs text-[#5c5575]">d</span>
+        </div>
       </td>
       <td className="px-4 py-2 text-right">
         <button

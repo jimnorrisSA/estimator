@@ -7,6 +7,7 @@ export interface Milestone {
   startDate: string;
   endDate: string;
   color: string;
+  hardeningDays: number;
 }
 
 export const MILESTONE_COLORS = [
@@ -17,7 +18,7 @@ export const MILESTONE_COLORS = [
 interface MilestonesStore {
   milestones: Milestone[];
   addMilestone: (title: string, startDate: string, endDate: string) => void;
-  updateMilestone: (id: string, patch: Partial<Pick<Milestone, "title" | "startDate" | "endDate" | "color">>) => void;
+  updateMilestone: (id: string, patch: Partial<Pick<Milestone, "title" | "startDate" | "endDate" | "color" | "hardeningDays">>) => void;
   deleteMilestone: (id: string) => void;
 }
 
@@ -29,7 +30,7 @@ export const useMilestonesStore = create<MilestonesStore>()(
       addMilestone(title, startDate, endDate) {
         const color = MILESTONE_COLORS[get().milestones.length % MILESTONE_COLORS.length];
         set((s) => ({
-          milestones: [...s.milestones, { id: crypto.randomUUID(), title, startDate, endDate, color }],
+          milestones: [...s.milestones, { id: crypto.randomUUID(), title, startDate, endDate, color, hardeningDays: 0 }],
         }));
       },
 

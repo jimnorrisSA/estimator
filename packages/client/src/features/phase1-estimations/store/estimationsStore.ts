@@ -8,6 +8,7 @@ const MAX_HISTORY = 50;
 interface EstimationsStore {
   features: Feature[];
   selectedId: string | null; // feature id or task id
+  selectedIds: string[]; // multi-select feature ids
   _past: Feature[][];
   _future: Feature[][];
 
@@ -18,6 +19,7 @@ interface EstimationsStore {
   updateFeatureName: (id: string, name: string) => void;
   updateFeaturePosition: (id: string, pos: { x: number; y: number }) => void;
   updateFeatureWidth: (id: string, width: number) => void;
+  batchUpdateFeaturePositions: (updates: { id: string; pos: { x: number; y: number } }[]) => void;
 
   deleteFeature: (id: string) => void;
   addGroup: (featureId: string, discipline: Discipline) => void;
@@ -29,6 +31,7 @@ interface EstimationsStore {
   deleteTask: (featureId: string, groupId: string, taskId: string) => void;
 
   setSelected: (id: string | null) => void;
+  setSelectedIds: (ids: string[]) => void;
 }
 
 function recorded(
@@ -49,6 +52,7 @@ export const useEstimationsStore = create<EstimationsStore>()(
     (set, get) => ({
       features: [],
       selectedId: null,
+      selectedIds: [],
       _past: [],
       _future: [],
 
@@ -93,6 +97,7 @@ export const useEstimationsStore = create<EstimationsStore>()(
           );
           if (!stillExists) set({ selectedId: null });
         }
+        set((s) => ({ selectedIds: s.selectedIds.filter((sid) => sid !== id) }));
       },
 
       updateFeatureName(id, name) {
@@ -104,6 +109,13 @@ export const useEstimationsStore = create<EstimationsStore>()(
       updateFeaturePosition(id, pos) {
         recorded(set, get, (fs) =>
           fs.map((f) => (f.id === id ? { ...f, position: pos, updatedAt: now() } : f))
+        );
+      },
+
+      batchUpdateFeaturePositions(updates) {
+        const posMap = new Map(updates.map((u) => [u.id, u.pos]));
+        recorded(set, get, (fs) =>
+          fs.map((f) => (posMap.has(f.id) ? { ...f, position: posMap.get(f.id)!, updatedAt: now() } : f))
         );
       },
 
@@ -223,6 +235,10 @@ export const useEstimationsStore = create<EstimationsStore>()(
 
       setSelected(id) {
         set({ selectedId: id });
+      },
+
+      setSelectedIds(ids) {
+        set({ selectedIds: ids });
       },
     }),
     {

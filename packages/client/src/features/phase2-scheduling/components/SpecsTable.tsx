@@ -19,10 +19,9 @@ interface Props {
   features: Feature[];
   settings: ScheduleSettings;
   currencySymbol: string;
-  contingencyPct: number;
 }
 
-export function SpecsTable({ tasks, features, settings, currencySymbol, contingencyPct }: Props) {
+export function SpecsTable({ tasks, features, settings, currencySymbol }: Props) {
   const updateTaskLabel = useEstimationsStore((s) => s.updateTaskLabel);
   const updateTaskEstimate = useEstimationsStore((s) => s.updateTaskEstimate);
   const overrides = useSchedulingStore((s) => s.overrides);
@@ -62,11 +61,9 @@ export function SpecsTable({ tasks, features, settings, currencySymbol, continge
 
   if (tasks.length === 0) return null;
 
-  const totalWd   = tasks.reduce((s, t) => s + t.workingDays, 0);
-  const baseCost  = tasks.reduce((s, t) => s + t.cost, 0);
-  const contCost  = baseCost * contingencyPct / 100;
-  const totalCost = baseCost + contCost;
-  const hasCosts  = baseCost > 0;
+  const totalWd  = tasks.reduce((s, t) => s + t.workingDays, 0);
+  const baseCost = tasks.reduce((s, t) => s + t.cost, 0);
+  const hasCosts = baseCost > 0;
 
   return (
     <div className="flex flex-col gap-2">
@@ -201,7 +198,7 @@ export function SpecsTable({ tasks, features, settings, currencySymbol, continge
           </tbody>
           <tfoot>
             <tr className="bg-[#1a1628] border-t-2 border-[#3d366a]">
-              <td colSpan={4} className="px-3 py-2 text-sm font-semibold text-[#9b93ba]">Base total</td>
+              <td colSpan={4} className="px-3 py-2 text-sm font-semibold text-[#9b93ba]">Total</td>
               <td className="px-3 py-2 text-sm font-semibold text-[#ece7ff] tabular-nums text-right">
                 {totalWd % 1 === 0 ? totalWd : totalWd.toFixed(1)}d
               </td>
@@ -209,28 +206,6 @@ export function SpecsTable({ tasks, features, settings, currencySymbol, continge
               {hasCosts && <td className="px-3 py-2 text-sm font-semibold text-[#ece7ff] tabular-nums text-right">{currencySymbol}{Math.round(baseCost).toLocaleString()}</td>}
               <td />
             </tr>
-            {hasCosts && contingencyPct > 0 && (
-              <tr className="bg-[#1a1628]">
-                <td colSpan={4} className="px-3 py-2 text-sm text-[#5c5575] italic">
-                  Contingency ({contingencyPct}%)
-                </td>
-                <td colSpan={4} />
-                <td className="px-3 py-2 text-sm text-[#5c5575] tabular-nums text-right italic">
-                  +{currencySymbol}{Math.round(contCost).toLocaleString()}
-                </td>
-                <td />
-              </tr>
-            )}
-            {hasCosts && contingencyPct > 0 && (
-              <tr className="bg-[#252041] border-t border-[#3d366a]">
-                <td colSpan={4} className="px-3 py-2 text-sm font-bold text-[#ece7ff]">Project total</td>
-                <td colSpan={4} />
-                <td className="px-3 py-2 text-sm font-bold text-[#a78bfa] tabular-nums text-right">
-                  {currencySymbol}{Math.round(totalCost).toLocaleString()}
-                </td>
-                <td />
-              </tr>
-            )}
           </tfoot>
         </table>
       </div>
