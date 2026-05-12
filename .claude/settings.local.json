@@ -11,15 +11,6 @@
       "Bash(pnpm typecheck *)",
       "PowerShell(Get-Command *)",
       "PowerShell(npm install *)",
-      "Bash(python notify_slack.py start \"Testing Slack notifier from estimator project\")",
-      "Bash(python notify_slack.py blocked \"Testing two-way Slack bridge — reply yes or no to confirm it works\")",
-      "Bash(python notify_slack.py wait 60)",
-      "Bash(python notify_slack.py blocked \"Testing two-way Slack bridge again — reply yes or no\")",
-      "Bash(python notify_slack.py wait 120)",
-      "Bash(python -c ' *)",
-      "Bash(python notify_slack.py blocked \"Two-way test — reply yes or no\")",
-      "Bash(python *)",
-      "Bash(pip install *)",
       "Bash(pnpm --filter @estimator/client build)",
       "Bash(pnpm *)",
       "Bash(echo \"EXIT:$?\")",
@@ -28,7 +19,13 @@
       "PowerShell(Stop-Process *)",
       "Bash(powershell \"Get-Process -Id \\(Get-NetTCPConnection -LocalPort 3000\\).OwningProcess | Select-Object Id, ProcessName, MainWindowTitle\")",
       "Bash(curl *)",
-      "PowerShell(Get-NetTCPConnection *)"
+      "PowerShell(Get-NetTCPConnection *)",
+      "Bash(git fetch *)",
+      "Bash(npx tsc *)",
+      "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\james\\\\Git\\\\Estimator\\\\packages\\\\client\\\\src\" -Recurse | Where-Object { $_.Extension -eq \".js\" } | Select-Object FullName, LastWriteTime)",
+      "PowerShell(Get-ChildItem \"C:\\\\Users\\\\james\\\\Git\\\\Estimator\\\\packages\\\\client\\\\src\" -Recurse | Where-Object { $_.Extension -in \".js\" } | Select-Object FullName, LastWriteTime | Format-Table -AutoSize)",
+      "PowerShell(Get-ChildItem \"C:\\\\Users\\\\james\\\\Git\\\\Estimator\\\\packages\\\\client\\\\src\" -Recurse | Where-Object { $_.Extension -eq \".js\" } | Select-Object FullName)",
+      "Bash(Get-ChildItem *)"
     ]
   }
 }

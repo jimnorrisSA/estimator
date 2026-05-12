@@ -20,6 +20,12 @@ export interface ScheduleSettings {
   contingencyPct: number;
   currency: Currency;
   defaultDailyRate: number; // fallback rate when task has no assigned resource
+  exchangeRates: Record<string, number>; // GBP → X conversion rates
+}
+
+export function getConversionRate(settings: ScheduleSettings): number {
+  if (settings.currency === "GBP") return 1;
+  return settings.exchangeRates?.[settings.currency] ?? 1;
 }
 
 export interface TaskOverride {
@@ -79,6 +85,7 @@ export const useSchedulingStore = create<SchedulingStore>()(
         contingencyPct: 15,
         currency: "GBP",
         defaultDailyRate: 0,
+        exchangeRates: { USD: 1.27, EUR: 1.17, AUD: 1.94 },
       },
       overrides: {},
       resources: [],

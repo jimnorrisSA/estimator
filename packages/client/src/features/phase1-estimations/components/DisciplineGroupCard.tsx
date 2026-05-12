@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { Group, Rect, Text } from "react-konva";
 import type Konva from "konva";
 import type { DisciplineGroup, EstimateUnit } from "@estimator/shared";
@@ -29,8 +29,11 @@ export function DisciplineGroupCard({ group, layout, featureId, selectedId, onSe
   const cardRef = useRef<Konva.Group>(null);
   const { requestTextEdit, requestEstimateEdit } = useCanvasContext();
   const addTask = useEstimationsStore((s) => s.addTask);
+  const duplicateTask = useEstimationsStore((s) => s.duplicateTask);
+  const deleteTask = useEstimationsStore((s) => s.deleteTask);
   const updateTaskLabel = useEstimationsStore((s) => s.updateTaskLabel);
   const updateTaskEstimate = useEstimationsStore((s) => s.updateTaskEstimate);
+  const [hoveredTaskId, setHoveredTaskId] = useState<string | null>(null);
 
   function screenPos(offsetX: number, offsetY: number) {
     const node = cardRef.current;
@@ -121,10 +124,17 @@ export function DisciplineGroupCard({ group, layout, featureId, selectedId, onSe
         const isSelected = selectedId === task.id;
         const estText = `${task.estimate.value}${unitShort(task.estimate.unit)}`;
 
+        const isHovered = hoveredTaskId === task.id;
+        const DUPE_W = 18;
+        const DEL_W = 18;
+        const ACTION_W = isHovered ? DUPE_W + DEL_W : 0;
+
         return (
           <Group
             key={task.id}
             y={ty}
+            onMouseEnter={() => setHoveredTaskId(task.id)}
+            onMouseLeave={() => setHoveredTaskId(null)}
             onClick={() => onSelect(task.id)}
             onTap={() => onSelect(task.id)}
             onDblClick={() => openTaskEdit(task.id, task.label, ty)}
@@ -135,7 +145,7 @@ export function DisciplineGroupCard({ group, layout, featureId, selectedId, onSe
             <Text
               x={PAD}
               y={(TASK_ROW_H - LABEL_FONT) / 2}
-              width={layout.width - PAD * 2 - EST_HIT_W}
+              width={layout.width - PAD * 2 - EST_HIT_W - ACTION_W}
               text={task.label || "Double-click to label…"}
               fontSize={LABEL_FONT}
               fill={task.label ? "rgba(255,255,255,0.95)" : "rgba(255,255,255,0.35)"}
@@ -167,6 +177,37 @@ export function DisciplineGroupCard({ group, layout, featureId, selectedId, onSe
                 openEstimateEdit(task.id, task.estimate.value, task.estimate.unit, ty);
               }}
             />
+            {/* Hover action icons: duplicate + delete */}
+            {isHovered && (
+              <>
+                <Group
+                  x={layout.width - EST_HIT_W - ACTION_W}
+                  y={0}
+                  onClick={(e) => { e.cancelBubble = true; duplicateTask(featureId, group.id, task.id); }}
+                  onTap={(e) => { e.cancelBubble = true; duplicateTask(featureId, group.id, task.id); }}
+                >
+                  <Rect width={DUPE_W} height={TASK_ROW_H} fill="rgba(255,255,255,0.12)" cornerRadius={2} />
+                  <Text
+                    x={0} y={(TASK_ROW_H - 11) / 2}
+                    width={DUPE_W} text="⧉" fontSize={11}
+                    fill="rgba(255,255,255,0.8)" align="center"
+                  />
+                </Group>
+                <Group
+                  x={layout.width - EST_HIT_W - DEL_W}
+                  y={0}
+                  onClick={(e) => { e.cancelBubble = true; deleteTask(featureId, group.id, task.id); }}
+                  onTap={(e) => { e.cancelBubble = true; deleteTask(featureId, group.id, task.id); }}
+                >
+                  <Rect width={DEL_W} height={TASK_ROW_H} fill="rgba(239,68,68,0.15)" cornerRadius={2} />
+                  <Text
+                    x={0} y={(TASK_ROW_H - 11) / 2}
+                    width={DEL_W} text="×" fontSize={13}
+                    fill="rgba(239,68,68,0.85)" align="center"
+                  />
+                </Group>
+              </>
+            )}
           </Group>
         );
       })}

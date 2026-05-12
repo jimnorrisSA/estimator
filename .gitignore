@@ -34,6 +34,3 @@ coverage/
 
 # Vite
 .vite/
-
-# Slack
-slack_inbox.jsonl

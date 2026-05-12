@@ -15,6 +15,22 @@ export function buildWorkingDayCalendar(startDate: Date, n: number): Date[] {
   return result;
 }
 
+export function dateToWorkingDay(
+  dateStr: string,
+  calendarMode: string,
+  startDate: string,
+  cal: Date[]
+): number {
+  const date = parseISODate(dateStr);
+  if (calendarMode === "actual" && cal.length > 0) {
+    const idx = cal.findIndex((d) => d >= date);
+    return idx >= 0 ? idx : cal.length;
+  }
+  const start = parseISODate(startDate);
+  const calDays = Math.round((date.getTime() - start.getTime()) / 86400000);
+  return Math.max(0, Math.round((calDays * 5) / 7));
+}
+
 export function formatDateShort(d: Date): string {
   return d.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
 }

@@ -3,7 +3,7 @@ import type { Feature, EstimateUnit, Resource, Discipline } from "@estimator/sha
 import type { ScheduledTask } from "../utils/scheduler.js";
 import type { ScheduleSettings } from "../store/schedulingStore.js";
 import { useEstimationsStore } from "../../phase1-estimations/store/estimationsStore.js";
-import { useSchedulingStore } from "../store/schedulingStore.js";
+import { useSchedulingStore, getConversionRate } from "../store/schedulingStore.js";
 import { buildWorkingDayCalendar, formatDateShort, parseISODate } from "../utils/calendarUtils.js";
 
 const UNITS: EstimateUnit[] = ["half_day", "day", "week", "month"];
@@ -19,16 +19,19 @@ interface Props {
   features: Feature[];
   settings: ScheduleSettings;
   currencySymbol: string;
-  contingencyPct: number;
 }
 
-export function SpecsTable({ tasks, features, settings, currencySymbol, contingencyPct }: Props) {
+export function SpecsTable({ tasks, features, settings, currencySymbol }: Props) {
   const updateTaskLabel = useEstimationsStore((s) => s.updateTaskLabel);
   const updateTaskEstimate = useEstimationsStore((s) => s.updateTaskEstimate);
+  const duplicateTask = useEstimationsStore((s) => s.duplicateTask);
+  const deleteTask = useEstimationsStore((s) => s.deleteTask);
   const overrides = useSchedulingStore((s) => s.overrides);
   const setOverride = useSchedulingStore((s) => s.setOverride);
   const assignResource = useSchedulingStore((s) => s.assignResource);
   const resources = useSchedulingStore((s) => s.resources);
+  const schedulingSettings = useSchedulingStore((s) => s.settings);
+  const conversionRate = getConversionRate(schedulingSettings);
 
   const maxDay = tasks.length > 0 ? Math.max(...tasks.map((t) => t.endDay)) : 0;
 
@@ -62,11 +65,9 @@ export function SpecsTable({ tasks, features, settings, currencySymbol, continge
 
   if (tasks.length === 0) return null;
 
-  const totalWd   = tasks.reduce((s, t) => s + t.workingDays, 0);
-  const baseCost  = tasks.reduce((s, t) => s + t.cost, 0);
-  const contCost  = baseCost * contingencyPct / 100;
-  const totalCost = baseCost + contCost;
-  const hasCosts  = baseCost > 0;
+  const totalWd  = tasks.reduce((s, t) => s + t.workingDays, 0);
+  const baseCost = tasks.reduce((s, t) => s + t.cost, 0);
+  const hasCosts = baseCost > 0;
 
   return (
     <div className="flex flex-col gap-2">
@@ -85,6 +86,7 @@ export function SpecsTable({ tasks, features, settings, currencySymbol, continge
               <Th>Resource</Th>
               {hasCosts && <Th align="right">Cost</Th>}
               <Th>Notes</Th>
+              <th className="px-2 py-2 w-8" />
             </tr>
           </thead>
           <tbody>
@@ -163,7 +165,7 @@ export function SpecsTable({ tasks, features, settings, currencySymbol, continge
                         {hasCosts && (
                           <td className="px-3 py-2 text-sm border-b border-[#2e2848] tabular-nums text-right">
                             {task.cost > 0
-                              ? <span className="text-[#a78bfa]">{currencySymbol}{Math.round(task.cost).toLocaleString()}</span>
+                              ? <span className="text-[#a78bfa]">{currencySymbol}{Math.round(task.cost * conversionRate).toLocaleString()}</span>
                               : <span className="text-[#3a3456]">—</span>}
                           </td>
                         )}
@@ -174,6 +176,27 @@ export function SpecsTable({ tasks, features, settings, currencySymbol, continge
                             placeholder="Add note…"
                             onCommit={(v) => setOverride(task.taskId, { notes: v })}
                           />
+                        </td>
+
+                        <td className="px-2 py-2 border-b border-[#2e2848]">
+                          {meta && (
+                            <div className="flex items-center gap-2">
+                              <button
+                                title="Duplicate task"
+                                className="text-[#3a3456] hover:text-[#a78bfa] transition-colors text-base leading-none"
+                                onClick={() => duplicateTask(meta.featureId, meta.groupId, task.taskId)}
+                              >
+                                ⧉
+                              </button>
+                              <button
+                                title="Delete task"
+                                className="text-[#3a3456] hover:text-[#ef4444] transition-colors text-lg leading-none"
+                                onClick={() => deleteTask(meta.featureId, meta.groupId, task.taskId)}
+                              >
+                                ×
+                              </button>
+                            </div>
+                          )}
                         </td>
                       </tr>
                     );
@@ -190,10 +213,10 @@ export function SpecsTable({ tasks, features, settings, currencySymbol, continge
                     <td colSpan={3} />
                     {hasCosts && (
                       <td className="px-3 py-1.5 text-sm font-semibold text-[#a78bfa] tabular-nums text-right">
-                        {groupCost > 0 ? `${currencySymbol}${Math.round(groupCost).toLocaleString()}` : "—"}
+                        {groupCost > 0 ? `${currencySymbol}${Math.round(groupCost * conversionRate).toLocaleString()}` : "—"}
                       </td>
                     )}
-                    <td />
+                    <td colSpan={2} />
                   </tr>
                 </>
               );
@@ -201,36 +224,14 @@ export function SpecsTable({ tasks, features, settings, currencySymbol, continge
           </tbody>
           <tfoot>
             <tr className="bg-[#1a1628] border-t-2 border-[#3d366a]">
-              <td colSpan={4} className="px-3 py-2 text-sm font-semibold text-[#9b93ba]">Base total</td>
+              <td colSpan={4} className="px-3 py-2 text-sm font-semibold text-[#9b93ba]">Total</td>
               <td className="px-3 py-2 text-sm font-semibold text-[#ece7ff] tabular-nums text-right">
                 {totalWd % 1 === 0 ? totalWd : totalWd.toFixed(1)}d
               </td>
               <td colSpan={3} />
-              {hasCosts && <td className="px-3 py-2 text-sm font-semibold text-[#ece7ff] tabular-nums text-right">{currencySymbol}{Math.round(baseCost).toLocaleString()}</td>}
-              <td />
+              {hasCosts && <td className="px-3 py-2 text-sm font-semibold text-[#ece7ff] tabular-nums text-right">{currencySymbol}{Math.round(baseCost * conversionRate).toLocaleString()}</td>}
+              <td colSpan={2} />
             </tr>
-            {hasCosts && contingencyPct > 0 && (
-              <tr className="bg-[#1a1628]">
-                <td colSpan={4} className="px-3 py-2 text-sm text-[#5c5575] italic">
-                  Contingency ({contingencyPct}%)
-                </td>
-                <td colSpan={4} />
-                <td className="px-3 py-2 text-sm text-[#5c5575] tabular-nums text-right italic">
-                  +{currencySymbol}{Math.round(contCost).toLocaleString()}
-                </td>
-                <td />
-              </tr>
-            )}
-            {hasCosts && contingencyPct > 0 && (
-              <tr className="bg-[#252041] border-t border-[#3d366a]">
-                <td colSpan={4} className="px-3 py-2 text-sm font-bold text-[#ece7ff]">Project total</td>
-                <td colSpan={4} />
-                <td className="px-3 py-2 text-sm font-bold text-[#a78bfa] tabular-nums text-right">
-                  {currencySymbol}{Math.round(totalCost).toLocaleString()}
-                </td>
-                <td />
-              </tr>
-            )}
           </tfoot>
         </table>
       </div>

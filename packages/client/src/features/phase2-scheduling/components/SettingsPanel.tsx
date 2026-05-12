@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Currency, ScheduleSettings } from "../store/schedulingStore.js";
 import { CURRENCY_SYMBOLS } from "../store/schedulingStore.js";
 
@@ -16,24 +16,42 @@ interface Props {
 
 export function SettingsPanel({ settings, onChange }: Props) {
   const symbol = CURRENCY_SYMBOLS[settings.currency];
-  const [dayDraft, setDayDraft] = useState(settings.defaultDailyRate > 0 ? String(settings.defaultDailyRate) : "");
-  const [monthDraft, setMonthDraft] = useState(settings.defaultDailyRate > 0 ? String(settings.defaultDailyRate * 20) : "");
+  const conversionRate = settings.currency === "GBP" ? 1 : (settings.exchangeRates?.[settings.currency] ?? 1);
+
+  const toDisplay = (gbp: number) => Math.round(gbp * conversionRate);
+  const toGbp = (display: number) => display / conversionRate;
+
+  const [dayDraft, setDayDraft] = useState(
+    settings.defaultDailyRate > 0 ? String(toDisplay(settings.defaultDailyRate)) : ""
+  );
+  const [monthDraft, setMonthDraft] = useState(
+    settings.defaultDailyRate > 0 ? String(toDisplay(settings.defaultDailyRate * 20)) : ""
+  );
+  const [rateDraft, setRateDraft] = useState(String(conversionRate));
+
+  useEffect(() => {
+    const rate = settings.currency === "GBP" ? 1 : (settings.exchangeRates?.[settings.currency] ?? 1);
+    setRateDraft(String(rate));
+    setDayDraft(settings.defaultDailyRate > 0 ? String(Math.round(settings.defaultDailyRate * rate)) : "");
+    setMonthDraft(settings.defaultDailyRate > 0 ? String(Math.round(settings.defaultDailyRate * 20 * rate)) : "");
+  }, [settings.currency, settings.exchangeRates, settings.defaultDailyRate]);
 
   function commitDayRate(raw: string) {
     const v = parseFloat(raw);
-    const rate = isNaN(v) || v < 0 ? 0 : v;
-    onChange({ defaultDailyRate: rate });
-    setDayDraft(rate > 0 ? String(rate) : "");
-    setMonthDraft(rate > 0 ? String(rate * 20) : "");
+    const displayVal = isNaN(v) || v < 0 ? 0 : v;
+    const gbp = toGbp(displayVal);
+    onChange({ defaultDailyRate: gbp });
+    setDayDraft(gbp > 0 ? String(Math.round(gbp * conversionRate)) : "");
+    setMonthDraft(gbp > 0 ? String(Math.round(gbp * 20 * conversionRate)) : "");
   }
 
   function commitMonthRate(raw: string) {
     const v = parseFloat(raw);
-    const monthly = isNaN(v) || v < 0 ? 0 : v;
-    const daily = monthly / 20;
-    onChange({ defaultDailyRate: daily });
-    setMonthDraft(monthly > 0 ? String(monthly) : "");
-    setDayDraft(daily > 0 ? String(daily) : "");
+    const displayMonthly = isNaN(v) || v < 0 ? 0 : v;
+    const gbp = toGbp(displayMonthly) / 20;
+    onChange({ defaultDailyRate: gbp });
+    setMonthDraft(displayMonthly > 0 ? String(Math.round(displayMonthly)) : "");
+    setDayDraft(gbp > 0 ? String(Math.round(gbp * conversionRate)) : "");
   }
 
   return (
@@ -121,6 +139,29 @@ export function SettingsPanel({ settings, onChange }: Props) {
           ))}
         </select>
       </Field>
+
+      {settings.currency !== "GBP" && (
+        <Field label={`1 GBP =`}>
+          <div className="flex items-center gap-1.5">
+            <input
+              type="number"
+              min={0.01}
+              step={0.01}
+              className="border border-[#2e2848] bg-[#1a1628] text-[#ece7ff] rounded-lg px-3 py-1.5 text-sm w-24 focus:outline-none focus:ring-2 focus:ring-[#7c3aed]"
+              value={rateDraft}
+              onChange={(e) => setRateDraft(e.target.value)}
+              onBlur={() => {
+                const v = parseFloat(rateDraft);
+                const rate = isNaN(v) || v <= 0 ? 1 : v;
+                onChange({ exchangeRates: { ...settings.exchangeRates, [settings.currency]: rate } });
+                setRateDraft(String(rate));
+              }}
+              onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
+            />
+            <span className="text-sm text-[#5c5575]">{symbol}</span>
+          </div>
+        </Field>
+      )}
 
       <Field label={`Default rate (${symbol})`}>
         <div className="flex items-center gap-2">

@@ -1,8 +1,9 @@
 import { useMemo, useState } from "react";
 import { useMilestonesStore, MILESTONE_COLORS, type Milestone } from "./store/milestonesStore.js";
 import { useEstimationsStore } from "../phase1-estimations/store/estimationsStore.js";
-import { useSchedulingStore, CURRENCY_SYMBOLS } from "../phase2-scheduling/store/schedulingStore.js";
+import { useSchedulingStore, CURRENCY_SYMBOLS, getConversionRate } from "../phase2-scheduling/store/schedulingStore.js";
 import { runScheduler } from "../phase2-scheduling/utils/scheduler.js";
+<<<<<<< HEAD
 import { buildWorkingDayCalendar, parseISODate } from "../phase2-scheduling/utils/calendarUtils.js";
 import { Timeline } from "../phase2-scheduling/components/Timeline.js";
 
@@ -16,12 +17,21 @@ function dateToWorkingDay(dateStr: string, calendarMode: string, startDate: stri
   const calDays = Math.round((date.getTime() - start.getTime()) / 86400000);
   return Math.max(0, Math.round(calDays * 5 / 7));
 }
+=======
+import { buildWorkingDayCalendar, dateToWorkingDay, parseISODate } from "../phase2-scheduling/utils/calendarUtils.js";
+
+>>>>>>> origin/HEAD
 
 export function MilestonesPage() {
-  const { milestones, addMilestone, updateMilestone, deleteMilestone } = useMilestonesStore();
+  const { milestones: rawMilestones, addMilestone, updateMilestone, deleteMilestone } = useMilestonesStore();
+  const milestones = useMemo(
+    () => [...rawMilestones].sort((a, b) => a.startDate.localeCompare(b.startDate)),
+    [rawMilestones]
+  );
   const features = useEstimationsStore((s) => s.features);
   const { settings, overrides, resources } = useSchedulingStore();
   const symbol = CURRENCY_SYMBOLS[settings.currency];
+<<<<<<< HEAD
 
   const [viewMode, setViewMode] = useState<"detailed" | "summary">("detailed");
 
@@ -29,15 +39,33 @@ export function MilestonesPage() {
     () => runScheduler(features, settings.contingencyPct, overrides, resources, settings.defaultDailyRate),
     [features, settings.contingencyPct, overrides, resources, settings.defaultDailyRate]
   );
+=======
+  const conversionRate = getConversionRate(settings);
+>>>>>>> origin/HEAD
 
   const cal = useMemo(() => {
-    if (settings.calendarMode !== "actual" || result.projectEndDay === 0) return [];
-    return buildWorkingDayCalendar(parseISODate(settings.startDate), result.projectEndDay + 10);
-  }, [settings.calendarMode, settings.startDate, result.projectEndDay]);
+    if (settings.calendarMode !== "actual") return [];
+    return buildWorkingDayCalendar(parseISODate(settings.startDate), 500);
+  }, [settings.calendarMode, settings.startDate]);
+
+  const blockedPeriods = useMemo(() =>
+    milestones
+      .filter((m) => (m.hardeningDays ?? 0) > 0)
+      .map((m) => {
+        const endDay = dateToWorkingDay(m.endDate, settings.calendarMode, settings.startDate, cal);
+        const startDay = Math.max(0, endDay - (m.hardeningDays ?? 0));
+        return { start: startDay, end: endDay, label: `${m.title} Hardening`, color: m.color };
+      }),
+    [milestones, settings.calendarMode, settings.startDate, cal]
+  );
+
+  const result = useMemo(
+    () => runScheduler(features, settings.contingencyPct, overrides, resources, settings.defaultDailyRate, blockedPeriods),
+    [features, settings.contingencyPct, overrides, resources, settings.defaultDailyRate, blockedPeriods]
+  );
 
   const hasCosts = result.tasks.some((t) => t.cost > 0);
   const baseCost = result.tasks.reduce((s, t) => s + t.cost, 0);
-  const projectCost = baseCost * (1 + settings.contingencyPct / 100);
 
   const milestoneCosts = useMemo(() =>
     milestones.map((m) => {
@@ -87,6 +115,7 @@ export function MilestonesPage() {
         <section className="flex flex-col gap-4">
           <h2 className="text-sm font-semibold text-[#9b93ba] uppercase tracking-wide">Cost Breakdown</h2>
 
+<<<<<<< HEAD
           {!hasCosts && (
             <p className="text-sm text-[#5c5575]">Add daily rates to team members in Phase 2 to see cost breakdowns.</p>
           )}
@@ -126,6 +155,73 @@ export function MilestonesPage() {
             </div>
           )}
         </section>
+=======
+        {hasCosts && (
+          <div className="flex flex-wrap gap-6 items-start">
+            {/* By milestone */}
+            {milestones.length > 0 && (
+              <div className="flex-1 min-w-[280px]">
+                <h3 className="text-xs font-semibold text-[#5c5575] uppercase tracking-wide mb-3">By Milestone</h3>
+                <table className="w-full text-sm border-collapse">
+                  <thead>
+                    <tr className="text-left text-xs text-[#5c5575] uppercase tracking-wide">
+                      <th className="pb-2 font-medium pr-4">Milestone</th>
+                      <th className="pb-2 font-medium pr-4 text-right">Days</th>
+                      <th className="pb-2 font-medium text-right">Cost</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {milestoneCosts.map((m) => (
+                      <tr key={m.id} className="border-t border-[#2e2848]">
+                        <td className="py-2.5 pr-4">
+                          <div className="flex items-center gap-2">
+                            <span className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ background: m.color }} />
+                            <span className="text-[#ece7ff]">{m.title}</span>
+                          </div>
+                        </td>
+                        <td className="py-2.5 pr-4 text-right text-[#9b93ba]">{m.days}d</td>
+                        <td className="py-2.5 text-right font-medium text-[#ece7ff]">
+                          {m.cost > 0 ? `${symbol}${Math.round(m.cost * conversionRate).toLocaleString()}` : "—"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {/* By discipline */}
+            <div className="flex-1 min-w-[240px]">
+              <h3 className="text-xs font-semibold text-[#5c5575] uppercase tracking-wide mb-3">By Discipline</h3>
+              <table className="w-full text-sm border-collapse">
+                <thead>
+                  <tr className="text-left text-xs text-[#5c5575] uppercase tracking-wide">
+                    <th className="pb-2 font-medium pr-4">Discipline</th>
+                    <th className="pb-2 font-medium pr-4 text-right">Days</th>
+                    <th className="pb-2 font-medium text-right">Cost</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {disciplineCosts.map(({ discipline, days, cost }) => (
+                    <tr key={discipline} className="border-t border-[#2e2848]">
+                      <td className="py-2.5 pr-4 text-[#ece7ff]">{discipline}</td>
+                      <td className="py-2.5 pr-4 text-right text-[#9b93ba]">{Math.round(days)}d</td>
+                      <td className="py-2.5 text-right font-medium text-[#ece7ff]">
+                        {cost > 0 ? `${symbol}${Math.round(cost * conversionRate).toLocaleString()}` : "—"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Totals */}
+            <div className="w-full flex flex-wrap gap-3 pt-2 border-t border-[#2e2848]">
+              <Stat label="Total" value={`${symbol}${Math.round(baseCost * conversionRate).toLocaleString()}`} highlight />
+            </div>
+          </div>
+        )}
+>>>>>>> origin/HEAD
       </div>
     </div>
   );
@@ -137,7 +233,7 @@ interface StripProps {
   milestones: Milestone[];
   settings: { startDate: string };
   onAdd: (title: string, startDate: string, endDate: string) => void;
-  onUpdate: (id: string, patch: Partial<Pick<Milestone, "title" | "startDate" | "endDate" | "color">>) => void;
+  onUpdate: (id: string, patch: Partial<Pick<Milestone, "title" | "startDate" | "endDate" | "color" | "hardeningDays">>) => void;
   onDelete: (id: string) => void;
 }
 
@@ -171,10 +267,31 @@ function MilestoneStrip({ milestones, settings, onAdd, onUpdate, onDelete }: Str
       )}
 
       {milestones.length > 0 && (
+<<<<<<< HEAD
         <div className="flex flex-wrap gap-2">
           {milestones.map((m) => (
             <MilestoneChip key={m.id} milestone={m} onUpdate={onUpdate} onDelete={onDelete} />
           ))}
+=======
+        <div className="rounded-xl border border-[#2e2848] overflow-hidden">
+          <table className="w-full text-sm border-collapse">
+            <thead>
+              <tr className="bg-[#14112a] text-left text-xs text-[#5c5575] uppercase tracking-wide">
+                <th className="px-4 py-2.5 font-medium w-6" />
+                <th className="px-4 py-2.5 font-medium">Title</th>
+                <th className="px-4 py-2.5 font-medium">Start</th>
+                <th className="px-4 py-2.5 font-medium">End</th>
+                <th className="px-4 py-2.5 font-medium">Hardening</th>
+                <th className="px-4 py-2.5 font-medium w-8" />
+              </tr>
+            </thead>
+            <tbody>
+              {milestones.map((m) => (
+                <MilestoneRow key={m.id} milestone={m} onUpdate={onUpdate} onDelete={onDelete} />
+              ))}
+            </tbody>
+          </table>
+>>>>>>> origin/HEAD
         </div>
       )}
 
@@ -218,15 +335,40 @@ function MilestoneStrip({ milestones, settings, onAdd, onUpdate, onDelete }: Str
 
 function MilestoneChip({ milestone, onUpdate, onDelete }: {
   milestone: Milestone;
-  onUpdate: (id: string, patch: Partial<Pick<Milestone, "title" | "startDate" | "endDate" | "color">>) => void;
+  onUpdate: (id: string, patch: Partial<Pick<Milestone, "title" | "startDate" | "endDate" | "color" | "hardeningDays">>) => void;
   onDelete: (id: string) => void;
 }) {
+<<<<<<< HEAD
   const [editing, setEditing] = useState(false);
 
   if (editing) {
     return (
       <div className="flex items-center gap-2 bg-[#1d1930] border border-[#3d366a] rounded-lg px-3 py-1.5">
         <span className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ background: milestone.color }} />
+=======
+  const hardening = milestone.hardeningDays ?? 0;
+  return (
+    <tr className="border-t border-[#2e2848] bg-[#0d0b16] hover:bg-[#14112a] transition-colors">
+      <td className="px-4 py-2">
+        <div className="relative group">
+          <span
+            className="block w-4 h-4 rounded-sm cursor-pointer"
+            style={{ background: milestone.color }}
+          />
+          <div className="absolute left-0 top-full mt-1 z-50 hidden group-hover:flex flex-wrap gap-1 bg-[#1d1930] border border-[#2e2848] rounded-lg p-2 shadow-xl w-28">
+            {MILESTONE_COLORS.map((c) => (
+              <button
+                key={c}
+                className="w-5 h-5 rounded-sm hover:scale-110 transition-transform"
+                style={{ background: c }}
+                onClick={() => onUpdate(milestone.id, { color: c })}
+              />
+            ))}
+          </div>
+        </div>
+      </td>
+      <td className="px-4 py-2">
+>>>>>>> origin/HEAD
         <input
           autoFocus
           className="bg-transparent text-[#ece7ff] text-sm w-32 focus:outline-none"
@@ -235,6 +377,7 @@ function MilestoneChip({ milestone, onUpdate, onDelete }: {
           onBlur={() => setEditing(false)}
           onKeyDown={(e) => { if (e.key === "Enter" || e.key === "Escape") setEditing(false); }}
         />
+<<<<<<< HEAD
         <input type="date" className="bg-transparent text-[#9b93ba] text-xs focus:outline-none"
           value={milestone.startDate} onChange={(e) => onUpdate(milestone.id, { startDate: e.target.value })} />
         <span className="text-[#3a3456] text-xs">→</span>
@@ -313,5 +456,49 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
       <label className="text-xs font-semibold text-[#5c5575] uppercase tracking-wide">{label}</label>
       {children}
     </div>
+=======
+      </td>
+      <td className="px-4 py-2">
+        <input
+          type="date"
+          className="bg-transparent text-[#9b93ba] text-sm focus:outline-none focus:bg-[#1a1628] focus:px-2 rounded"
+          value={milestone.startDate}
+          onChange={(e) => onUpdate(milestone.id, { startDate: e.target.value })}
+        />
+      </td>
+      <td className="px-4 py-2">
+        <input
+          type="date"
+          className="bg-transparent text-[#9b93ba] text-sm focus:outline-none focus:bg-[#1a1628] focus:px-2 rounded"
+          value={milestone.endDate}
+          onChange={(e) => onUpdate(milestone.id, { endDate: e.target.value })}
+        />
+      </td>
+      <td className="px-4 py-2">
+        <div className="flex items-center gap-1">
+          <input
+            type="number"
+            min={0}
+            step={1}
+            className="w-14 bg-[#1a1628] border border-[#2e2848] text-[#ece7ff] text-sm rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-[#7c3aed] tabular-nums"
+            value={hardening}
+            onChange={(e) => {
+              const v = parseInt(e.target.value, 10);
+              onUpdate(milestone.id, { hardeningDays: isNaN(v) || v < 0 ? 0 : v });
+            }}
+          />
+          <span className="text-xs text-[#5c5575]">d</span>
+        </div>
+      </td>
+      <td className="px-4 py-2 text-right">
+        <button
+          className="text-[#3a3456] hover:text-[#ef4444] text-lg leading-none transition-colors"
+          onClick={() => onDelete(milestone.id)}
+        >
+          ×
+        </button>
+      </td>
+    </tr>
+>>>>>>> origin/HEAD
   );
 }

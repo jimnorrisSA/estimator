@@ -19,10 +19,9 @@ const MONTH_H = 22;
 const WEEK_H = 20;
 const HEADER_H = MONTH_H + WEEK_H;
 const MILESTONE_LANE_H = 30;
-const SLOT_H = 28;
+const SLOT_H = 40;
 const ROW_VPAD = 5;
 const ROW_GAP = 6;
-const CONT_ROW_H = 34;
 const BOTTOM_PAD = 16;
 
 function rowHeight(cap: number) {
@@ -109,7 +108,10 @@ function DraggableTaskBar({ task, y, barH, color, onMove, onResize, onClearPin }
   const x    = dispStart * DAY_W;
   const barW = Math.max(2, (dispEnd - dispStart) * DAY_W - 2);
   const maxChars = Math.floor((barW - 10) / 5.5);
+  const maxFeatureChars = Math.floor((barW - 10) / 4.8);
   const isDragging = dragType !== null;
+  const featureY = y + Math.round(barH * 0.3);
+  const taskY = y + Math.round(barH * 0.68);
 
   return (
     <g>
@@ -124,11 +126,18 @@ function DraggableTaskBar({ task, y, barH, color, onMove, onResize, onClearPin }
         onDoubleClick={(e) => { e.stopPropagation(); onClearPin(task.taskId); }}
       />
 
-      {barW > 32 && (
-        <text x={x + 5} y={y + barH / 2} dominantBaseline="middle" fontSize={11} fill="white"
-          style={{ pointerEvents: "none", userSelect: "none" }}>
-          {task.label.length > maxChars ? task.label.slice(0, maxChars) + "…" : task.label}
-        </text>
+      {barW > 40 && (
+        <>
+          <text x={x + 5} y={featureY} dominantBaseline="middle" fontSize={9}
+            fill="rgba(255,255,255,0.65)"
+            style={{ pointerEvents: "none", userSelect: "none" }}>
+            {task.featureName.length > maxFeatureChars ? task.featureName.slice(0, maxFeatureChars) + "…" : task.featureName}
+          </text>
+          <text x={x + 5} y={taskY} dominantBaseline="middle" fontSize={11} fill="white"
+            style={{ pointerEvents: "none", userSelect: "none" }}>
+            {task.label.length > maxChars ? task.label.slice(0, maxChars) + "…" : task.label}
+          </text>
+        </>
       )}
 
       {barW > 16 && (
@@ -167,7 +176,7 @@ interface Props {
 }
 
 export function Timeline({ result, features, settings, viewMode, onToggleView }: Props) {
-  const { tasks, disciplines, capacities, totalDays, contingencyDays, projectEndDay } = result;
+  const { tasks, disciplines, capacities, projectEndDay, slotContingency, blockedPeriods } = result;
 
   const { setOverride, clearOverride } = useSchedulingStore();
   const updateTaskEstimate = useEstimationsStore((s) => s.updateTaskEstimate);
@@ -232,12 +241,11 @@ export function Timeline({ result, features, settings, viewMode, onToggleView }:
     });
   }, [disciplines, capacities]);
 
-  const detailedContY =
+  const detailedH =
     rowLayouts.length > 0
       ? rowLayouts[rowLayouts.length - 1].rowY + rowLayouts[rowLayouts.length - 1].height + ROW_GAP
       : 0;
-  const summaryContY = summaryRows.length * (SUMMARY_ROW_H + ROW_GAP);
-  const contY = viewMode === "summary" ? summaryContY : detailedContY;
+  const summaryH = summaryRows.length * (SUMMARY_ROW_H + ROW_GAP);
 
   if (tasks.length === 0) {
     return (
@@ -247,7 +255,7 @@ export function Timeline({ result, features, settings, viewMode, onToggleView }:
     );
   }
 
-  const svgH = HEADER_H + milestoneH + contY + CONT_ROW_H + BOTTOM_PAD;
+  const svgH = HEADER_H + milestoneH + (viewMode === "detailed" ? detailedH : summaryH) + BOTTOM_PAD;
   const chartW = Math.max(projectEndDay * DAY_W + 20 * DAY_W, 480);
 
   return (
@@ -315,13 +323,6 @@ export function Timeline({ result, features, settings, viewMode, onToggleView }:
                     {row.featureName.length > 12 ? row.featureName.slice(0, 11) + "…" : row.featureName}
                   </text>
                 ))}
-            <text
-              x={LABEL_W - 12}
-              y={HEADER_H + milestoneH + contY + CONT_ROW_H / 2}
-              textAnchor="end" dominantBaseline="middle" fontSize={12} fill="#5c5575" fontStyle="italic"
-            >
-              Contingency
-            </text>
           </svg>
 
           {/* Scrollable chart */}
@@ -364,13 +365,44 @@ export function Timeline({ result, features, settings, viewMode, onToggleView }:
                       x={0} y={HEADER_H + milestoneH + row.rowY} width={chartW} height={SUMMARY_ROW_H}
                       fill={i % 2 === 0 ? "#1d1930" : "#201c32"} />
                   ))}
-              <rect
-                x={0}
-                y={HEADER_H + milestoneH + contY}
-                width={chartW}
-                height={CONT_ROW_H}
-                fill="#18152a"
-              />
+
+              {/* Hardening overlays — span all discipline rows */}
+              {blockedPeriods.map((bp) => {
+                const bx = bp.start * DAY_W;
+                const bw = Math.max(2, (bp.end - bp.start) * DAY_W);
+                const rowsH =
+                  viewMode === "detailed"
+                    ? rowLayouts.length > 0
+                      ? rowLayouts[rowLayouts.length - 1].rowY + rowLayouts[rowLayouts.length - 1].height
+                      : 0
+                    : summaryRows.length * (SUMMARY_ROW_H + ROW_GAP);
+                const by = HEADER_H + milestoneH;
+                return (
+                  <g key={`harden-${bp.label}`}>
+                    <title>{bp.label}</title>
+                    <rect
+                      x={bx} y={by} width={bw} height={rowsH}
+                      fill={bp.color} opacity={0.13}
+                    />
+                    <rect
+                      x={bx} y={by} width={bw} height={rowsH}
+                      fill="none" stroke={bp.color} strokeWidth={1.5} opacity={0.5}
+                    />
+                    {bw > 40 && (
+                      <text
+                        x={bx + bw / 2} y={by + Math.min(rowsH / 2, 60)}
+                        textAnchor="middle" dominantBaseline="middle"
+                        fontSize={10} fontWeight="600"
+                        fill={bp.color} opacity={0.85}
+                        style={{ pointerEvents: "none", userSelect: "none" }}
+                        transform={bw < 80 ? `rotate(-90, ${bx + bw / 2}, ${by + Math.min(rowsH / 2, 60)})` : undefined}
+                      >
+                        {bp.label}
+                      </text>
+                    )}
+                  </g>
+                );
+              })}
 
               {/* Date headers */}
               {settings.calendarMode === "four-week" ? (
@@ -462,34 +494,28 @@ export function Timeline({ result, features, settings, viewMode, onToggleView }:
                 );
               })()}
 
-              {/* Contingency block */}
-              {contingencyDays > 0 && (
-                <g>
-                  <title>Contingency — {settings.contingencyPct}%</title>
-                  <rect
-                    x={totalDays * DAY_W}
-                    y={HEADER_H + milestoneH + contY + 5}
-                    width={Math.max(2, contingencyDays * DAY_W - 2)}
-                    height={CONT_ROW_H - 10}
-                    rx={3}
-                    fill="#252041"
-                    stroke="#3d366a"
-                    strokeWidth={1}
-                  />
-                  {contingencyDays * DAY_W > 60 && (
-                    <text
-                      x={totalDays * DAY_W + (contingencyDays * DAY_W) / 2}
-                      y={HEADER_H + milestoneH + contY + CONT_ROW_H / 2}
-                      textAnchor="middle"
-                      dominantBaseline="middle"
-                      fontSize={11}
-                      fill="#5c5575"
-                    >
-                      {settings.contingencyPct}% contingency
-                    </text>
-                  )}
-                </g>
-              )}
+              {/* Per-member contingency buffers */}
+              {viewMode === "detailed" && slotContingency.map((sc) => {
+                const layout = rowLayouts.find((r) => r.discipline === sc.discipline);
+                if (!layout || sc.contingencyDays <= 0) return null;
+                const barH = SLOT_H - 4;
+                const bx = sc.lastTaskEndDay * DAY_W;
+                const bw = Math.max(2, sc.contingencyDays * DAY_W - 2);
+                const by = HEADER_H + milestoneH + layout.rowY + ROW_VPAD + sc.slotIndex * SLOT_H;
+                return (
+                  <g key={`buf-${sc.discipline}-${sc.slotIndex}`}>
+                    <title>{sc.discipline} slot {sc.slotIndex + 1} — {sc.contingencyDays}d buffer ({settings.contingencyPct}%)</title>
+                    <rect x={bx} y={by} width={bw} height={barH} rx={3}
+                      fill="rgba(255,255,255,0.04)" stroke="#3d366a" strokeWidth={1} strokeDasharray="4 3" />
+                    {bw > 28 && (
+                      <text x={bx + bw / 2} y={by + barH / 2} dominantBaseline="middle" textAnchor="middle"
+                        fontSize={9} fill="#4a4060" style={{ pointerEvents: "none", userSelect: "none" }}>
+                        +{sc.contingencyDays}d
+                      </text>
+                    )}
+                  </g>
+                );
+              })}
             </svg>
           </div>
         </div>
