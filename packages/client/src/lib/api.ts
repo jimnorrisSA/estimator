@@ -20,7 +20,7 @@ export const api = {
     config: () => apiFetch("/api/auth/config"),
     devLogin: () => apiFetch("/api/auth/dev-login", { method: "POST" }),
     logout: () => apiFetch("/api/auth/logout", { method: "POST" }),
-    googleLoginUrl: "/api/auth/google",
+    googleLoginUrl: `${API_BASE}/api/auth/google`,
   },
   projects: {
     list: () => apiFetch("/api/projects"),
