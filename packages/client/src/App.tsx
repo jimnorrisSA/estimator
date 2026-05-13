@@ -56,10 +56,14 @@ function AppContent() {
       milestones: useMilestonesStore.getState().milestones,
     };
     saveActiveSnapshot(snapshot);
-    pushToServer(active.id);
-    // If this is a checked-out shared project, check it back in after saving
     if (active.checkedOutBy && active.apiId) {
-      api.projects.checkin(active.apiId).catch(() => {});
+      // Save first, then release the lock — order matters
+      const apiId = active.apiId;
+      pushToServer(active.id).then(() => {
+        api.projects.checkin(apiId).catch(() => {});
+      });
+    } else {
+      pushToServer(active.id);
     }
   }
 
