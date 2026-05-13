@@ -5,6 +5,7 @@ import type { ScheduleSettings } from "../store/schedulingStore.js";
 import { useSchedulingStore } from "../store/schedulingStore.js";
 import { useEstimationsStore } from "../../phase1-estimations/store/estimationsStore.js";
 import { useMilestonesStore } from "../../phase3-milestones/store/milestonesStore.js";
+import { TaskEditModal } from "./TaskEditModal.js";
 import {
   buildWorkingDayCalendar,
   formatDateShort,
@@ -60,14 +61,29 @@ interface TaskBarProps {
   onMove: (taskId: string, startDay: number, endDay: number) => void;
   onResize: (taskId: string, startDay: number, endDay: number, newDays: number) => void;
   onClearPin: (taskId: string) => void;
+  onEditTask: (task: ScheduledTask) => void;
+  onRenameTask: (taskId: string, label: string) => void;
 }
 
-function DraggableTaskBar({ task, y, barH, color, onMove, onResize, onClearPin }: TaskBarProps) {
+function DraggableTaskBar({ task, y, barH, color, onMove, onResize, onClearPin, onEditTask, onRenameTask }: TaskBarProps) {
   const [preview, setPreview] = useState<{ startDay: number; endDay: number } | null>(null);
   const [dragType, setDragType] = useState<"move" | "resize" | null>(null);
+  const [nameEdit, setNameEdit] = useState<string | null>(null);
 
-  const callbacksRef = useRef({ onMove, onResize, onClearPin });
-  callbacksRef.current = { onMove, onResize, onClearPin };
+  const callbacksRef = useRef({ onMove, onResize, onClearPin, onEditTask, onRenameTask });
+  callbacksRef.current = { onMove, onResize, onClearPin, onEditTask, onRenameTask };
+
+  function commitRename() {
+    setNameEdit((val) => {
+      if (val !== null) {
+        const trimmed = val.trim();
+        if (trimmed && trimmed !== task.label) {
+          callbacksRef.current.onRenameTask(task.taskId, trimmed);
+        }
+      }
+      return null;
+    });
+  }
 
   function startDrag(type: "move" | "resize", clientX: number) {
     const origStart = task.startDay;
@@ -122,8 +138,8 @@ function DraggableTaskBar({ task, y, barH, color, onMove, onResize, onClearPin }
         fill={color}
         opacity={isDragging ? 0.55 : 0.9}
         style={{ cursor: isDragging ? "grabbing" : "grab" }}
-        onMouseDown={(e) => { if (e.button !== 0) return; e.stopPropagation(); startDrag("move", e.clientX); }}
-        onDoubleClick={(e) => { e.stopPropagation(); onClearPin(task.taskId); }}
+        onMouseDown={(e) => { if (e.button !== 0) return; e.stopPropagation(); if (nameEdit === null) startDrag("move", e.clientX); }}
+        onDoubleClick={(e) => { e.stopPropagation(); setNameEdit(task.label); }}
       />
 
       {barW > 40 && (
@@ -161,6 +177,56 @@ function DraggableTaskBar({ task, y, barH, color, onMove, onResize, onClearPin }
           {String(Math.round((preview.endDay - preview.startDay) * 2) / 2)}d
         </text>
       )}
+
+      {nameEdit !== null && (
+        <foreignObject x={x} y={y} width={Math.max(barW, 180)} height={barH}>
+          <div style={{ display: "flex", height: "100%", gap: 2, padding: 2, boxSizing: "border-box" }}>
+            <input
+              type="text"
+              value={nameEdit}
+              autoFocus
+              onChange={(e) => setNameEdit(e.target.value)}
+              onBlur={commitRename}
+              onMouseDown={(e) => e.stopPropagation()}
+              onKeyDown={(e) => {
+                e.stopPropagation();
+                if (e.key === "Enter") commitRename();
+                if (e.key === "Escape") setNameEdit(null);
+              }}
+              style={{
+                flex: 1,
+                minWidth: 0,
+                background: "#1a1628",
+                border: "2px solid #7c3aed",
+                borderRadius: 3,
+                color: "white",
+                fontSize: 11,
+                padding: "0 5px",
+                outline: "none",
+                boxSizing: "border-box",
+              }}
+            />
+            <button
+              type="button"
+              onMouseDown={(e) => e.stopPropagation()}
+              onClick={(e) => { e.stopPropagation(); setNameEdit(null); onEditTask(task); }}
+              style={{
+                flexShrink: 0,
+                background: "#2e2848",
+                border: "1px solid #3d366a",
+                borderRadius: 3,
+                color: "#9b93ba",
+                fontSize: 10,
+                padding: "0 6px",
+                cursor: "pointer",
+                whiteSpace: "nowrap",
+              }}
+            >
+              Edit all
+            </button>
+          </div>
+        </foreignObject>
+      )}
     </g>
   );
 }
@@ -178,9 +244,12 @@ interface Props {
 export function Timeline({ result, features, settings, viewMode, onToggleView }: Props) {
   const { tasks, disciplines, capacities, projectEndDay, slotContingency, blockedPeriods } = result;
 
-  const { setOverride, clearOverride } = useSchedulingStore();
+  const { setOverride, clearOverride, resources } = useSchedulingStore();
   const updateTaskEstimate = useEstimationsStore((s) => s.updateTaskEstimate);
+  const updateTaskLabel = useEstimationsStore((s) => s.updateTaskLabel);
   const milestones = useMilestonesStore((s) => s.milestones);
+
+  const [editingTask, setEditingTask] = useState<ScheduledTask | null>(null);
   const milestoneH = milestones.length > 0 ? MILESTONE_LANE_H : 0;
 
   function handleMove(taskId: string, startDay: number, endDay: number) {
@@ -198,6 +267,32 @@ export function Timeline({ result, features, settings, viewMode, onToggleView }:
 
   function handleClearPin(taskId: string) {
     clearOverride(taskId);
+  }
+
+  function handleRenameTask(taskId: string, label: string) {
+    const t = tasks.find((t) => t.taskId === taskId);
+    if (t) updateTaskLabel(t.featureId, t.groupId, taskId, label);
+  }
+
+  function handleSaveTask(changes: {
+    label: string;
+    estimateValue: number;
+    estimateUnit: EstimateUnit;
+    assignedResourceId: string | null;
+    notes: string;
+  }) {
+    if (!editingTask) return;
+    const { taskId, featureId, groupId } = editingTask;
+    if (changes.label !== editingTask.label) {
+      updateTaskLabel(featureId, groupId, taskId, changes.label);
+    }
+    if (changes.estimateValue !== editingTask.estimateValue || changes.estimateUnit !== editingTask.estimateUnit) {
+      updateTaskEstimate(featureId, groupId, taskId, changes.estimateValue, changes.estimateUnit);
+    }
+    setOverride(taskId, {
+      assignedResourceId: changes.assignedResourceId ?? undefined,
+      notes: changes.notes,
+    });
   }
 
   const featureColors = useMemo(
@@ -430,7 +525,8 @@ export function Timeline({ result, features, settings, viewMode, onToggleView }:
                     const color = featureColors.get(task.featureId) ?? "#7c3aed";
                     return (
                       <DraggableTaskBar key={task.taskId} task={task} y={y} barH={barH} color={color}
-                        onMove={handleMove} onResize={handleResize} onClearPin={handleClearPin} />
+                        onMove={handleMove} onResize={handleResize} onClearPin={handleClearPin}
+                        onEditTask={setEditingTask} onRenameTask={handleRenameTask} />
                     );
                   })
                 : summaryRows.map((row) => {
@@ -522,6 +618,16 @@ export function Timeline({ result, features, settings, viewMode, onToggleView }:
       </div>
 
       <FeatureLegend features={features} featureColors={featureColors} tasks={tasks} />
+
+      {editingTask && (
+        <TaskEditModal
+          task={editingTask}
+          resources={resources}
+          onSave={handleSaveTask}
+          onUnpin={() => handleClearPin(editingTask.taskId)}
+          onClose={() => setEditingTask(null)}
+        />
+      )}
     </div>
   );
 }

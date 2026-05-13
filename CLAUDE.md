@@ -20,6 +20,14 @@ docs/phase-1-reference/   Visual reference images for Phase 1 UI.
 - **Backend:** Go + Gin
 - **Data store:** MongoDB (mongo-driver for Go)
 
+## Hosting plan (get team online now, permanent migration later)
+Deploy the planned stack on cheap managed services:
+- **MongoDB:** MongoDB Atlas free tier (M0, 512MB) — `MONGODB_URI` env var in Go server
+- **Go API:** Railway or Fly.io (free/hobby tier) — containerised via Dockerfile
+- **Yjs realtime:** y-websocket as a separate Railway service (Node.js, already in client deps)
+- **React SPA:** Vercel (free tier, auto-deploy from GitHub)
+- **Auth:** Google OAuth handled in the Go server, restricted to `@soulassembly.com`
+
 ## Running locally
 
 **Frontend (Phase 1 — no backend needed yet):**
@@ -40,6 +48,13 @@ go run ./cmd/api
 2. Scheduling & Cost Collector — timeline, editable specs table, cost math
 3. Roster — resources with roll-on/off dates and rates
 4. Timeline Generator + Plantastic integration — milestone line, push/pull sync
+
+## Landing page requirements
+- Full-screen hero background image (user-supplied, place at `packages/client/src/assets/hero.jpg`)
+- Logo featured prominently (top-center or overlaid)
+- Large CTA buttons: **New Project**, **Existing Projects**
+- Flashy/bold design — dark overlay on image, large typography
+- Unauthenticated users always land here; authenticated users go to project dashboard
 
 ## Plantastic integration
 Adapter stub at `server/internal/integrations/plantastic/adapter.go`.

@@ -46,7 +46,7 @@ interface SchedulingStore {
   assignResource: (taskId: string, resourceId: string | null) => void;
 
   addResource: (role: Discipline, name: string) => void;
-  updateResource: (id: string, patch: Partial<Pick<Resource, "name" | "dailyRate" | "allocationPct">>) => void;
+  updateResource: (id: string, patch: Partial<Pick<Resource, "name" | "dailyRate" | "allocationPct" | "rollOnDate" | "rollOffDate">>) => void;
   deleteResource: (id: string) => void;
 }
 

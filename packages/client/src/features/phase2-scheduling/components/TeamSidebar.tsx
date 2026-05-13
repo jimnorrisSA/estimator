@@ -13,11 +13,13 @@ const DISCIPLINE_STYLES: Record<Discipline, { dot: string; badge: string }> = {
   Custom:     { dot: "bg-gray-500",   badge: "bg-gray-800 text-gray-400" },
 };
 
+type ResourcePatch = Partial<Pick<Resource, "name" | "dailyRate" | "rollOnDate" | "rollOffDate">>;
+
 interface Props {
   resources: Resource[];
   currency: Currency;
   onAdd: (role: Discipline, name: string) => void;
-  onUpdate: (id: string, patch: Partial<Pick<Resource, "name" | "dailyRate">>) => void;
+  onUpdate: (id: string, patch: ResourcePatch) => void;
   onDelete: (id: string) => void;
 }
 
@@ -77,7 +79,7 @@ function DisciplineSection({
   members: Resource[];
   symbol: string;
   onAdd: (name: string) => void;
-  onUpdate: (id: string, patch: Partial<Pick<Resource, "name" | "dailyRate">>) => void;
+  onUpdate: (id: string, patch: ResourcePatch) => void;
   onDelete: (id: string) => void;
 }) {
   const [adding, setAdding] = useState(false);
@@ -139,6 +141,17 @@ function DisciplineSection({
 
 // ─── Member row ───────────────────────────────────────────────────────────────
 
+function formatDateHint(rollOnDate: string, rollOffDate: string): string | null {
+  const fmt = (s: string) => {
+    const [, m, d] = s.split("-");
+    return `${parseInt(d)} ${["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][parseInt(m) - 1]}`;
+  };
+  if (rollOnDate && rollOffDate) return `${fmt(rollOnDate)} – ${fmt(rollOffDate)}`;
+  if (rollOnDate) return `From ${fmt(rollOnDate)}`;
+  if (rollOffDate) return `Until ${fmt(rollOffDate)}`;
+  return null;
+}
+
 function MemberRow({
   member,
   symbol,
@@ -147,12 +160,22 @@ function MemberRow({
 }: {
   member: Resource;
   symbol: string;
-  onUpdate: (id: string, patch: Partial<Pick<Resource, "name" | "dailyRate">>) => void;
+  onUpdate: (id: string, patch: ResourcePatch) => void;
   onDelete: (id: string) => void;
 }) {
   const [editing, setEditing] = useState(false);
   const [draftName, setDraftName] = useState(member.name);
   const [draftRate, setDraftRate] = useState(String(member.dailyRate || ""));
+  const [draftRollOn, setDraftRollOn] = useState(member.rollOnDate || "");
+  const [draftRollOff, setDraftRollOff] = useState(member.rollOffDate || "");
+
+  function openEdit() {
+    setDraftName(member.name);
+    setDraftRate(String(member.dailyRate || ""));
+    setDraftRollOn(member.rollOnDate || "");
+    setDraftRollOff(member.rollOffDate || "");
+    setEditing(true);
+  }
 
   function commitEdit() {
     const name = draftName.trim() || member.name;
@@ -160,9 +183,13 @@ function MemberRow({
     onUpdate(member.id, {
       name,
       dailyRate: isNaN(rate) || rate < 0 ? 0 : rate,
+      rollOnDate: draftRollOn || "",
+      rollOffDate: draftRollOff || "",
     });
     setEditing(false);
   }
+
+  const dateHint = formatDateHint(member.rollOnDate, member.rollOffDate);
 
   if (editing) {
     return (
@@ -188,6 +215,27 @@ function MemberRow({
             onKeyDown={(e) => { if (e.key === "Enter") commitEdit(); if (e.key === "Escape") setEditing(false); }}
           />
         </div>
+        <div className="flex flex-col gap-1">
+          <p className="text-xs text-[#5c5575]">Availability</p>
+          <div className="flex items-center gap-1">
+            <span className="text-xs text-[#5c5575] w-10 flex-shrink-0">From</span>
+            <input
+              type="date"
+              className="flex-1 text-xs border border-[#2e2848] bg-[#1a1628] text-[#ece7ff] rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-[#7c3aed]"
+              value={draftRollOn}
+              onChange={(e) => setDraftRollOn(e.target.value)}
+            />
+          </div>
+          <div className="flex items-center gap-1">
+            <span className="text-xs text-[#5c5575] w-10 flex-shrink-0">Until</span>
+            <input
+              type="date"
+              className="flex-1 text-xs border border-[#2e2848] bg-[#1a1628] text-[#ece7ff] rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-[#7c3aed]"
+              value={draftRollOff}
+              onChange={(e) => setDraftRollOff(e.target.value)}
+            />
+          </div>
+        </div>
         <div className="flex gap-1 justify-end">
           <button
             className="text-sm px-2 py-0.5 rounded text-[#9b93ba] hover:bg-[#252041] transition-colors"
@@ -207,17 +255,24 @@ function MemberRow({
   }
 
   return (
-    <div className="flex items-center gap-1.5 group rounded-lg px-1.5 py-1 hover:bg-[#1d1930] transition-colors">
-      <span className="flex-1 text-sm text-[#ece7ff] truncate">{member.name}</span>
-      {member.dailyRate > 0 && (
-        <span className="text-sm text-[#5c5575] tabular-nums">
-          {symbol}{member.dailyRate.toLocaleString()}
-        </span>
-      )}
-      <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+    <div className="flex items-start gap-1.5 group rounded-lg px-1.5 py-1 hover:bg-[#1d1930] transition-colors">
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-1.5">
+          <span className="flex-1 text-sm text-[#ece7ff] truncate">{member.name}</span>
+          {member.dailyRate > 0 && (
+            <span className="text-sm text-[#5c5575] tabular-nums flex-shrink-0">
+              {symbol}{member.dailyRate.toLocaleString()}
+            </span>
+          )}
+        </div>
+        {dateHint && (
+          <p className="text-xs text-[#5c5575] mt-0.5">{dateHint}</p>
+        )}
+      </div>
+      <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity mt-0.5 flex-shrink-0">
         <button
           className="p-0.5 rounded text-[#5c5575] hover:text-[#a78bfa] hover:bg-[#252041] transition-colors"
-          onClick={() => { setDraftName(member.name); setDraftRate(String(member.dailyRate || "")); setEditing(true); }}
+          onClick={openEdit}
           title="Edit"
         >
           <svg className="w-3 h-3" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5">

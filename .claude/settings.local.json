@@ -25,7 +25,12 @@
       "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\james\\\\Git\\\\Estimator\\\\packages\\\\client\\\\src\" -Recurse | Where-Object { $_.Extension -eq \".js\" } | Select-Object FullName, LastWriteTime)",
       "PowerShell(Get-ChildItem \"C:\\\\Users\\\\james\\\\Git\\\\Estimator\\\\packages\\\\client\\\\src\" -Recurse | Where-Object { $_.Extension -in \".js\" } | Select-Object FullName, LastWriteTime | Format-Table -AutoSize)",
       "PowerShell(Get-ChildItem \"C:\\\\Users\\\\james\\\\Git\\\\Estimator\\\\packages\\\\client\\\\src\" -Recurse | Where-Object { $_.Extension -eq \".js\" } | Select-Object FullName)",
-      "Bash(Get-ChildItem *)"
+      "Bash(Get-ChildItem *)",
+      "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\james\\\\Git\\\\Estimator\\\\server\" -Recurse | Where-Object { $_.PSIsContainer -or $_.Extension -in '.go', '.mod', '.sum' } | Sort-Object FullName | Select-Object FullName)",
+      "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\james\\\\Git\\\\Estimator\\\\server\" -Recurse | ForEach-Object { $_.FullName } | Sort-Object)",
+      "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\james\\\\Git\\\\Estimator\\\\server\" -Recurse -File | ForEach-Object { $_.FullName } | Sort-Object)",
+      "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\james\\\\Git\\\\Estimator\\\\server\\\\internal\\\\websocket\" -File 2>$null | ForEach-Object { $_.FullName })",
+      "Bash(git merge *)"
     ]
   }
 }

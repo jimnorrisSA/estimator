@@ -34,6 +34,11 @@ export interface SlotContingency {
   contingencyDays: number;
 }
 
+export interface ResourceWindow {
+  startDay: number;         // first working day the resource is available
+  endDay: number | null;    // last working day available (null = no limit)
+}
+
 export interface ScheduleResult {
   tasks: ScheduledTask[];
   capacities: Record<string, number>; // discipline → slot count
@@ -70,7 +75,8 @@ export function runScheduler(
   overrides: Overrides,
   resources: Resource[],
   defaultDailyRate = 0,
-  blockedPeriods: BlockedPeriod[] = []
+  blockedPeriods: BlockedPeriod[] = [],
+  resourceWindows: Record<string, ResourceWindow> = {}
 ): ScheduleResult {
   const disciplineSet = new Set<Discipline>();
   for (const f of features)
@@ -92,9 +98,19 @@ export function runScheduler(
     ratesByDiscipline[d] = Array.from({ length: capacities[d] }, (_, i) => dr[i]?.dailyRate ?? 0);
   }
 
+  // Resources ordered per discipline — slot i maps to disciplineResources[d][i]
+  const disciplineResources: Record<string, Resource[]> = {};
+  for (const d of disciplines) disciplineResources[d] = resources.filter((r) => r.role === d);
+
   // Multi-cursor forward pack: cursors[d][slot] = next available day
+  // Initialise each slot at the resource's roll-on day (0 if unset)
   const cursors: Record<string, number[]> = {};
-  for (const d of disciplines) cursors[d] = Array(capacities[d]).fill(0);
+  for (const d of disciplines) {
+    cursors[d] = Array.from({ length: capacities[d] }, (_, i) => {
+      const r = disciplineResources[d][i];
+      return r ? (resourceWindows[r.id]?.startDay ?? 0) : 0;
+    });
+  }
 
   const tasks: ScheduledTask[] = [];
 
@@ -109,8 +125,21 @@ export function runScheduler(
         const isPinned = ov?.startDay != null;
         const slots = cursors[discipline];
 
-        // Earliest-available slot assignment
-        const slotIndex = slots.reduce((best, v, i) => (v < slots[best] ? i : best), 0);
+        // Earliest-available slot assignment, preferring slots that fit before roll-off
+        let slotIndex: number;
+        if (isPinned) {
+          slotIndex = slots.reduce((best, v, i) => (v < slots[best] ? i : best), 0);
+        } else {
+          const discRes = disciplineResources[discipline];
+          // Slots where the task finishes before the resource rolls off
+          const fitting = slots.reduce<number[]>((acc, cursor, i) => {
+            const win = discRes[i] ? resourceWindows[discRes[i].id] : undefined;
+            if (!win?.endDay || cursor + wd <= win.endDay) acc.push(i);
+            return acc;
+          }, []);
+          const candidates = fitting.length > 0 ? fitting : slots.map((_, i) => i);
+          slotIndex = candidates.reduce((best, i) => (slots[i] < slots[best] ? i : best), candidates[0]);
+        }
 
         let startDay: number;
         let endDay: number;

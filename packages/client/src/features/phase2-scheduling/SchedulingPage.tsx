@@ -3,7 +3,7 @@ import type { Feature } from "@estimator/shared";
 import { useEstimationsStore } from "../phase1-estimations/store/estimationsStore.js";
 import { useSchedulingStore, CURRENCY_SYMBOLS, getConversionRate } from "./store/schedulingStore.js";
 import { runScheduler } from "./utils/scheduler.js";
-import type { ScheduledTask } from "./utils/scheduler.js";
+import type { ResourceWindow, ScheduledTask } from "./utils/scheduler.js";
 import { useMilestonesStore } from "../phase3-milestones/store/milestonesStore.js";
 import { buildWorkingDayCalendar, dateToWorkingDay, parseISODate } from "./utils/calendarUtils.js";
 import { SettingsPanel } from "./components/SettingsPanel.js";
@@ -41,9 +41,23 @@ export function SchedulingPage() {
     [milestones, settings.calendarMode, settings.startDate, cal]
   );
 
+  const resourceWindows = useMemo(() => {
+    const map: Record<string, ResourceWindow> = {};
+    for (const r of resources) {
+      const startDay = r.rollOnDate
+        ? dateToWorkingDay(r.rollOnDate, settings.calendarMode, settings.startDate, cal)
+        : 0;
+      const endDay = r.rollOffDate
+        ? dateToWorkingDay(r.rollOffDate, settings.calendarMode, settings.startDate, cal)
+        : null;
+      if (startDay > 0 || endDay !== null) map[r.id] = { startDay, endDay };
+    }
+    return map;
+  }, [resources, settings.calendarMode, settings.startDate, cal]);
+
   const result = useMemo(
-    () => runScheduler(features, settings.contingencyPct, overrides, resources, settings.defaultDailyRate, blockedPeriods),
-    [features, settings.contingencyPct, overrides, resources, settings.defaultDailyRate, blockedPeriods]
+    () => runScheduler(features, settings.contingencyPct, overrides, resources, settings.defaultDailyRate, blockedPeriods, resourceWindows),
+    [features, settings.contingencyPct, overrides, resources, settings.defaultDailyRate, blockedPeriods, resourceWindows]
   );
 
   const symbol = CURRENCY_SYMBOLS[settings.currency];
