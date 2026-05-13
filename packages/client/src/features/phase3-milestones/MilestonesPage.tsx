@@ -138,6 +138,8 @@ export function MilestonesPage() {
 
 // ─── Milestone strip ──────────────────────────────────────────────────────────
 
+type StripView = "list" | "chips";
+
 interface StripProps {
   milestones: Milestone[];
   settings: { startDate: string };
@@ -148,6 +150,7 @@ interface StripProps {
 
 function MilestoneStrip({ milestones, settings, onAdd, onUpdate, onDelete }: StripProps) {
   const [adding, setAdding] = useState(false);
+  const [stripView, setStripView] = useState<StripView>("list");
   const [draft, setDraft] = useState({ title: "", startDate: settings.startDate, endDate: "" });
 
   function commitAdd() {
@@ -161,26 +164,48 @@ function MilestoneStrip({ milestones, settings, onAdd, onUpdate, onDelete }: Str
     <div className="flex-shrink-0 border-b border-[#2e2848] bg-[#14112a] px-6 py-3 flex flex-col gap-3">
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-semibold text-[#9b93ba] uppercase tracking-wide">Milestones</h2>
-        {!adding && (
-          <button
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#252041] border border-[#3d366a] text-sm text-[#a78bfa] hover:bg-[#2e2848] transition-colors"
-            onClick={() => setAdding(true)}
-          >
-            <span className="text-base leading-none">+</span> Add milestone
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          {/* View toggle */}
+          <div className="flex rounded-lg border border-[#2e2848] overflow-hidden text-xs">
+            {(["list", "chips"] as StripView[]).map((v) => (
+              <button
+                key={v}
+                onClick={() => setStripView(v)}
+                className={`px-3 py-1 transition-colors ${
+                  stripView === v
+                    ? "bg-[#7c3aed] text-white font-medium"
+                    : "bg-[#1d1930] text-[#5c5575] hover:bg-[#252041]"
+                }`}
+              >
+                {v === "list" ? "List" : "Chips"}
+              </button>
+            ))}
+          </div>
+          {!adding && (
+            <button
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#252041] border border-[#3d366a] text-sm text-[#a78bfa] hover:bg-[#2e2848] transition-colors"
+              onClick={() => setAdding(true)}
+            >
+              <span className="text-base leading-none">+</span> Add milestone
+            </button>
+          )}
+        </div>
       </div>
 
       {milestones.length === 0 && !adding && (
         <p className="text-xs text-[#5c5575]">No milestones yet. Add one to see it on the timeline above.</p>
       )}
 
-      {milestones.length > 0 && (
+      {milestones.length > 0 && stripView === "chips" && (
         <div className="flex flex-wrap gap-2">
           {milestones.map((m) => (
             <MilestoneChip key={m.id} milestone={m} onUpdate={onUpdate} onDelete={onDelete} />
           ))}
         </div>
+      )}
+
+      {milestones.length > 0 && stripView === "list" && (
+        <MilestoneList milestones={milestones} onUpdate={onUpdate} onDelete={onDelete} />
       )}
 
       {adding && (
@@ -218,6 +243,131 @@ function MilestoneStrip({ milestones, settings, onAdd, onUpdate, onDelete }: Str
         </div>
       )}
     </div>
+  );
+}
+
+function MilestoneList({ milestones, onUpdate, onDelete }: {
+  milestones: Milestone[];
+  onUpdate: (id: string, patch: Partial<Pick<Milestone, "title" | "startDate" | "endDate" | "color" | "hardeningDays">>) => void;
+  onDelete: (id: string) => void;
+}) {
+  return (
+    <div className="rounded-xl border border-[#2e2848] overflow-hidden">
+      <table className="w-full text-sm border-collapse">
+        <thead>
+          <tr className="bg-[#1a1628] text-left text-xs text-[#5c5575] uppercase tracking-wide">
+            <th className="px-4 py-2 font-medium">Milestone</th>
+            <th className="px-4 py-2 font-medium">Start</th>
+            <th className="px-4 py-2 font-medium">End</th>
+            <th className="px-4 py-2 font-medium text-center">Hardening</th>
+            <th className="px-4 py-2 font-medium w-16" />
+          </tr>
+        </thead>
+        <tbody>
+          {milestones.map((m, i) => (
+            <MilestoneRow
+              key={m.id}
+              milestone={m}
+              zebra={i % 2 === 1}
+              onUpdate={onUpdate}
+              onDelete={onDelete}
+            />
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function MilestoneRow({ milestone: m, zebra, onUpdate, onDelete }: {
+  milestone: Milestone;
+  zebra: boolean;
+  onUpdate: (id: string, patch: Partial<Pick<Milestone, "title" | "startDate" | "endDate" | "color" | "hardeningDays">>) => void;
+  onDelete: (id: string) => void;
+}) {
+  const [editingTitle, setEditingTitle] = useState(false);
+
+  const rowBg = zebra ? "bg-[#1a1628]" : "bg-[#14112a]";
+
+  return (
+    <tr className={`${rowBg} border-t border-[#2e2848] group`}>
+      {/* Name + colour */}
+      <td className="px-4 py-2.5">
+        <div className="flex items-center gap-2.5">
+          <input
+            type="color"
+            value={m.color}
+            onChange={(e) => onUpdate(m.id, { color: e.target.value })}
+            className="w-4 h-4 rounded-sm border-0 cursor-pointer flex-shrink-0 bg-transparent"
+            title="Change colour"
+          />
+          {editingTitle ? (
+            <input
+              autoFocus
+              className="bg-transparent border-b border-[#7c3aed] text-[#ece7ff] text-sm outline-none w-40 caret-[#a78bfa]"
+              value={m.title}
+              onChange={(e) => onUpdate(m.id, { title: e.target.value })}
+              onBlur={() => setEditingTitle(false)}
+              onKeyDown={(e) => { if (e.key === "Enter" || e.key === "Escape") setEditingTitle(false); }}
+            />
+          ) : (
+            <span
+              className="text-[#ece7ff] font-medium cursor-pointer hover:text-[#a78bfa] transition-colors"
+              onDoubleClick={() => setEditingTitle(true)}
+              title="Double-click to rename"
+            >
+              {m.title}
+            </span>
+          )}
+        </div>
+      </td>
+
+      {/* Start date */}
+      <td className="px-4 py-2.5">
+        <input
+          type="date"
+          className="bg-transparent text-[#9b93ba] text-xs focus:outline-none focus:text-[#ece7ff] cursor-pointer"
+          value={m.startDate}
+          onChange={(e) => onUpdate(m.id, { startDate: e.target.value })}
+        />
+      </td>
+
+      {/* End date */}
+      <td className="px-4 py-2.5">
+        <input
+          type="date"
+          className="bg-transparent text-[#9b93ba] text-xs focus:outline-none focus:text-[#ece7ff] cursor-pointer"
+          value={m.endDate}
+          onChange={(e) => onUpdate(m.id, { endDate: e.target.value })}
+        />
+      </td>
+
+      {/* Hardening days */}
+      <td className="px-4 py-2.5 text-center">
+        <div className="flex items-center justify-center gap-1">
+          <input
+            type="number"
+            min={0}
+            step={1}
+            className="w-12 text-center bg-[#1d1930] border border-[#2e2848] text-[#ece7ff] text-xs rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-[#7c3aed]"
+            value={m.hardeningDays ?? 0}
+            onChange={(e) => onUpdate(m.id, { hardeningDays: Math.max(0, parseInt(e.target.value) || 0) })}
+          />
+          <span className="text-xs text-[#5c5575]">d</span>
+        </div>
+      </td>
+
+      {/* Delete */}
+      <td className="px-4 py-2.5 text-center">
+        <button
+          className="opacity-0 group-hover:opacity-100 text-[#3a3456] hover:text-red-400 transition-all text-lg leading-none"
+          onClick={() => onDelete(m.id)}
+          title="Delete milestone"
+        >
+          ×
+        </button>
+      </td>
+    </tr>
   );
 }
 

@@ -22,22 +22,24 @@ export function LandingPage({ onEnterApp, onOpenProjects }: Props) {
   return (
     <div className="relative w-full h-full overflow-hidden" style={{ background: "#080612" }}>
 
-      {/* Hero background — swap src to /hero.jpg when image is ready */}
-      <div
-        className="absolute inset-0 bg-cover bg-center"
-        style={{ backgroundImage: "url('/hero.jpg')" }}
+      {/* Hero image — fills the screen as a true img element */}
+      <img
+        src="/hero.png"
+        alt=""
+        aria-hidden
+        className="absolute inset-0 w-full h-full object-cover"
       />
 
-      {/* Gradient overlay — visible always; darkens the image */}
+      {/* Gradient overlay */}
       <div
         className="absolute inset-0"
         style={{
           background:
-            "linear-gradient(to bottom, rgba(8,6,18,0.55) 0%, rgba(8,6,18,0.45) 40%, rgba(8,6,18,0.75) 80%, rgba(8,6,18,0.95) 100%)",
+            "linear-gradient(to bottom, rgba(8,6,18,0.45) 0%, rgba(8,6,18,0.35) 35%, rgba(8,6,18,0.65) 70%, rgba(8,6,18,0.92) 100%)",
         }}
       />
 
-      {/* Fallback ambience when no image — purple glow radials */}
+      {/* Fallback ambience (shows when hero.png is absent) */}
       <div
         className="absolute inset-0 pointer-events-none"
         style={{
@@ -46,25 +48,16 @@ export function LandingPage({ onEnterApp, onOpenProjects }: Props) {
         }}
       />
 
-      {/* Subtle grid texture */}
-      <div
-        className="absolute inset-0 pointer-events-none"
-        style={{
-          backgroundImage:
-            "linear-gradient(rgba(124,58,237,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(124,58,237,0.04) 1px, transparent 1px)",
-          backgroundSize: "40px 40px",
-        }}
-      />
-
       {/* Content */}
-      <div className="relative z-10 flex flex-col items-center justify-center h-full px-8 gap-10">
+      <div className="relative z-10 flex flex-col items-center justify-center h-full px-8 gap-8">
 
-        {/* Logo + wordmark */}
-        <div className="flex flex-col items-center gap-5">
+        {/* Hero image as logo / main visual */}
+        <div className="flex flex-col items-center gap-6">
           <img
-            src="/logo.png"
+            src="/hero.png"
             alt="Vigo"
-            className="w-24 h-24 object-contain drop-shadow-[0_0_32px_rgba(139,92,246,0.7)]"
+            className="w-48 h-48 object-contain drop-shadow-[0_0_48px_rgba(139,92,246,0.5)]"
+            style={{ filter: "drop-shadow(0 0 32px rgba(139,92,246,0.6))" }}
           />
           <div className="flex flex-col items-center gap-2">
             <h1

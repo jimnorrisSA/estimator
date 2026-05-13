@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { EstimationsPage } from "./features/phase1-estimations/EstimationsPage.js";
 import { SchedulingPage } from "./features/phase2-scheduling/SchedulingPage.js";
 import { MilestonesPage } from "./features/phase3-milestones/MilestonesPage.js";
@@ -26,13 +26,15 @@ export function App() {
   const { getActiveProject, saveActiveSnapshot, projects, createProject } = useProjectsStore();
 
   // One-time migration: import legacy localStorage data as the first project
-  if (projects.length === 0) {
-    const legacy = migrateFromLegacyStores();
-    if (legacy) {
-      const name = legacy.schedulingSettings.projectName || "My Project";
-      createProject(name, legacy);
+  useEffect(() => {
+    if (useProjectsStore.getState().projects.length === 0) {
+      const legacy = migrateFromLegacyStores();
+      if (legacy) {
+        const name = legacy.schedulingSettings.projectName || "My Project";
+        createProject(name, legacy);
+      }
     }
-  }
+  }, []);
 
   // Save current store states into the active project snapshot before leaving
   function snapshotCurrentProject() {
