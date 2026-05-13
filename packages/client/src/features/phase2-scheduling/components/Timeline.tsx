@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import type { Feature, EstimateUnit } from "@estimator/shared";
 import type { ScheduleResult, ScheduledTask } from "../utils/scheduler.js";
 import type { ScheduleSettings } from "../store/schedulingStore.js";
@@ -15,6 +15,7 @@ import {
 // Layout
 const LABEL_W = 124;
 const DAY_W = 22;
+const WKND_W = 10;   // px for a full 2-day weekend gap (actual-dates mode only)
 const MONTH_H = 22;
 const WEEK_H = 20;
 const HEADER_H = MONTH_H + WEEK_H;
@@ -23,9 +24,16 @@ const SLOT_H = 40;
 const ROW_VPAD = 5;
 const ROW_GAP = 6;
 const BOTTOM_PAD = 16;
+const RESIZE_HANDLE_W = 8;
+const SUMMARY_ROW_H = 36;
 
 function rowHeight(cap: number) {
   return cap * SLOT_H + ROW_VPAD * 2;
+}
+
+// JS getDay() is 0=Sun, 1=Mon…6=Sat — convert to Mon-origin (0=Mon…4=Fri)
+function jsWeekdayToMon(jsDay: number): number {
+  return jsDay === 0 ? 6 : jsDay - 1;
 }
 
 const FEATURE_PALETTE = [
@@ -41,8 +49,6 @@ interface RowLayout {
   capacity: number;
 }
 
-const RESIZE_HANDLE_W = 8;
-
 function daysToEstimate(days: number, preferred: EstimateUnit): { value: number; unit: EstimateUnit } {
   const perUnit: Record<EstimateUnit, number> = { half_day: 0.5, day: 1, week: 5, month: 20 };
   const ratio = days / perUnit[preferred];
@@ -57,39 +63,55 @@ interface TaskBarProps {
   y: number;
   barH: number;
   color: string;
-  onMove: (taskId: string, startDay: number, endDay: number) => void;
+  slotCount: number;
+  disciplineBoundaries: Array<{ slotIndex: number; startDay: number; endDay: number }>;
+  wdToX: (n: number) => number;
+  effectiveDayW: number;
+  onMove: (taskId: string, startDay: number, endDay: number, targetSlot: number) => void;
   onResize: (taskId: string, startDay: number, endDay: number, newDays: number) => void;
   onClearPin: (taskId: string) => void;
 }
 
-function DraggableTaskBar({ task, y, barH, color, onMove, onResize, onClearPin }: TaskBarProps) {
-  const [preview, setPreview] = useState<{ startDay: number; endDay: number } | null>(null);
+function DraggableTaskBar({ task, y, barH, color, slotCount, disciplineBoundaries, wdToX, effectiveDayW, onMove, onResize, onClearPin }: TaskBarProps) {
+  const [preview, setPreview] = useState<{ startDay: number; endDay: number; slotIndex: number } | null>(null);
   const [dragType, setDragType] = useState<"move" | "resize" | null>(null);
 
   const callbacksRef = useRef({ onMove, onResize, onClearPin });
   callbacksRef.current = { onMove, onResize, onClearPin };
 
-  function startDrag(type: "move" | "resize", clientX: number) {
+  function startDrag(type: "move" | "resize", clientX: number, clientY: number) {
     const origStart = task.startDay;
     const origEnd = task.endDay;
     setDragType(type);
 
     function onMouseMove(e: MouseEvent) {
       const dx = e.clientX - clientX;
-      const snap = Math.round((dx / DAY_W) * 2) / 2;
+      const dy = e.clientY - clientY;
+      const snap = Math.round((dx / effectiveDayW) * 2) / 2;
       if (type === "move") {
         const dur = origEnd - origStart;
-        const s = Math.max(0, origStart + snap);
-        setPreview({ startDay: s, endDay: s + dur });
+        let s = Math.max(0, origStart + snap);
+        const slotDelta = Math.round(dy / SLOT_H);
+        const targetSlot = Math.max(0, Math.min(slotCount - 1, task.slotIndex + slotDelta));
+
+        // Snap start to the end of any task in the target slot it would overlap
+        for (const b of disciplineBoundaries) {
+          if (b.slotIndex === targetSlot && s < b.endDay && s + dur > b.startDay) {
+            s = b.endDay;
+            break;
+          }
+        }
+
+        setPreview({ startDay: s, endDay: s + dur, slotIndex: targetSlot });
       } else {
-        setPreview({ startDay: origStart, endDay: Math.max(origStart + 0.5, origEnd + snap) });
+        setPreview({ startDay: origStart, endDay: Math.max(origStart + 0.5, origEnd + snap), slotIndex: task.slotIndex });
       }
     }
 
     function onMouseUp() {
       setPreview((p) => {
         if (p) {
-          if (type === "move") callbacksRef.current.onMove(task.taskId, p.startDay, p.endDay);
+          if (type === "move") callbacksRef.current.onMove(task.taskId, p.startDay, p.endDay, p.slotIndex);
           else callbacksRef.current.onResize(task.taskId, p.startDay, p.endDay, p.endDay - p.startDay);
         }
         return null;
@@ -105,24 +127,26 @@ function DraggableTaskBar({ task, y, barH, color, onMove, onResize, onClearPin }
 
   const dispStart = preview?.startDay ?? task.startDay;
   const dispEnd   = preview?.endDay   ?? task.endDay;
-  const x    = dispStart * DAY_W;
-  const barW = Math.max(2, (dispEnd - dispStart) * DAY_W - 2);
+  const dispSlot  = preview?.slotIndex ?? task.slotIndex;
+  const x    = wdToX(dispStart);
+  const barW = Math.max(2, wdToX(dispEnd) - wdToX(dispStart) - 2);
+  const dispY = y + (dispSlot - task.slotIndex) * SLOT_H;
   const maxChars = Math.floor((barW - 10) / 5.5);
   const maxFeatureChars = Math.floor((barW - 10) / 4.8);
   const isDragging = dragType !== null;
-  const featureY = y + Math.round(barH * 0.3);
-  const taskY = y + Math.round(barH * 0.68);
+  const featureY = dispY + Math.round(barH * 0.3);
+  const taskY = dispY + Math.round(barH * 0.68);
 
   return (
     <g>
       <title>{task.featureName} — {task.label}{task.isPinned ? " · pinned" : ""}</title>
 
       <rect
-        x={x} y={y} width={barW} height={barH} rx={3}
+        x={x} y={dispY} width={barW} height={barH} rx={3}
         fill={color}
         opacity={isDragging ? 0.55 : 0.9}
         style={{ cursor: isDragging ? "grabbing" : "grab" }}
-        onMouseDown={(e) => { if (e.button !== 0) return; e.stopPropagation(); startDrag("move", e.clientX); }}
+        onMouseDown={(e) => { if (e.button !== 0) return; e.stopPropagation(); startDrag("move", e.clientX, e.clientY); }}
         onDoubleClick={(e) => { e.stopPropagation(); onClearPin(task.taskId); }}
       />
 
@@ -142,30 +166,29 @@ function DraggableTaskBar({ task, y, barH, color, onMove, onResize, onClearPin }
 
       {barW > 16 && (
         <rect
-          x={x + barW - RESIZE_HANDLE_W} y={y}
+          x={x + barW - RESIZE_HANDLE_W} y={dispY}
           width={RESIZE_HANDLE_W} height={barH}
           fill={isDragging && dragType === "resize" ? "rgba(255,255,255,0.25)" : "transparent"}
           style={{ cursor: "ew-resize" }}
-          onMouseDown={(e) => { if (e.button !== 0) return; e.stopPropagation(); startDrag("resize", e.clientX); }}
+          onMouseDown={(e) => { if (e.button !== 0) return; e.stopPropagation(); startDrag("resize", e.clientX, e.clientY); }}
         />
       )}
 
       {task.isPinned && !isDragging && (
-        <circle cx={x + 5} cy={y + 4} r={2.5} fill="white" opacity={0.8}
+        <circle cx={x + 5} cy={dispY + 4} r={2.5} fill="white" opacity={0.8}
           style={{ pointerEvents: "none" }} />
       )}
 
       {isDragging && preview && (
-        <text x={x + barW / 2} y={y - 5} textAnchor="middle" fontSize={11} fill="#a78bfa" fontWeight="600"
+        <text x={x + barW / 2} y={dispY - 5} textAnchor="middle" fontSize={11} fill="#a78bfa" fontWeight="600"
           style={{ pointerEvents: "none", userSelect: "none" }}>
           {String(Math.round((preview.endDay - preview.startDay) * 2) / 2)}d
+          {preview.slotIndex !== task.slotIndex ? ` · slot ${preview.slotIndex + 1}` : ""}
         </text>
       )}
     </g>
   );
 }
-
-const SUMMARY_ROW_H = 36;
 
 interface Props {
   result: ScheduleResult;
@@ -183,8 +206,108 @@ export function Timeline({ result, features, settings, viewMode, onToggleView }:
   const milestones = useMilestonesStore((s) => s.milestones);
   const milestoneH = milestones.length > 0 ? MILESTONE_LANE_H : 0;
 
-  function handleMove(taskId: string, startDay: number, endDay: number) {
-    setOverride(taskId, { startDay, endDay });
+  // ─── Coordinate system: working-day → pixel ───────────────────────────────
+  const showWeekends = settings.calendarMode === "actual";
+
+  const startWeekday = useMemo(() => {
+    if (!showWeekends || !settings.startDate) return 0;
+    return jsWeekdayToMon(parseISODate(settings.startDate).getDay());
+  }, [showWeekends, settings.startDate]);
+
+  // Pixels per working-day for drag snap (average accounts for weekend gaps)
+  const effectiveDayW = showWeekends ? DAY_W + WKND_W / 5 : DAY_W;
+
+  const wdToX = useCallback((n: number): number => {
+    if (!showWeekends) return n * DAY_W;
+    const weekends = Math.floor((startWeekday + n) / 5);
+    return n * DAY_W + weekends * WKND_W;
+  }, [showWeekends, startWeekday]);
+
+  // X positions where weekend gaps start (for overlay rendering)
+  const weekendStrips = useMemo(() => {
+    if (!showWeekends) return [] as number[];
+    const strips: number[] = [];
+    const sw = startWeekday;
+    const maxWd = projectEndDay + 25;
+    for (let n = 0; n <= maxWd; n++) {
+      if ((sw + n) % 5 === 4) { // Friday (Mon=0…Fri=4)
+        strips.push(wdToX(n) + DAY_W);
+      }
+    }
+    return strips;
+  }, [showWeekends, startWeekday, projectEndDay, wdToX]);
+
+  // ─── Interaction handlers ─────────────────────────────────────────────────
+
+  function handleMove(taskId: string, startDay: number, endDay: number, targetSlot: number) {
+    const movedTask = tasks.find((t) => t.taskId === taskId);
+    if (!movedTask) {
+      setOverride(taskId, { startDay, endDay });
+      return;
+    }
+
+    const isSameSlot = targetSlot === movedTask.slotIndex;
+
+    if (!isSameSlot) {
+      // Cross-slot move: freeze both slots to prevent scheduler repacking either.
+      const affectedTasks = tasks.filter(
+        (t) =>
+          t.discipline === movedTask.discipline &&
+          (t.slotIndex === movedTask.slotIndex || t.slotIndex === targetSlot) &&
+          t.taskId !== taskId
+      );
+      for (const t of affectedTasks) {
+        if (!t.isPinned) setOverride(t.taskId, { startDay: t.startDay, endDay: t.endDay });
+      }
+      setOverride(taskId, { startDay, endDay, slotIndex: targetSlot });
+      return;
+    }
+
+    // Same-slot move: freeze, align neighbours, push forward.
+    const slotTasks = tasks
+      .filter(
+        (t) =>
+          t.discipline === movedTask.discipline &&
+          t.slotIndex === movedTask.slotIndex &&
+          t.taskId !== taskId
+      )
+      .sort((a, b) => a.startDay - b.startDay);
+
+    for (const t of slotTasks) {
+      if (!t.isPinned) setOverride(t.taskId, { startDay: t.startDay, endDay: t.endDay });
+    }
+
+    // Snap predecessor to end at newStart (no backward cascade)
+    const beforeInsert = slotTasks.filter((t) => t.startDay < startDay);
+    if (beforeInsert.length > 0) {
+      const taskBefore = beforeInsert[beforeInsert.length - 1];
+      if (!taskBefore.isPinned) {
+        const dur = taskBefore.endDay - taskBefore.startDay;
+        const newBeforeStart = Math.max(0, startDay - dur);
+        setOverride(taskBefore.taskId, { startDay: newBeforeStart, endDay: newBeforeStart + dur });
+      }
+    }
+
+    setOverride(taskId, { startDay, endDay, slotIndex: targetSlot });
+
+    // Push immediate successor to start right after the inserted task
+    const afterInsert = slotTasks.filter((t) => t.startDay >= startDay);
+    if (afterInsert.length === 0) return;
+
+    const [firstAfter, ...rest] = afterInsert;
+    const firstDur = firstAfter.endDay - firstAfter.startDay;
+    setOverride(firstAfter.taskId, { startDay: endDay, endDay: endDay + firstDur });
+
+    let cursor = endDay + firstDur;
+    for (const t of rest) {
+      if (t.startDay < cursor) {
+        const dur = t.endDay - t.startDay;
+        setOverride(t.taskId, { startDay: cursor, endDay: cursor + dur });
+        cursor += dur;
+      } else {
+        break;
+      }
+    }
   }
 
   function handleResize(taskId: string, startDay: number, endDay: number, newDays: number) {
@@ -199,6 +322,8 @@ export function Timeline({ result, features, settings, viewMode, onToggleView }:
   function handleClearPin(taskId: string) {
     clearOverride(taskId);
   }
+
+  // ─── Derived layout ───────────────────────────────────────────────────────
 
   const featureColors = useMemo(
     () => new Map(features.map((f, i) => [f.id, FEATURE_PALETTE[i % FEATURE_PALETTE.length]])),
@@ -256,7 +381,7 @@ export function Timeline({ result, features, settings, viewMode, onToggleView }:
   }
 
   const svgH = HEADER_H + milestoneH + (viewMode === "detailed" ? detailedH : summaryH) + BOTTOM_PAD;
-  const chartW = Math.max(projectEndDay * DAY_W + 20 * DAY_W, 480);
+  const chartW = Math.max(wdToX(projectEndDay + 20), 480);
 
   return (
     <div className="flex flex-col gap-3">
@@ -328,14 +453,15 @@ export function Timeline({ result, features, settings, viewMode, onToggleView }:
           {/* Scrollable chart */}
           <div className="overflow-x-auto flex-1" style={{ background: "#14112a" }}>
             <svg data-chart-svg width={chartW} height={svgH}>
+
               {/* Milestone lane */}
               {milestoneH > 0 && (
                 <>
                   <rect x={0} y={HEADER_H} width={chartW} height={milestoneH} fill="#1a1628" />
                   {milestones.map((m) => {
                     const { startDay, endDay } = milestoneWorkingDays(m, settings.calendarMode, settings.startDate, cal);
-                    const x = startDay * DAY_W;
-                    const w = Math.max(4, (endDay - startDay) * DAY_W - 2);
+                    const x = wdToX(startDay);
+                    const w = Math.max(4, wdToX(endDay) - wdToX(startDay) - 2);
                     const barH = milestoneH - 8;
                     const maxChars = Math.floor((w - 10) / 5.5);
                     return (
@@ -366,10 +492,20 @@ export function Timeline({ result, features, settings, viewMode, onToggleView }:
                       fill={i % 2 === 0 ? "#1d1930" : "#201c32"} />
                   ))}
 
+              {/* Weekend strips — full-height overlay so task bars naturally bridge Fri→Mon */}
+              {weekendStrips.map((wx) => (
+                <rect
+                  key={`wknd-${wx}`}
+                  x={wx} y={0} width={WKND_W} height={svgH}
+                  fill="#0a0814" opacity={0.55}
+                  style={{ pointerEvents: "none" }}
+                />
+              ))}
+
               {/* Hardening overlays — span all discipline rows */}
               {blockedPeriods.map((bp) => {
-                const bx = bp.start * DAY_W;
-                const bw = Math.max(2, (bp.end - bp.start) * DAY_W);
+                const bx = wdToX(bp.start);
+                const bw = Math.max(2, wdToX(bp.end) - wdToX(bp.start));
                 const rowsH =
                   viewMode === "detailed"
                     ? rowLayouts.length > 0
@@ -380,14 +516,8 @@ export function Timeline({ result, features, settings, viewMode, onToggleView }:
                 return (
                   <g key={`harden-${bp.label}`}>
                     <title>{bp.label}</title>
-                    <rect
-                      x={bx} y={by} width={bw} height={rowsH}
-                      fill={bp.color} opacity={0.13}
-                    />
-                    <rect
-                      x={bx} y={by} width={bw} height={rowsH}
-                      fill="none" stroke={bp.color} strokeWidth={1.5} opacity={0.5}
-                    />
+                    <rect x={bx} y={by} width={bw} height={rowsH} fill={bp.color} opacity={0.13} />
+                    <rect x={bx} y={by} width={bw} height={rowsH} fill="none" stroke={bp.color} strokeWidth={1.5} opacity={0.5} />
                     {bw > 40 && (
                       <text
                         x={bx + bw / 2} y={by + Math.min(rowsH / 2, 60)}
@@ -406,9 +536,9 @@ export function Timeline({ result, features, settings, viewMode, onToggleView }:
 
               {/* Date headers */}
               {settings.calendarMode === "four-week" ? (
-                <FourWeekHeader projectEndDay={projectEndDay} chartW={chartW} />
+                <FourWeekHeader projectEndDay={projectEndDay} chartW={chartW} wdToX={wdToX} />
               ) : (
-                <ActualDateHeader projectEndDay={projectEndDay} cal={cal} chartW={chartW} />
+                <ActualDateHeader projectEndDay={projectEndDay} cal={cal} chartW={chartW} wdToX={wdToX} />
               )}
 
               {/* Grid lines */}
@@ -418,6 +548,7 @@ export function Timeline({ result, features, settings, viewMode, onToggleView }:
                 cal={cal}
                 svgH={svgH}
                 milestoneH={milestoneH}
+                wdToX={wdToX}
               />
 
               {/* Task bars */}
@@ -428,14 +559,22 @@ export function Timeline({ result, features, settings, viewMode, onToggleView }:
                     const barH = SLOT_H - 4;
                     const y = HEADER_H + milestoneH + layout.rowY + ROW_VPAD + task.slotIndex * SLOT_H;
                     const color = featureColors.get(task.featureId) ?? "#7c3aed";
+                    const disciplineBoundaries = tasks
+                      .filter((t) => t.discipline === task.discipline && t.taskId !== task.taskId)
+                      .map((t) => ({ slotIndex: t.slotIndex, startDay: t.startDay, endDay: t.endDay }));
                     return (
-                      <DraggableTaskBar key={task.taskId} task={task} y={y} barH={barH} color={color}
-                        onMove={handleMove} onResize={handleResize} onClearPin={handleClearPin} />
+                      <DraggableTaskBar
+                        key={task.taskId} task={task} y={y} barH={barH} color={color}
+                        slotCount={layout.capacity}
+                        disciplineBoundaries={disciplineBoundaries}
+                        wdToX={wdToX} effectiveDayW={effectiveDayW}
+                        onMove={handleMove} onResize={handleResize} onClearPin={handleClearPin}
+                      />
                     );
                   })
                 : summaryRows.map((row) => {
-                    const x = row.startDay * DAY_W;
-                    const barW = Math.max(4, (row.endDay - row.startDay) * DAY_W - 2);
+                    const x = wdToX(row.startDay);
+                    const barW = Math.max(4, wdToX(row.endDay) - wdToX(row.startDay) - 2);
                     const y = HEADER_H + milestoneH + row.rowY + 5;
                     const barH = SUMMARY_ROW_H - 10;
                     const maxChars = Math.floor((barW - 10) / 6);
@@ -468,12 +607,11 @@ export function Timeline({ result, features, settings, viewMode, onToggleView }:
                 } else if (settings.calendarMode === "four-week" && settings.startDate) {
                   const start = parseISODate(settings.startDate);
                   const target = parseISODate(settings.targetEndDate);
-                  const msPerDay = 86400000;
-                  const calDays = Math.round((target.getTime() - start.getTime()) / msPerDay);
+                  const calDays = Math.round((target.getTime() - start.getTime()) / 86400000);
                   deadlineDay = Math.round(calDays * 5 / 7);
                 }
                 if (deadlineDay === null || deadlineDay <= 0) return null;
-                const dx = deadlineDay * DAY_W;
+                const dx = wdToX(deadlineDay);
                 const isOverrun = deadlineDay < projectEndDay;
                 const lineColor = isOverrun ? "#ef4444" : "#22c55e";
                 return (
@@ -499,8 +637,8 @@ export function Timeline({ result, features, settings, viewMode, onToggleView }:
                 const layout = rowLayouts.find((r) => r.discipline === sc.discipline);
                 if (!layout || sc.contingencyDays <= 0) return null;
                 const barH = SLOT_H - 4;
-                const bx = sc.lastTaskEndDay * DAY_W;
-                const bw = Math.max(2, sc.contingencyDays * DAY_W - 2);
+                const bx = wdToX(sc.lastTaskEndDay);
+                const bw = Math.max(2, wdToX(sc.lastTaskEndDay + sc.contingencyDays) - bx - 2);
                 const by = HEADER_H + milestoneH + layout.rowY + ROW_VPAD + sc.slotIndex * SLOT_H;
                 return (
                   <g key={`buf-${sc.discipline}-${sc.slotIndex}`}>
@@ -528,15 +666,15 @@ export function Timeline({ result, features, settings, viewMode, onToggleView }:
 
 // ─── Date headers ─────────────────────────────────────────────────────────────
 
-function FourWeekHeader({ projectEndDay, chartW }: { projectEndDay: number; chartW: number }) {
+function FourWeekHeader({ projectEndDay, chartW, wdToX }: { projectEndDay: number; chartW: number; wdToX: (n: number) => number }) {
   const numMonths = Math.ceil(projectEndDay / 20);
   const els: React.ReactNode[] = [];
 
   for (let m = 0; m < numMonths; m++) {
     const mStart = m * 20;
     const mEnd = Math.min((m + 1) * 20, projectEndDay);
-    const x = mStart * DAY_W;
-    const w = (mEnd - mStart) * DAY_W;
+    const x = wdToX(mStart);
+    const w = wdToX(mEnd) - wdToX(mStart);
     els.push(
       <g key={`m-${m}`}>
         <rect x={x} y={0} width={w} height={MONTH_H} fill={m % 2 === 0 ? "#1a1628" : "#211d38"} />
@@ -549,8 +687,8 @@ function FourWeekHeader({ projectEndDay, chartW }: { projectEndDay: number; char
       const wStart = mStart + w4 * 5;
       const wEnd = Math.min(wStart + 5, projectEndDay);
       if (wStart >= projectEndDay) break;
-      const wx = wStart * DAY_W;
-      const ww = (wEnd - wStart) * DAY_W;
+      const wx = wdToX(wStart);
+      const ww = wdToX(wEnd) - wdToX(wStart);
       els.push(
         <g key={`w-${m}-${w4}`}>
           <rect x={wx} y={MONTH_H} width={ww} height={WEEK_H} fill={(m + w4) % 2 === 0 ? "#1d1930" : "#201c32"} />
@@ -566,7 +704,7 @@ function FourWeekHeader({ projectEndDay, chartW }: { projectEndDay: number; char
   return <>{els}</>;
 }
 
-function ActualDateHeader({ projectEndDay, cal, chartW }: { projectEndDay: number; cal: Date[]; chartW: number }) {
+function ActualDateHeader({ projectEndDay, cal, chartW, wdToX }: { projectEndDay: number; cal: Date[]; chartW: number; wdToX: (n: number) => number }) {
   if (cal.length === 0) return null;
   const els: React.ReactNode[] = [];
   let monthKey = -1;
@@ -575,8 +713,8 @@ function ActualDateHeader({ projectEndDay, cal, chartW }: { projectEndDay: numbe
 
   const flushMonth = (endDay: number) => {
     if (monthKey === -1) return;
-    const x = monthStart * DAY_W;
-    const w = (endDay - monthStart) * DAY_W;
+    const x = wdToX(monthStart);
+    const w = wdToX(endDay) - wdToX(monthStart);
     if (w <= 0) return;
     els.push(
       <g key={`month-${monthKey}`}>
@@ -600,7 +738,7 @@ function ActualDateHeader({ projectEndDay, cal, chartW }: { projectEndDay: numbe
     }
     if (date.getDay() === 1) {
       els.push(
-        <text key={`wk-${d}`} x={d * DAY_W + 3} y={MONTH_H + WEEK_H / 2} dominantBaseline="middle" fontSize={10} fill="#5c5575">
+        <text key={`wk-${d}`} x={wdToX(d) + 3} y={MONTH_H + WEEK_H / 2} dominantBaseline="middle" fontSize={10} fill="#5c5575">
           {formatDateShort(date)}
         </text>
       );
@@ -634,15 +772,19 @@ function milestoneWorkingDays(
   };
 }
 
-function GridLines({ projectEndDay, calendarMode, cal, svgH, milestoneH }: { projectEndDay: number; calendarMode: string; cal: Date[]; svgH: number; milestoneH: number }) {
+function GridLines({ projectEndDay, calendarMode, cal, svgH, milestoneH, wdToX }: {
+  projectEndDay: number; calendarMode: string; cal: Date[]; svgH: number; milestoneH: number;
+  wdToX: (n: number) => number;
+}) {
   const bottom = svgH - BOTTOM_PAD;
   const top = HEADER_H + milestoneH;
   const lines: React.ReactNode[] = [];
   if (calendarMode === "four-week") {
     for (let d = 5; d <= projectEndDay; d += 5) {
       const isMonth = d % 20 === 0;
+      const x = wdToX(d);
       lines.push(
-        <line key={`gl-${d}`} x1={d * DAY_W} y1={top} x2={d * DAY_W} y2={bottom}
+        <line key={`gl-${d}`} x1={x} y1={top} x2={x} y2={bottom}
           stroke={isMonth ? "#2e2848" : "#1e1a2e"} strokeWidth={isMonth ? 1.5 : 1} />
       );
     }
@@ -651,8 +793,9 @@ function GridLines({ projectEndDay, calendarMode, cal, svgH, milestoneH }: { pro
       const date = cal[d];
       if (!date || date.getDay() !== 1) continue;
       const isMonthStart = date.getDate() <= 7;
+      const x = wdToX(d);
       lines.push(
-        <line key={`gl-${d}`} x1={d * DAY_W} y1={top} x2={d * DAY_W} y2={bottom}
+        <line key={`gl-${d}`} x1={x} y1={top} x2={x} y2={bottom}
           stroke={isMonthStart ? "#2e2848" : "#1e1a2e"} strokeWidth={isMonthStart ? 1.5 : 1} />
       );
     }
