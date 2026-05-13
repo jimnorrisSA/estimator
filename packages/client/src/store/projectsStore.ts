@@ -23,7 +23,11 @@ interface ProjectSnapshot {
 
 interface ProjectEntry extends ProjectMeta {
   snapshot: ProjectSnapshot;
-  apiId?: string; // MongoDB _id — present once synced to server
+  apiId?: string;
+  owner?: string;
+  published?: boolean;
+  checkedOutBy?: string;
+  checkedOutAt?: string;
 }
 
 interface ProjectsStore {
@@ -173,26 +177,38 @@ export const useProjectsStore = create<ProjectsStore>()(
 
       async syncFromServer() {
         try {
-          const res = await api.projects.list();
-          if (!res.ok) return;
-          const serverProjects: Array<{
-            id: string; name: string; createdAt: string; updatedAt: string;
-            snapshot?: ProjectSnapshot;
-          }> = await res.json();
+          const [myRes, sharedRes] = await Promise.all([
+            api.projects.list(),
+            api.projects.listShared(),
+          ]);
+          if (!myRes.ok) return;
 
-          if (serverProjects.length > 0) {
-            // Server has data — it's the source of truth
-            const entries: ProjectEntry[] = serverProjects.map((sp) => ({
-              id: sp.id,
-              apiId: sp.id,
-              name: sp.name,
-              createdAt: sp.createdAt,
-              updatedAt: sp.updatedAt,
-              snapshot: sp.snapshot ?? emptySnapshot(),
-            }));
-            get().replaceFromServer(entries);
+          type SP = {
+            id: string; name: string; createdAt: string; updatedAt: string;
+            owner?: string; published?: boolean;
+            checkedOutBy?: string; checkedOutAt?: string;
+            snapshot?: ProjectSnapshot;
+          };
+
+          const mine: SP[] = await myRes.json();
+          const shared: SP[] = sharedRes.ok ? await sharedRes.json() : [];
+
+          const toEntry = (sp: SP): ProjectEntry => ({
+            id: sp.id,
+            apiId: sp.id,
+            name: sp.name,
+            createdAt: sp.createdAt,
+            updatedAt: sp.updatedAt,
+            owner: sp.owner,
+            published: sp.published,
+            checkedOutBy: sp.checkedOutBy,
+            checkedOutAt: sp.checkedOutAt,
+            snapshot: sp.snapshot ?? emptySnapshot(),
+          });
+
+          if (mine.length > 0 || shared.length > 0) {
+            get().replaceFromServer([...mine.map(toEntry), ...shared.map(toEntry)]);
           } else {
-            // Server is empty — push local projects up to seed it
             const local = get().projects;
             for (const p of local) {
               await get().pushToServer(p.id);

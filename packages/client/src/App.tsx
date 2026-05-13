@@ -6,6 +6,7 @@ import { ExportMenu } from "./features/phase2-scheduling/components/ExportMenu.j
 import { LandingPage } from "./features/landing/LandingPage.js";
 import { ProjectsListPage } from "./features/landing/ProjectsListPage.js";
 import { AuthGate } from "./features/auth/AuthGate.js";
+import { api } from "./lib/api.js";
 import { useProjectsStore, migrateFromLegacyStores } from "./store/projectsStore.js";
 import { useEstimationsStore } from "./features/phase1-estimations/store/estimationsStore.js";
 import { useSchedulingStore } from "./features/phase2-scheduling/store/schedulingStore.js";
@@ -45,7 +46,7 @@ function AppContent() {
 
   // Collect the current phase store states into a snapshot and save locally + server
   function saveCurrentProject() {
-    const active = getActiveProject();
+    const active = useProjectsStore.getState().getActiveProject();
     if (!active) return;
     const snapshot = {
       features: useEstimationsStore.getState().features,
@@ -55,8 +56,11 @@ function AppContent() {
       milestones: useMilestonesStore.getState().milestones,
     };
     saveActiveSnapshot(snapshot);
-    // Fire-and-forget push to server
     pushToServer(active.id);
+    // If this is a checked-out shared project, check it back in after saving
+    if (active.checkedOutBy && active.apiId) {
+      api.projects.checkin(active.apiId).catch(() => {});
+    }
   }
 
   // Load a project's snapshot into all phase stores

@@ -33,7 +33,12 @@
       "Bash(git merge *)",
       "Bash(git commit *)",
       "Bash(git stash *)",
-      "Bash(go get *)"
+      "Bash(go get *)",
+      "Bash(go build *)",
+      "PowerShell(go version *)",
+      "PowerShell(go build *)",
+      "Bash(git push *)",
+      "Bash(git rm *)"
     ]
   }
 }

@@ -24,11 +24,16 @@ export const api = {
   },
   projects: {
     list: () => apiFetch("/api/projects"),
+    listShared: () => apiFetch("/api/projects/shared"),
     create: (name: string) =>
       apiFetch("/api/projects", { method: "POST", ...json({ name }) }),
     update: (apiId: string, data: object) =>
       apiFetch(`/api/projects/${apiId}`, { method: "PUT", ...json(data) }),
     delete: (apiId: string) =>
       apiFetch(`/api/projects/${apiId}`, { method: "DELETE" }),
+    checkout: (apiId: string) =>
+      apiFetch(`/api/projects/${apiId}/checkout`, { method: "POST" }),
+    checkin: (apiId: string) =>
+      apiFetch(`/api/projects/${apiId}/checkin`, { method: "POST" }),
   },
 };

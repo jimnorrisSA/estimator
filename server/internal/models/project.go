@@ -120,6 +120,9 @@ type Project struct {
 	Resources           []Resource         `bson:"resources"                        json:"resources"`
 	Milestones          []Milestone        `bson:"milestones"                       json:"milestones"`
 	Snapshot            interface{}        `bson:"snapshot,omitempty"               json:"snapshot,omitempty"`
+	Published           bool               `bson:"published"                        json:"published"`
+	CheckedOutBy        string             `bson:"checked_out_by,omitempty"         json:"checkedOutBy,omitempty"`
+	CheckedOutAt        *time.Time         `bson:"checked_out_at,omitempty"         json:"checkedOutAt,omitempty"`
 	PlantasticProjectID string             `bson:"plantastic_project_id,omitempty"  json:"plantasticProjectId,omitempty"`
 	CreatedAt           time.Time          `bson:"created_at"                       json:"createdAt"`
 	UpdatedAt           time.Time          `bson:"updated_at"                       json:"updatedAt"`
