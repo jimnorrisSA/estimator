@@ -19,8 +19,15 @@ export function ProjectsListPage({ onOpenProject, onBack }: Props) {
   const [editingName, setEditingName] = useState("");
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
   const [publishingId, setPublishingId] = useState<string | null>(null);
+  const [syncing, setSyncing] = useState(false);
 
-  useEffect(() => { syncFromServer(); }, []);
+  useEffect(() => { handleSync(); }, []);
+
+  async function handleSync() {
+    setSyncing(true);
+    await syncFromServer();
+    setSyncing(false);
+  }
 
   const myProjects = projects.filter((p) => !p.owner || p.owner === auth?.email);
   const teamProjects = projects.filter((p) => p.owner && p.owner !== auth?.email);
@@ -124,6 +131,16 @@ export function ProjectsListPage({ onOpenProject, onBack }: Props) {
         </div>
         <div className="ml-auto flex items-center gap-3">
           {auth && <span className="text-xs text-[#3a3456]">{auth.email}</span>}
+          <button
+            type="button"
+            onClick={handleSync}
+            disabled={syncing}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer disabled:opacity-50"
+            style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", color: "#5c5575" }}
+            title="Refresh project list"
+          >
+            {syncing ? "↻ Syncing…" : "↻ Refresh"}
+          </button>
           <button
             onClick={() => setNaming(true)}
             className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold text-white transition-all"
