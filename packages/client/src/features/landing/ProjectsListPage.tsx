@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useProjectsStore, emptySnapshot } from "../../store/projectsStore.js";
 import { useAuth } from "../auth/AuthGate.js";
 import { api } from "../../lib/api.js";
@@ -19,6 +19,8 @@ export function ProjectsListPage({ onOpenProject, onBack }: Props) {
   const [editingName, setEditingName] = useState("");
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
   const [publishingId, setPublishingId] = useState<string | null>(null);
+
+  useEffect(() => { syncFromServer(); }, []);
 
   const myProjects = projects.filter((p) => !p.owner || p.owner === auth?.email);
   const teamProjects = projects.filter((p) => p.owner && p.owner !== auth?.email);
