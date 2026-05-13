@@ -5,7 +5,7 @@ import { MilestonesPage } from "./features/phase3-milestones/MilestonesPage.js";
 import { ExportMenu } from "./features/phase2-scheduling/components/ExportMenu.js";
 import { LandingPage } from "./features/landing/LandingPage.js";
 import { ProjectsListPage } from "./features/landing/ProjectsListPage.js";
-import { useProjectsStore } from "./store/projectsStore.js";
+import { useProjectsStore, migrateFromLegacyStores } from "./store/projectsStore.js";
 import { useEstimationsStore } from "./features/phase1-estimations/store/estimationsStore.js";
 import { useSchedulingStore } from "./features/phase2-scheduling/store/schedulingStore.js";
 import { useMilestonesStore } from "./features/phase3-milestones/store/milestonesStore.js";
@@ -23,7 +23,16 @@ export function App() {
   const [view, setView] = useState<AppView>("landing");
   const [activePhase, setActivePhase] = useState<Phase>(1);
 
-  const { getActiveProject, saveActiveSnapshot, projects } = useProjectsStore();
+  const { getActiveProject, saveActiveSnapshot, projects, createProject } = useProjectsStore();
+
+  // One-time migration: import legacy localStorage data as the first project
+  if (projects.length === 0) {
+    const legacy = migrateFromLegacyStores();
+    if (legacy) {
+      const name = legacy.schedulingSettings.projectName || "My Project";
+      createProject(name, legacy);
+    }
+  }
 
   // Save current store states into the active project snapshot before leaving
   function snapshotCurrentProject() {

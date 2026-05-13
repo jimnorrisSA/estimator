@@ -57,6 +57,38 @@ export function emptySnapshot(): ProjectSnapshot {
   };
 }
 
+function readPersistedState<T>(key: string): T | null {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return (parsed?.state ?? null) as T | null;
+  } catch {
+    return null;
+  }
+}
+
+export function migrateFromLegacyStores(): ProjectSnapshot | null {
+  const estimations = readPersistedState<{ features: Feature[] }>("estimator-phase1-v2");
+  if (!estimations?.features?.length) return null;
+
+  const scheduling = readPersistedState<{
+    settings: ScheduleSettings;
+    overrides: Record<string, TaskOverride>;
+    resources: Resource[];
+  }>("estimator-scheduling-v1");
+
+  const milestones = readPersistedState<{ milestones: Milestone[] }>("vigo-milestones-v1");
+
+  return {
+    features: estimations.features,
+    schedulingSettings: scheduling?.settings ?? { ...DEFAULT_SETTINGS },
+    overrides: scheduling?.overrides ?? {},
+    resources: scheduling?.resources ?? [],
+    milestones: milestones?.milestones ?? [],
+  };
+}
+
 export const useProjectsStore = create<ProjectsStore>()(
   persist(
     (set, get) => ({
