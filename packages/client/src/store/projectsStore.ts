@@ -181,7 +181,10 @@ export const useProjectsStore = create<ProjectsStore>()(
             api.projects.list(),
             api.projects.listShared(),
           ]);
-          if (!myRes.ok) return;
+          if (!myRes.ok) {
+            console.warn("[sync] /api/projects returned", myRes.status);
+            return;
+          }
 
           type SP = {
             id: string; name: string; createdAt: string; updatedAt: string;
@@ -192,6 +195,10 @@ export const useProjectsStore = create<ProjectsStore>()(
 
           const mine: SP[] = await myRes.json();
           const shared: SP[] = sharedRes.ok ? await sharedRes.json() : [];
+
+          console.log("[sync] mine:", mine.length, "shared:", shared.length, "| shared status:", sharedRes.status);
+          if (mine.length > 0) console.log("[sync] my projects:", mine.map(p => ({ name: p.name, owner: p.owner, published: p.published })));
+          if (shared.length > 0) console.log("[sync] shared projects:", shared.map(p => ({ name: p.name, owner: p.owner, published: p.published })));
 
           const toEntry = (sp: SP): ProjectEntry => ({
             id: sp.id,
@@ -214,8 +221,8 @@ export const useProjectsStore = create<ProjectsStore>()(
               await get().pushToServer(p.id);
             }
           }
-        } catch {
-          // server unreachable — stay with local data
+        } catch (e) {
+          console.warn("[sync] error:", e);
         }
       },
 
