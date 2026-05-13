@@ -24,7 +24,7 @@ export function LandingPage({ onEnterApp, onOpenProjects }: Props) {
 
       {/* Hero image — fills the screen as a true img element */}
       <img
-        src="/hero.png"
+        src="/HERO.png"
         alt=""
         aria-hidden
         className="absolute inset-0 w-full h-full object-cover"
@@ -54,7 +54,7 @@ export function LandingPage({ onEnterApp, onOpenProjects }: Props) {
         {/* Hero image as logo / main visual */}
         <div className="flex flex-col items-center gap-6">
           <img
-            src="/hero.png"
+            src="/HERO.png"
             alt="Vigo"
             className="w-48 h-48 object-contain drop-shadow-[0_0_48px_rgba(139,92,246,0.5)]"
             style={{ filter: "drop-shadow(0 0 32px rgba(139,92,246,0.6))" }}
