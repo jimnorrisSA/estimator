@@ -59,15 +59,26 @@ export function ProjectsListPage({ onOpenProject, onBack }: Props) {
   }
 
   async function handleTogglePublish(id: string) {
-    let project = projects.find((p) => p.id === id);
+    let project = useProjectsStore.getState().projects.find((p) => p.id === id);
     if (!project) return;
+
     if (!project.apiId) {
-      // Project hasn't been pushed to server yet — sync first
-      await syncFromServer();
+      await useProjectsStore.getState().pushToServer(id);
       project = useProjectsStore.getState().projects.find((p) => p.id === id);
-      if (!project?.apiId) return;
+      if (!project?.apiId) {
+        setCheckoutError("Could not sync project to server. Please try again.");
+        setTimeout(() => setCheckoutError(null), 4000);
+        return;
+      }
     }
-    await api.projects.update(project.apiId, { published: !project.published });
+
+    const res = await api.projects.update(project.apiId, { published: !project.published });
+    if (!res.ok) {
+      const body: { error?: string } = await res.json().catch(() => ({}));
+      setCheckoutError(body.error ?? "Could not update sharing. Please try again.");
+      setTimeout(() => setCheckoutError(null), 4000);
+      return;
+    }
     await syncFromServer();
   }
 

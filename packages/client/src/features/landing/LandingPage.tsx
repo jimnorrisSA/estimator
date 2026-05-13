@@ -13,9 +13,11 @@ export function LandingPage({ onEnterApp, onOpenProjects }: Props) {
 
   function handleCreate() {
     const name = projectName.trim() || "Untitled Project";
-    createProject(name, emptySnapshot());
+    const localId = createProject(name, emptySnapshot());
     setNaming(false);
     setProjectName("");
+    // Push to server in background so the project gets an apiId
+    useProjectsStore.getState().pushToServer(localId);
     onEnterApp();
   }
 
