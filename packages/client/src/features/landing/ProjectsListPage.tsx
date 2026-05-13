@@ -59,8 +59,14 @@ export function ProjectsListPage({ onOpenProject, onBack }: Props) {
   }
 
   async function handleTogglePublish(id: string) {
-    const project = projects.find((p) => p.id === id);
-    if (!project?.apiId) return;
+    let project = projects.find((p) => p.id === id);
+    if (!project) return;
+    if (!project.apiId) {
+      // Project hasn't been pushed to server yet — sync first
+      await syncFromServer();
+      project = useProjectsStore.getState().projects.find((p) => p.id === id);
+      if (!project?.apiId) return;
+    }
     await api.projects.update(project.apiId, { published: !project.published });
     await syncFromServer();
   }
@@ -173,7 +179,7 @@ export function ProjectsListPage({ onOpenProject, onBack }: Props) {
                       className="px-3 py-2 rounded-lg text-xs font-semibold transition-colors"
                       style={project.published
                         ? { background: "rgba(124,58,237,0.2)", border: "1px solid rgba(124,58,237,0.5)", color: "#a78bfa" }
-                        : { background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", color: "#5c5575" }}
+                        : { background: "rgba(255,255,255,0.06)", border: "1px solid rgba(139,92,246,0.35)", color: "#9b93ba" }}
                       title={project.published ? "Unshare with team" : "Share with team"}
                     >
                       {project.published ? "Shared" : "Share"}
