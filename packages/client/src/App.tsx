@@ -5,6 +5,7 @@ import { MilestonesPage } from "./features/phase3-milestones/MilestonesPage.js";
 import { ExportMenu } from "./features/phase2-scheduling/components/ExportMenu.js";
 import { LandingPage } from "./features/landing/LandingPage.js";
 import { ProjectsListPage } from "./features/landing/ProjectsListPage.js";
+import { AuthGate } from "./features/auth/AuthGate.js";
 import { useProjectsStore, migrateFromLegacyStores } from "./store/projectsStore.js";
 import { useEstimationsStore } from "./features/phase1-estimations/store/estimationsStore.js";
 import { useSchedulingStore } from "./features/phase2-scheduling/store/schedulingStore.js";
@@ -19,39 +20,48 @@ const TABS: { phase: Phase; label: string; sub: string }[] = [
   { phase: 3, label: "Phase 3", sub: "Milestones" },
 ];
 
-export function App() {
+function AppContent() {
   const [view, setView] = useState<AppView>("landing");
   const [activePhase, setActivePhase] = useState<Phase>(1);
 
-  const { getActiveProject, saveActiveSnapshot, projects, createProject } = useProjectsStore();
+  const { getActiveProject, saveActiveSnapshot, pushToServer } =
+    useProjectsStore();
 
-  // One-time migration: import legacy localStorage data as the first project
+  // On first authenticated load: pull from server, fallback to legacy migration
   useEffect(() => {
-    if (useProjectsStore.getState().projects.length === 0) {
-      const legacy = migrateFromLegacyStores();
-      if (legacy) {
-        const name = legacy.schedulingSettings.projectName || "My Project";
-        createProject(name, legacy);
+    const store = useProjectsStore.getState();
+    store.syncFromServer().then(() => {
+      // If still empty after server load, try legacy migration
+      if (useProjectsStore.getState().projects.length === 0) {
+        const legacy = migrateFromLegacyStores();
+        if (legacy) {
+          const name = legacy.schedulingSettings.projectName || "My Project";
+          const localId = store.createProject(name, legacy);
+          store.pushToServer(localId);
+        }
       }
-    }
+    });
   }, []);
 
-  // Save current store states into the active project snapshot before leaving
-  function snapshotCurrentProject() {
+  // Collect the current phase store states into a snapshot and save locally + server
+  function saveCurrentProject() {
     const active = getActiveProject();
     if (!active) return;
-    saveActiveSnapshot({
+    const snapshot = {
       features: useEstimationsStore.getState().features,
       schedulingSettings: useSchedulingStore.getState().settings,
       overrides: useSchedulingStore.getState().overrides,
       resources: useSchedulingStore.getState().resources,
       milestones: useMilestonesStore.getState().milestones,
-    });
+    };
+    saveActiveSnapshot(snapshot);
+    // Fire-and-forget push to server
+    pushToServer(active.id);
   }
 
   // Load a project's snapshot into all phase stores
   function loadProjectSnapshot(projectId: string) {
-    const entry = projects.find((p) => p.id === projectId);
+    const entry = useProjectsStore.getState().projects.find((p) => p.id === projectId);
     if (!entry) return;
     const { snapshot } = entry;
     useEstimationsStore.setState({
@@ -70,26 +80,26 @@ export function App() {
   }
 
   function handleEnterApp() {
-    const active = getActiveProject();
+    const active = useProjectsStore.getState().getActiveProject();
     if (active) loadProjectSnapshot(active.id);
     setView("app");
     setActivePhase(1);
   }
 
   function handleOpenProjectFromList() {
-    const active = getActiveProject();
+    const active = useProjectsStore.getState().getActiveProject();
     if (active) loadProjectSnapshot(active.id);
     setView("app");
     setActivePhase(1);
   }
 
   function handleBackToProjects() {
-    snapshotCurrentProject();
+    saveCurrentProject();
     setView("projects");
   }
 
   function handleBackToLanding() {
-    snapshotCurrentProject();
+    saveCurrentProject();
     setView("landing");
   }
 
@@ -180,5 +190,13 @@ export function App() {
         {activePhase === 3 && <MilestonesPage />}
       </div>
     </div>
+  );
+}
+
+export function App() {
+  return (
+    <AuthGate>
+      <AppContent />
+    </AuthGate>
   );
 }

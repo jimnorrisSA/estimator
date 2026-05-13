@@ -119,6 +119,7 @@ type Project struct {
 	Features            []Feature          `bson:"features"                         json:"features"`
 	Resources           []Resource         `bson:"resources"                        json:"resources"`
 	Milestones          []Milestone        `bson:"milestones"                       json:"milestones"`
+	Snapshot            interface{}        `bson:"snapshot,omitempty"               json:"snapshot,omitempty"`
 	PlantasticProjectID string             `bson:"plantastic_project_id,omitempty"  json:"plantasticProjectId,omitempty"`
 	CreatedAt           time.Time          `bson:"created_at"                       json:"createdAt"`
 	UpdatedAt           time.Time          `bson:"updated_at"                       json:"updatedAt"`

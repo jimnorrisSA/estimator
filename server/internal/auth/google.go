@@ -32,10 +32,16 @@ func oauthCfg() *oauth2.Config {
 }
 
 func RegisterRoutes(r *gin.Engine, _ *mongo.Database) {
-	r.GET("/api/auth/google", startOAuth)
-	r.GET("/api/auth/google/callback", oauthCallback)
+	r.GET("/api/auth/config", authConfig)
 	r.GET("/api/auth/me", me)
 	r.POST("/api/auth/logout", logout)
+
+	if os.Getenv("GOOGLE_CLIENT_ID") == "" {
+		r.POST("/api/auth/dev-login", devLogin)
+	} else {
+		r.GET("/api/auth/google", startOAuth)
+		r.GET("/api/auth/google/callback", oauthCallback)
+	}
 }
 
 func startOAuth(c *gin.Context) {
@@ -68,7 +74,11 @@ func oauthCallback(c *gin.Context) {
 	sess.Set("name", userInfo["name"])
 	sess.Save() //nolint:errcheck
 
-	c.Redirect(http.StatusTemporaryRedirect, "/")
+	frontendURL := os.Getenv("FRONTEND_URL")
+	if frontendURL == "" {
+		frontendURL = "http://localhost:3000"
+	}
+	c.Redirect(http.StatusTemporaryRedirect, frontendURL)
 }
 
 func me(c *gin.Context) {
@@ -86,6 +96,22 @@ func logout(c *gin.Context) {
 	sess.Clear()
 	sess.Save() //nolint:errcheck
 	c.JSON(http.StatusOK, gin.H{"ok": true})
+}
+
+func authConfig(c *gin.Context) {
+	devAvailable := os.Getenv("GOOGLE_CLIENT_ID") == ""
+	c.JSON(http.StatusOK, gin.H{
+		"devLoginAvailable":    devAvailable,
+		"googleLoginAvailable": !devAvailable,
+	})
+}
+
+func devLogin(c *gin.Context) {
+	sess := sessions.Default(c)
+	sess.Set("email", "jim.norris@soulassembly.com")
+	sess.Set("name", "Jim Norris")
+	sess.Save() //nolint:errcheck
+	c.JSON(http.StatusOK, gin.H{"ok": true, "email": "jim.norris@soulassembly.com", "name": "Jim Norris"})
 }
 
 func fetchUserInfo(ctx context.Context, token *oauth2.Token) (map[string]any, error) {

@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"log"
+	"net/http"
 	"os"
 	"strings"
 	"time"
@@ -62,8 +63,41 @@ func main() {
 
 	r := gin.Default()
 
+	// CORS — only allow the configured frontend origin
+	frontendOrigin := os.Getenv("FRONTEND_URL")
+	if frontendOrigin == "" {
+		frontendOrigin = "http://localhost:3000"
+	}
+	r.Use(func(c *gin.Context) {
+		origin := c.Request.Header.Get("Origin")
+		if origin == frontendOrigin {
+			c.Header("Access-Control-Allow-Origin", origin)
+			c.Header("Access-Control-Allow-Credentials", "true")
+			c.Header("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS")
+			c.Header("Access-Control-Allow-Headers", "Content-Type,Authorization")
+		}
+		if c.Request.Method == http.MethodOptions {
+			c.AbortWithStatus(http.StatusNoContent)
+			return
+		}
+		c.Next()
+	})
+
+	// Cross-origin cookies require SameSite=None + Secure in production
+	secureCookies := os.Getenv("SESSION_SECURE") == "true"
+	sameSite := http.SameSiteLaxMode
+	if secureCookies {
+		sameSite = http.SameSiteNoneMode
+	}
 	store := cookie.NewStore([]byte(os.Getenv("SESSION_SECRET")))
-	r.Use(sessions.Sessions("estimator_session", store))
+	store.Options(sessions.Options{
+		Path:     "/",
+		MaxAge:   86400 * 7,
+		HttpOnly: true,
+		Secure:   secureCookies,
+		SameSite: sameSite,
+	})
+	r.Use(sessions.Sessions("vigo_session", store))
 
 	auth.RegisterRoutes(r, database)
 
