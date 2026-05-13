@@ -108,7 +108,7 @@ func main() {
 	if port == "" {
 		port = "4000"
 	}
-	log.Printf("API server listening on :%s", port)
+	log.Printf("API server listening on :%s (build includes listShared, checkout, checkin)", port)
 	if err := r.Run(":" + port); err != nil {
 		log.Fatalf("server error: %v", err)
 	}
