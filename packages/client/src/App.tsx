@@ -142,7 +142,7 @@ function AppContent() {
           className="flex items-center pr-4 mr-2 border-r border-[#2e2848]"
           title="Home"
         >
-          <img src="/logo.png" alt="Vigo" className="h-9 w-9 object-contain rounded-lg" />
+          <img src="/HERO.png" alt="Vigo" className="h-9 w-9 object-contain rounded-lg" />
         </button>
 
         {/* Active phase tabs */}

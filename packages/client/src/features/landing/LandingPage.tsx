@@ -51,14 +51,7 @@ export function LandingPage({ onEnterApp, onOpenProjects }: Props) {
       {/* Content */}
       <div className="relative z-10 flex flex-col items-center justify-center h-full px-8 gap-8">
 
-        {/* Hero image as logo / main visual */}
         <div className="flex flex-col items-center gap-6">
-          <img
-            src="/HERO.png"
-            alt="Vigo"
-            className="w-48 h-48 object-contain drop-shadow-[0_0_48px_rgba(139,92,246,0.5)]"
-            style={{ filter: "drop-shadow(0 0 32px rgba(139,92,246,0.6))" }}
-          />
           <div className="flex flex-col items-center gap-2">
             <h1
               className="text-7xl font-black tracking-[0.25em] text-white uppercase"
@@ -70,7 +63,6 @@ export function LandingPage({ onEnterApp, onOpenProjects }: Props) {
               Project Estimation Suite
             </p>
           </div>
-        </div>
 
         {/* Tagline */}
         <p className="text-xl text-[#c5bedf] font-light text-center max-w-md" style={{ textShadow: "0 1px 8px rgba(0,0,0,0.6)" }}>

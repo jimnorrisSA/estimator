@@ -54,7 +54,7 @@ export function ProjectsListPage({ onOpenProject, onBack }: Props) {
           ← Back
         </button>
         <div className="flex items-center gap-3 ml-2">
-          <img src="/logo.png" alt="Vigo" className="w-7 h-7 object-contain rounded-md" />
+          <img src="/HERO.png" alt="Vigo" className="w-7 h-7 object-contain rounded-md" />
           <span className="text-sm font-bold tracking-widest uppercase text-[#9b93ba]">Vigo</span>
         </div>
         <div className="ml-auto">
