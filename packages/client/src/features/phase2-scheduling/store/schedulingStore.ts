@@ -33,6 +33,7 @@ export interface TaskOverride {
   endDay?: number;
   notes: string;
   assignedResourceId?: string;
+  slotIndex?: number;
 }
 
 interface SchedulingStore {

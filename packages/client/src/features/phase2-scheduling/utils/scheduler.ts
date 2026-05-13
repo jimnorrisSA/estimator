@@ -125,13 +125,15 @@ export function runScheduler(
         const isPinned = ov?.startDay != null;
         const slots = cursors[discipline];
 
-        // Earliest-available slot assignment, preferring slots that fit before roll-off
+        // Pinned slotIndex takes priority; otherwise pick earliest-available slot,
+        // preferring slots that complete before the resource rolls off.
         let slotIndex: number;
-        if (isPinned) {
+        if (ov?.slotIndex != null) {
+          slotIndex = Math.min(ov.slotIndex, slots.length - 1);
+        } else if (isPinned) {
           slotIndex = slots.reduce((best, v, i) => (v < slots[best] ? i : best), 0);
         } else {
           const discRes = disciplineResources[discipline];
-          // Slots where the task finishes before the resource rolls off
           const fitting = slots.reduce<number[]>((acc, cursor, i) => {
             const win = discRes[i] ? resourceWindows[discRes[i].id] : undefined;
             if (!win?.endDay || cursor + wd <= win.endDay) acc.push(i);

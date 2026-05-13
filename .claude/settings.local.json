@@ -30,7 +30,9 @@
       "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\james\\\\Git\\\\Estimator\\\\server\" -Recurse | ForEach-Object { $_.FullName } | Sort-Object)",
       "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\james\\\\Git\\\\Estimator\\\\server\" -Recurse -File | ForEach-Object { $_.FullName } | Sort-Object)",
       "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\james\\\\Git\\\\Estimator\\\\server\\\\internal\\\\websocket\" -File 2>$null | ForEach-Object { $_.FullName })",
-      "Bash(git merge *)"
+      "Bash(git merge *)",
+      "Bash(git commit *)",
+      "Bash(git stash *)"
     ]
   }
 }
