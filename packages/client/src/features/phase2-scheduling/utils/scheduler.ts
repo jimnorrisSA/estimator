@@ -52,7 +52,7 @@ export interface ScheduleResult {
 
 const DISCIPLINE_ORDER: Discipline[] = ["Art", "Design", "Code", "Production", "Custom"];
 
-type Overrides = Record<string, { startDay?: number; endDay?: number; notes?: string; assignedResourceId?: string }>;
+type Overrides = Record<string, { startDay?: number; endDay?: number; notes?: string; assignedResourceId?: string; slotIndex?: number }>;
 
 function firstFreeStart(start: number, duration: number, blocks: BlockedPeriod[]): number {
   let s = start;

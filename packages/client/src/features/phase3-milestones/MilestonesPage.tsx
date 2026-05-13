@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { useMilestonesStore, MILESTONE_COLORS, type Milestone } from "./store/milestonesStore.js";
+import { useMilestonesStore, type Milestone } from "./store/milestonesStore.js";
 import { useEstimationsStore } from "../phase1-estimations/store/estimationsStore.js";
 import { useSchedulingStore, CURRENCY_SYMBOLS, getConversionRate } from "../phase2-scheduling/store/schedulingStore.js";
 import { runScheduler } from "../phase2-scheduling/utils/scheduler.js";
