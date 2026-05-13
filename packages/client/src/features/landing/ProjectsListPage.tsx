@@ -18,6 +18,7 @@ export function ProjectsListPage({ onOpenProject, onBack }: Props) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState("");
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
+  const [publishingId, setPublishingId] = useState<string | null>(null);
 
   const myProjects = projects.filter((p) => !p.owner || p.owner === auth?.email);
   const teamProjects = projects.filter((p) => p.owner && p.owner !== auth?.email);
@@ -59,27 +60,35 @@ export function ProjectsListPage({ onOpenProject, onBack }: Props) {
   }
 
   async function handleTogglePublish(id: string) {
-    let project = useProjectsStore.getState().projects.find((p) => p.id === id);
-    if (!project) return;
+    setPublishingId(id);
+    try {
+      let project = useProjectsStore.getState().projects.find((p) => p.id === id);
+      if (!project) return;
 
-    if (!project.apiId) {
-      await useProjectsStore.getState().pushToServer(id);
-      project = useProjectsStore.getState().projects.find((p) => p.id === id);
-      if (!project?.apiId) {
-        setCheckoutError("Could not sync project to server. Please try again.");
-        setTimeout(() => setCheckoutError(null), 4000);
+      if (!project.apiId) {
+        await useProjectsStore.getState().pushToServer(id);
+        project = useProjectsStore.getState().projects.find((p) => p.id === id);
+        if (!project?.apiId) {
+          setCheckoutError("Could not sync project to server. Please try again.");
+          setTimeout(() => setCheckoutError(null), 5000);
+          return;
+        }
+      }
+
+      const res = await api.projects.update(project.apiId, { published: !project.published });
+      if (!res.ok) {
+        const body: { error?: string } = await res.json().catch(() => ({}));
+        setCheckoutError(body.error ?? "Could not update sharing. Please try again.");
+        setTimeout(() => setCheckoutError(null), 5000);
         return;
       }
+      await syncFromServer();
+    } catch (err) {
+      setCheckoutError("Network error — could not reach server.");
+      setTimeout(() => setCheckoutError(null), 5000);
+    } finally {
+      setPublishingId(null);
     }
-
-    const res = await api.projects.update(project.apiId, { published: !project.published });
-    if (!res.ok) {
-      const body: { error?: string } = await res.json().catch(() => ({}));
-      setCheckoutError(body.error ?? "Could not update sharing. Please try again.");
-      setTimeout(() => setCheckoutError(null), 4000);
-      return;
-    }
-    await syncFromServer();
   }
 
   async function handleCheckin(id: string) {
@@ -186,14 +195,16 @@ export function ProjectsListPage({ onOpenProject, onBack }: Props) {
                   <div className="flex items-center gap-2 mt-auto pt-3 border-t border-[#2e2848]">
                     <button onClick={() => handleOpen(project.id)} className="flex-1 py-2 rounded-lg text-sm font-semibold text-white" style={{ background: "linear-gradient(135deg, #7c3aed, #5b21b6)" }}>Open →</button>
                     <button
+                      type="button"
                       onClick={() => handleTogglePublish(project.id)}
-                      className="px-3 py-2 rounded-lg text-xs font-semibold transition-colors"
+                      disabled={publishingId === project.id}
+                      className="px-3 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer disabled:opacity-50 disabled:cursor-wait hover:brightness-125"
                       style={project.published
                         ? { background: "rgba(124,58,237,0.2)", border: "1px solid rgba(124,58,237,0.5)", color: "#a78bfa" }
-                        : { background: "rgba(255,255,255,0.06)", border: "1px solid rgba(139,92,246,0.35)", color: "#9b93ba" }}
+                        : { background: "rgba(139,92,246,0.15)", border: "1px solid rgba(139,92,246,0.5)", color: "#c4b5fd" }}
                       title={project.published ? "Unshare with team" : "Share with team"}
                     >
-                      {project.published ? "Shared" : "Share"}
+                      {publishingId === project.id ? "…" : project.published ? "Shared" : "Share"}
                     </button>
                     <button onClick={() => setConfirmDelete(project.id)} className="p-2 rounded-lg text-[#3a3456] hover:text-red-400 transition-colors" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>×</button>
                   </div>
