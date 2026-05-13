@@ -109,8 +109,10 @@ export function runScheduler(
         const isPinned = ov?.startDay != null;
         const slots = cursors[discipline];
 
-        // Earliest-available slot assignment
-        const slotIndex = slots.reduce((best, v, i) => (v < slots[best] ? i : best), 0);
+        // Use pinned slot when set, otherwise pick earliest-available
+        const slotIndex = ov?.slotIndex != null
+          ? Math.min(ov.slotIndex, slots.length - 1)
+          : slots.reduce((best, v, i) => (v < slots[best] ? i : best), 0);
 
         let startDay: number;
         let endDay: number;
