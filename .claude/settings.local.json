@@ -32,7 +32,8 @@
       "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\james\\\\Git\\\\Estimator\\\\server\\\\internal\\\\websocket\" -File 2>$null | ForEach-Object { $_.FullName })",
       "Bash(git merge *)",
       "Bash(git commit *)",
-      "Bash(git stash *)"
+      "Bash(git stash *)",
+      "Bash(go get *)"
     ]
   }
 }

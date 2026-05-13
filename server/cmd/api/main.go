@@ -1,9 +1,11 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"log"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/gin-contrib/sessions"
@@ -15,7 +17,33 @@ import (
 	"github.com/soulassembly/estimator/internal/middleware"
 )
 
+// loadEnv reads a .env file and sets any unset environment variables from it.
+func loadEnv(path string) {
+	f, err := os.Open(path)
+	if err != nil {
+		return // no .env file is fine
+	}
+	defer f.Close()
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		parts := strings.SplitN(line, "=", 2)
+		if len(parts) != 2 {
+			continue
+		}
+		key := strings.TrimSpace(parts[0])
+		val := strings.TrimSpace(parts[1])
+		if os.Getenv(key) == "" {
+			os.Setenv(key, val)
+		}
+	}
+}
+
 func main() {
+	loadEnv(".env")
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
