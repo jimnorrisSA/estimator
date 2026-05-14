@@ -45,15 +45,18 @@ export interface Feature {
   updatedAt: string;
 }
 
+export type ResourceType = "FTE" | "Contractor";
+
 export interface Resource {
   id: string;
   projectId: string;
   name: string;
   role: Discipline;
+  resourceType: ResourceType;
   rollOnDate: string;
   rollOffDate: string;
   allocationPct: number;
-  dailyRate: number;
+  dailyRate: number;        // 0 on FTE means "use project default rate"
   currency: string;
   notes: string;
   plantasticUserId?: string;

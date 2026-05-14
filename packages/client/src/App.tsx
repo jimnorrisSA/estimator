@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { EstimationsPage } from "./features/phase1-estimations/EstimationsPage.js";
 import { SchedulingPage } from "./features/phase2-scheduling/SchedulingPage.js";
 import { MilestonesPage } from "./features/phase3-milestones/MilestonesPage.js";
+import { CostSheetPage } from "./features/phase4-costs/CostSheetPage.js";
 import { ExportMenu } from "./features/phase2-scheduling/components/ExportMenu.js";
 import { LandingPage } from "./features/landing/LandingPage.js";
 import { ProjectsListPage } from "./features/landing/ProjectsListPage.js";
@@ -13,12 +14,13 @@ import { useSchedulingStore } from "./features/phase2-scheduling/store/schedulin
 import { useMilestonesStore } from "./features/phase3-milestones/store/milestonesStore.js";
 
 type AppView = "landing" | "projects" | "app";
-type Phase = 1 | 2 | 3;
+type Phase = 1 | 2 | 3 | 4;
 
 const TABS: { phase: Phase; label: string; sub: string }[] = [
   { phase: 1, label: "Phase 1", sub: "Estimations" },
   { phase: 2, label: "Phase 2", sub: "Schedule" },
   { phase: 3, label: "Phase 3", sub: "Milestones" },
+  { phase: 4, label: "Phase 4", sub: "Costs" },
 ];
 
 function AppContent() {
@@ -199,16 +201,6 @@ function AppContent() {
           </button>
         </div>
 
-        {/* Future phase tab */}
-        <div className="flex items-stretch gap-1">
-          <button
-            disabled
-            className="flex flex-col items-start justify-center px-4 py-2.5 text-left border-b-2 border-transparent opacity-30 cursor-not-allowed"
-          >
-            <span className="text-xs font-semibold uppercase tracking-wide leading-none text-[#5c5575]">Phase 4</span>
-            <span className="text-sm font-medium leading-tight mt-0.5 text-[#5c5575]">Timeline</span>
-          </button>
-        </div>
       </nav>
 
       {/* Page content */}
@@ -216,6 +208,7 @@ function AppContent() {
         {activePhase === 1 && <EstimationsPage />}
         {activePhase === 2 && <SchedulingPage />}
         {activePhase === 3 && <MilestonesPage />}
+        {activePhase === 4 && <CostSheetPage />}
       </div>
     </div>
   );

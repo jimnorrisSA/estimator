@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { Discipline, Resource } from "@estimator/shared";
+import type { Discipline, Resource, ResourceType } from "@estimator/shared";
 import type { Currency } from "../store/schedulingStore.js";
 import { CURRENCY_SYMBOLS } from "../store/schedulingStore.js";
 
@@ -13,19 +13,20 @@ const DISCIPLINE_STYLES: Record<Discipline, { dot: string; badge: string }> = {
   Custom:     { dot: "bg-gray-500",   badge: "bg-gray-800 text-gray-400" },
 };
 
-type ResourcePatch = Partial<Pick<Resource, "name" | "dailyRate" | "rollOnDate" | "rollOffDate">>;
+type ResourcePatch = Partial<Pick<Resource, "name" | "resourceType" | "dailyRate" | "allocationPct" | "rollOnDate" | "rollOffDate">>;
 
 interface Props {
   resources: Resource[];
   currency: Currency;
+  defaultDailyRate: number;
   onAdd: (role: Discipline, name: string) => void;
   onUpdate: (id: string, patch: ResourcePatch) => void;
   onDelete: (id: string) => void;
 }
 
-export function TeamSidebar({ resources, currency, onAdd, onUpdate, onDelete }: Props) {
+export function TeamSidebar({ resources, currency, defaultDailyRate, onAdd, onUpdate, onDelete }: Props) {
   const symbol = CURRENCY_SYMBOLS[currency];
-  const hasRates = resources.some((r) => r.dailyRate > 0);
+  const hasRates = resources.some((r) => r.dailyRate > 0 || (r.resourceType === "FTE" && defaultDailyRate > 0));
 
   return (
     <div className="w-56 flex-shrink-0 border-l border-[#2e2848] bg-[#14112a] flex flex-col h-full">
@@ -50,6 +51,7 @@ export function TeamSidebar({ resources, currency, onAdd, onUpdate, onDelete }: 
             discipline={discipline}
             members={resources.filter((r) => r.role === discipline)}
             symbol={symbol}
+            defaultDailyRate={defaultDailyRate}
             onAdd={(name) => onAdd(discipline, name)}
             onUpdate={onUpdate}
             onDelete={onDelete}
@@ -59,7 +61,7 @@ export function TeamSidebar({ resources, currency, onAdd, onUpdate, onDelete }: 
 
       {/* Total cost footer */}
       {hasRates && (
-        <TotalCostFooter resources={resources} symbol={symbol} />
+        <TotalCostFooter resources={resources} symbol={symbol} defaultDailyRate={defaultDailyRate} />
       )}
     </div>
   );
@@ -71,6 +73,7 @@ function DisciplineSection({
   discipline,
   members,
   symbol,
+  defaultDailyRate,
   onAdd,
   onUpdate,
   onDelete,
@@ -78,6 +81,7 @@ function DisciplineSection({
   discipline: Discipline;
   members: Resource[];
   symbol: string;
+  defaultDailyRate: number;
   onAdd: (name: string) => void;
   onUpdate: (id: string, patch: ResourcePatch) => void;
   onDelete: (id: string) => void;
@@ -108,6 +112,7 @@ function DisciplineSection({
             key={m.id}
             member={m}
             symbol={symbol}
+            defaultDailyRate={defaultDailyRate}
             onUpdate={onUpdate}
             onDelete={onDelete}
           />
@@ -155,34 +160,52 @@ function formatDateHint(rollOnDate: string, rollOffDate: string): string | null 
 function MemberRow({
   member,
   symbol,
+  defaultDailyRate,
   onUpdate,
   onDelete,
 }: {
   member: Resource;
   symbol: string;
+  defaultDailyRate: number;
   onUpdate: (id: string, patch: ResourcePatch) => void;
   onDelete: (id: string) => void;
 }) {
   const [editing, setEditing] = useState(false);
+  const effectiveType: ResourceType = member.resourceType ?? "Contractor";
   const [draftName, setDraftName] = useState(member.name);
+  const [draftType, setDraftType] = useState<ResourceType>(effectiveType);
   const [draftRate, setDraftRate] = useState(String(member.dailyRate || ""));
+  const [useDefault, setUseDefault] = useState(effectiveType === "FTE" && !member.dailyRate);
+  const [draftAlloc, setDraftAlloc] = useState(String(member.allocationPct ?? 100));
   const [draftRollOn, setDraftRollOn] = useState(member.rollOnDate || "");
   const [draftRollOff, setDraftRollOff] = useState(member.rollOffDate || "");
 
   function openEdit() {
+    const t: ResourceType = member.resourceType ?? "Contractor";
     setDraftName(member.name);
+    setDraftType(t);
     setDraftRate(String(member.dailyRate || ""));
+    setUseDefault(t === "FTE" && !member.dailyRate);
+    setDraftAlloc(String(member.allocationPct ?? 100));
     setDraftRollOn(member.rollOnDate || "");
     setDraftRollOff(member.rollOffDate || "");
     setEditing(true);
   }
 
+  function handleTypeChange(t: ResourceType) {
+    setDraftType(t);
+    if (t === "FTE") setUseDefault(!member.dailyRate);
+  }
+
   function commitEdit() {
     const name = draftName.trim() || member.name;
-    const rate = parseFloat(draftRate);
+    const rate = (draftType === "FTE" && useDefault) ? 0 : (parseFloat(draftRate) || 0);
+    const alloc = Math.min(100, Math.max(1, parseInt(draftAlloc) || 100));
     onUpdate(member.id, {
       name,
-      dailyRate: isNaN(rate) || rate < 0 ? 0 : rate,
+      resourceType: draftType,
+      dailyRate: rate,
+      allocationPct: alloc,
       rollOnDate: draftRollOn || "",
       rollOffDate: draftRollOff || "",
     });
@@ -190,10 +213,13 @@ function MemberRow({
   }
 
   const dateHint = formatDateHint(member.rollOnDate, member.rollOffDate);
+  const displayRate = effectiveType === "FTE" && !member.dailyRate ? defaultDailyRate : member.dailyRate;
+  const allocLabel = (member.allocationPct ?? 100) < 100 ? ` · ${member.allocationPct}%` : "";
 
   if (editing) {
     return (
-      <div className="bg-[#1d1930] rounded-lg p-2 flex flex-col gap-1.5 border border-[#2e2848]">
+      <div className="bg-[#1d1930] rounded-lg p-2 flex flex-col gap-2 border border-[#2e2848]">
+        {/* Name */}
         <input
           autoFocus
           className="text-sm border border-[#2e2848] bg-[#1a1628] text-[#ece7ff] rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-[#7c3aed] w-full placeholder:text-[#3a3456]"
@@ -202,19 +228,82 @@ function MemberRow({
           placeholder="Name"
           onKeyDown={(e) => { if (e.key === "Enter") commitEdit(); if (e.key === "Escape") setEditing(false); }}
         />
+
+        {/* FTE / Contractor toggle */}
+        <div className="flex rounded-lg overflow-hidden border border-[#2e2848]">
+          {(["FTE", "Contractor"] as ResourceType[]).map((t) => (
+            <button
+              key={t}
+              type="button"
+              onClick={() => handleTypeChange(t)}
+              className={`flex-1 text-xs py-1 font-semibold transition-colors ${
+                draftType === t
+                  ? "bg-[#7c3aed] text-white"
+                  : "bg-[#1a1628] text-[#5c5575] hover:text-[#9b93ba]"
+              }`}
+            >
+              {t}
+            </button>
+          ))}
+        </div>
+
+        {/* Rate */}
+        {draftType === "FTE" ? (
+          <div className="flex flex-col gap-1">
+            <label className="flex items-center gap-1.5 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={useDefault}
+                onChange={(e) => setUseDefault(e.target.checked)}
+                className="accent-[#7c3aed]"
+              />
+              <span className="text-xs text-[#9b93ba]">
+                Use project default
+                {defaultDailyRate > 0 && ` (${symbol}${defaultDailyRate.toLocaleString()})`}
+              </span>
+            </label>
+            {!useDefault && (
+              <div className="flex items-center gap-1">
+                <span className="text-sm text-[#5c5575]">{symbol}</span>
+                <input
+                  type="number" min={0} step={50}
+                  className="flex-1 text-sm border border-[#2e2848] bg-[#1a1628] text-[#ece7ff] rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-[#7c3aed] placeholder:text-[#3a3456]"
+                  value={draftRate}
+                  onChange={(e) => setDraftRate(e.target.value)}
+                  placeholder="Override rate"
+                  onKeyDown={(e) => { if (e.key === "Enter") commitEdit(); if (e.key === "Escape") setEditing(false); }}
+                />
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="flex items-center gap-1">
+            <span className="text-sm text-[#5c5575]">{symbol}</span>
+            <input
+              type="number" min={0} step={50}
+              className="flex-1 text-sm border border-[#2e2848] bg-[#1a1628] text-[#ece7ff] rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-[#7c3aed] placeholder:text-[#3a3456]"
+              value={draftRate}
+              onChange={(e) => setDraftRate(e.target.value)}
+              placeholder="Daily rate"
+              onKeyDown={(e) => { if (e.key === "Enter") commitEdit(); if (e.key === "Escape") setEditing(false); }}
+            />
+          </div>
+        )}
+
+        {/* Allocation % */}
         <div className="flex items-center gap-1">
-          <span className="text-sm text-[#5c5575]">{symbol}</span>
+          <span className="text-xs text-[#5c5575] w-16 flex-shrink-0">Allocation</span>
           <input
-            type="number"
-            min={0}
-            step={50}
-            className="flex-1 text-sm border border-[#2e2848] bg-[#1a1628] text-[#ece7ff] rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-[#7c3aed] placeholder:text-[#3a3456]"
-            value={draftRate}
-            onChange={(e) => setDraftRate(e.target.value)}
-            placeholder="Daily rate"
+            type="number" min={1} max={100} step={10}
+            className="flex-1 text-sm border border-[#2e2848] bg-[#1a1628] text-[#ece7ff] rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-[#7c3aed]"
+            value={draftAlloc}
+            onChange={(e) => setDraftAlloc(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter") commitEdit(); if (e.key === "Escape") setEditing(false); }}
           />
+          <span className="text-xs text-[#5c5575]">%</span>
         </div>
+
+        {/* Availability */}
         <div className="flex flex-col gap-1">
           <p className="text-xs text-[#5c5575]">Availability</p>
           <div className="flex items-center gap-1">
@@ -236,6 +325,7 @@ function MemberRow({
             />
           </div>
         </div>
+
         <div className="flex gap-1 justify-end">
           <button
             className="text-sm px-2 py-0.5 rounded text-[#9b93ba] hover:bg-[#252041] transition-colors"
@@ -259,15 +349,21 @@ function MemberRow({
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5">
           <span className="flex-1 text-sm text-[#ece7ff] truncate">{member.name}</span>
-          {member.dailyRate > 0 && (
+          {displayRate > 0 && (
             <span className="text-sm text-[#5c5575] tabular-nums flex-shrink-0">
-              {symbol}{member.dailyRate.toLocaleString()}
+              {symbol}{displayRate.toLocaleString()}
             </span>
           )}
         </div>
-        {dateHint && (
-          <p className="text-xs text-[#5c5575] mt-0.5">{dateHint}</p>
-        )}
+        <div className="flex items-center gap-1.5 mt-0.5">
+          {effectiveType === "FTE" ? (
+            <span className="text-xs px-1 rounded" style={{ background: "rgba(16,185,129,0.15)", color: "#6ee7b7" }}>FTE</span>
+          ) : (
+            <span className="text-xs px-1 rounded" style={{ background: "rgba(124,58,237,0.15)", color: "#a78bfa" }}>Contractor</span>
+          )}
+          {allocLabel && <span className="text-xs text-[#5c5575]">{allocLabel}</span>}
+          {dateHint && <span className="text-xs text-[#5c5575] truncate">{dateHint}</span>}
+        </div>
       </div>
       <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity mt-0.5 flex-shrink-0">
         <button
@@ -295,19 +391,25 @@ function MemberRow({
 
 // ─── Cost footer ──────────────────────────────────────────────────────────────
 
-function TotalCostFooter({ resources, symbol }: { resources: Resource[]; symbol: string }) {
+function TotalCostFooter({ resources, symbol, defaultDailyRate }: { resources: Resource[]; symbol: string; defaultDailyRate: number }) {
   const byDiscipline = DISCIPLINES.map((d) => ({
     discipline: d,
-    members: resources.filter((r) => r.role === d && r.dailyRate > 0),
+    members: resources.filter((r) => r.role === d).filter((r) => {
+      const rate = (r.resourceType === "FTE" && !r.dailyRate) ? defaultDailyRate : r.dailyRate;
+      return rate > 0;
+    }),
   })).filter((g) => g.members.length > 0);
 
   if (byDiscipline.length === 0) return null;
+
+  const effectiveRate = (r: Resource) =>
+    (r.resourceType === "FTE" && !r.dailyRate) ? defaultDailyRate : r.dailyRate;
 
   return (
     <div className="border-t border-[#2e2848] px-4 py-3 flex flex-col gap-1">
       <p className="text-xs font-semibold text-[#5c5575] uppercase tracking-wide mb-1">Daily team cost</p>
       {byDiscipline.map(({ discipline, members }) => {
-        const total = members.reduce((s, m) => s + m.dailyRate, 0);
+        const total = members.reduce((s, m) => s + effectiveRate(m), 0);
         return (
           <div key={discipline} className="flex justify-between text-sm">
             <span className="text-[#9b93ba]">{discipline}</span>
@@ -320,7 +422,7 @@ function TotalCostFooter({ resources, symbol }: { resources: Resource[]; symbol:
       <div className="flex justify-between text-sm font-semibold pt-1 border-t border-[#2e2848] mt-0.5">
         <span className="text-[#9b93ba]">Total / day</span>
         <span className="text-[#a78bfa] tabular-nums">
-          {symbol}{resources.filter((r) => r.dailyRate > 0).reduce((s, r) => s + r.dailyRate, 0).toLocaleString()}
+          {symbol}{resources.reduce((s, r) => s + effectiveRate(r), 0).toLocaleString()}
         </span>
       </div>
     </div>

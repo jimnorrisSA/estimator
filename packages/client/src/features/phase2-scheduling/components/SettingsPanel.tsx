@@ -27,14 +27,10 @@ export function SettingsPanel({ settings, onChange }: Props) {
   const [monthDraft, setMonthDraft] = useState(
     settings.defaultDailyRate > 0 ? String(toDisplay(settings.defaultDailyRate * 20)) : ""
   );
-  const [rateDraft, setRateDraft] = useState(String(conversionRate));
-
   useEffect(() => {
-    const rate = settings.currency === "GBP" ? 1 : (settings.exchangeRates?.[settings.currency] ?? 1);
-    setRateDraft(String(rate));
-    setDayDraft(settings.defaultDailyRate > 0 ? String(Math.round(settings.defaultDailyRate * rate)) : "");
-    setMonthDraft(settings.defaultDailyRate > 0 ? String(Math.round(settings.defaultDailyRate * 20 * rate)) : "");
-  }, [settings.currency, settings.exchangeRates, settings.defaultDailyRate]);
+    setDayDraft(settings.defaultDailyRate > 0 ? String(Math.round(settings.defaultDailyRate * conversionRate)) : "");
+    setMonthDraft(settings.defaultDailyRate > 0 ? String(Math.round(settings.defaultDailyRate * 20 * conversionRate)) : "");
+  }, [settings.currency, settings.exchangeRates, settings.defaultDailyRate, conversionRate]);
 
   function commitDayRate(raw: string) {
     const v = parseFloat(raw);
@@ -139,29 +135,6 @@ export function SettingsPanel({ settings, onChange }: Props) {
           ))}
         </select>
       </Field>
-
-      {settings.currency !== "GBP" && (
-        <Field label={`1 GBP =`}>
-          <div className="flex items-center gap-1.5">
-            <input
-              type="number"
-              min={0.01}
-              step={0.01}
-              className="border border-[#2e2848] bg-[#1a1628] text-[#ece7ff] rounded-lg px-3 py-1.5 text-sm w-24 focus:outline-none focus:ring-2 focus:ring-[#7c3aed]"
-              value={rateDraft}
-              onChange={(e) => setRateDraft(e.target.value)}
-              onBlur={() => {
-                const v = parseFloat(rateDraft);
-                const rate = isNaN(v) || v <= 0 ? 1 : v;
-                onChange({ exchangeRates: { ...settings.exchangeRates, [settings.currency]: rate } });
-                setRateDraft(String(rate));
-              }}
-              onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
-            />
-            <span className="text-sm text-[#5c5575]">{symbol}</span>
-          </div>
-        </Field>
-      )}
 
       <Field label={`Default rate (${symbol})`}>
         <div className="flex items-center gap-2">
