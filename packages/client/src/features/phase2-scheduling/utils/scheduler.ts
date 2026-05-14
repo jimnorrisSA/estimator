@@ -14,6 +14,7 @@ export interface ScheduledTask {
   workingDays: number;
   startDay: number;
   endDay: number;
+  segments?: { start: number; end: number }[]; // present only when task straddles a hardening period
   isPinned: boolean;
   notes: string;
   cost: number;
@@ -54,21 +55,59 @@ const DISCIPLINE_ORDER: Discipline[] = ["Art", "Design", "Code", "Production", "
 
 type Overrides = Record<string, { startDay?: number; endDay?: number; notes?: string; assignedResourceId?: string; slotIndex?: number }>;
 
-function firstFreeStart(start: number, blocks: BlockedPeriod[]): number {
-  let s = start;
-  let changed = true;
-  while (changed) {
-    changed = false;
-    for (const b of blocks) {
-      // Only push if the start falls *inside* a hardening period.
-      // Tasks that begin before hardening are allowed to straddle it.
-      if (s >= b.start && s < b.end) {
-        s = b.end;
-        changed = true;
-      }
+// Advance pos past any hardening block it falls inside.
+function pushPastBlocks(pos: number, sorted: BlockedPeriod[]): number {
+  let p = pos;
+  let pushed = true;
+  while (pushed) {
+    pushed = false;
+    for (const b of sorted) {
+      if (p >= b.start && p < b.end) { p = b.end; pushed = true; break; }
     }
   }
-  return s;
+  return p;
+}
+
+// Place a task of `duration` working days starting from `start`, splitting
+// around hardening periods.  Returns the first segment start, the last
+// segment end, and an array of segments (undefined when there is only one).
+export function computeTaskPlacement(
+  start: number,
+  duration: number,
+  blocks: BlockedPeriod[]
+): { startDay: number; endDay: number; segments?: { start: number; end: number }[] } {
+  if (!blocks.length || duration <= 0) {
+    return { startDay: start, endDay: start + duration };
+  }
+  const sorted = [...blocks].sort((a, b) => a.start - b.start);
+
+  // Advance start past any block it sits inside.
+  const pos0 = pushPastBlocks(start, sorted);
+
+  // Fast path: no block interrupts [pos0, pos0 + duration).
+  if (!sorted.some(b => b.start > pos0 && b.start < pos0 + duration)) {
+    return { startDay: pos0, endDay: pos0 + duration };
+  }
+
+  // Build segments, splitting wherever a hardening period interrupts.
+  const segs: { start: number; end: number }[] = [];
+  let remaining = duration;
+  let pos = pos0;
+
+  while (remaining > 0) {
+    pos = pushPastBlocks(pos, sorted);
+    const next = sorted.find(b => b.start > pos && b.start < pos + remaining);
+    if (next) {
+      segs.push({ start: pos, end: next.start });
+      remaining -= (next.start - pos);
+      pos = next.end;
+    } else {
+      segs.push({ start: pos, end: pos + remaining });
+      remaining = 0;
+    }
+  }
+
+  return { startDay: segs[0].start, endDay: segs[segs.length - 1].end, segments: segs };
 }
 
 export function runScheduler(
@@ -145,16 +184,13 @@ export function runScheduler(
           slotIndex = candidates.reduce((best, i) => (slots[i] < slots[best] ? i : best), candidates[0]);
         }
 
-        let startDay: number;
-        let endDay: number;
+        const placementStart = isPinned && ov.startDay != null ? ov.startDay : slots[slotIndex];
+        const placement = computeTaskPlacement(placementStart, wd, blockedPeriods);
+        const { startDay, endDay } = placement;
 
         if (isPinned && ov.startDay != null) {
-          startDay = ov.startDay;
-          endDay = ov.endDay ?? startDay + wd;
           slots[slotIndex] = Math.max(slots[slotIndex], endDay);
         } else {
-          startDay = firstFreeStart(slots[slotIndex], blockedPeriods);
-          endDay = startDay + wd;
           slots[slotIndex] = endDay;
         }
 
@@ -177,6 +213,7 @@ export function runScheduler(
           workingDays: wd,
           startDay,
           endDay,
+          segments: placement.segments,
           isPinned,
           notes: ov?.notes ?? "",
           cost: wd * rate,

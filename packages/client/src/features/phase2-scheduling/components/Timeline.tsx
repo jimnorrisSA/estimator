@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import type { Feature, EstimateUnit } from "@estimator/shared";
-import type { ScheduleResult, ScheduledTask } from "../utils/scheduler.js";
+import type { ScheduleResult, ScheduledTask, BlockedPeriod } from "../utils/scheduler.js";
+import { computeTaskPlacement } from "../utils/scheduler.js";
 import type { ScheduleSettings } from "../store/schedulingStore.js";
 import { useSchedulingStore } from "../store/schedulingStore.js";
 import { useEstimationsStore } from "../../phase1-estimations/store/estimationsStore.js";
@@ -68,6 +69,7 @@ interface TaskBarProps {
   disciplineBoundaries: Array<{ slotIndex: number; startDay: number; endDay: number }>;
   wdToX: (n: number) => number;
   effectiveDayW: number;
+  blockedPeriods: BlockedPeriod[];
   onMove: (taskId: string, startDay: number, endDay: number, targetSlot: number) => void;
   onResize: (taskId: string, startDay: number, endDay: number, newDays: number) => void;
   onClearPin: (taskId: string) => void;
@@ -75,8 +77,11 @@ interface TaskBarProps {
   onRenameTask: (taskId: string, label: string) => void;
 }
 
-function DraggableTaskBar({ task, y, barH, color, slotCount, disciplineBoundaries, wdToX, effectiveDayW, onMove, onResize, onClearPin, onEditTask, onRenameTask }: TaskBarProps) {
-  const [preview, setPreview] = useState<{ startDay: number; endDay: number; slotIndex: number } | null>(null);
+function DraggableTaskBar({ task, y, barH, color, slotCount, disciplineBoundaries, wdToX, effectiveDayW, blockedPeriods, onMove, onResize, onClearPin, onEditTask, onRenameTask }: TaskBarProps) {
+  const [preview, setPreview] = useState<{
+    startDay: number; endDay: number; slotIndex: number;
+    segments?: { start: number; end: number }[];
+  } | null>(null);
   const [dragType, setDragType] = useState<"move" | "resize" | null>(null);
   const [nameEdit, setNameEdit] = useState<string | null>(null);
 
@@ -87,9 +92,7 @@ function DraggableTaskBar({ task, y, barH, color, slotCount, disciplineBoundarie
     setNameEdit((val) => {
       if (val !== null) {
         const trimmed = val.trim();
-        if (trimmed && trimmed !== task.label) {
-          callbacksRef.current.onRenameTask(task.taskId, trimmed);
-        }
+        if (trimmed && trimmed !== task.label) callbacksRef.current.onRenameTask(task.taskId, trimmed);
       }
       return null;
     });
@@ -97,38 +100,47 @@ function DraggableTaskBar({ task, y, barH, color, slotCount, disciplineBoundarie
 
   function startDrag(type: "move" | "resize", clientX: number, clientY: number) {
     const origStart = task.startDay;
-    const origEnd = task.endDay;
+    const origEnd   = task.endDay;   // last segment end for segmented tasks
+    const origWd    = task.workingDays;
     setDragType(type);
 
     function onMouseMove(e: MouseEvent) {
       const dx = e.clientX - clientX;
       const dy = e.clientY - clientY;
       const snap = Math.round((dx / effectiveDayW) * 2) / 2;
+
       if (type === "move") {
-        const dur = origEnd - origStart;
         let s = Math.max(0, origStart + snap);
         const slotDelta = Math.round(dy / SLOT_H);
         const targetSlot = Math.max(0, Math.min(slotCount - 1, task.slotIndex + slotDelta));
-
-        // Snap start to the end of any task in the target slot it would overlap
+        // Snap past any task boundary in the target slot
         for (const b of disciplineBoundaries) {
-          if (b.slotIndex === targetSlot && s < b.endDay && s + dur > b.startDay) {
-            s = b.endDay;
-            break;
+          if (b.slotIndex === targetSlot && s < b.endDay && s + origWd > b.startDay) {
+            s = b.endDay; break;
           }
         }
-
-        setPreview({ startDay: s, endDay: s + dur, slotIndex: targetSlot });
+        const p = computeTaskPlacement(s, origWd, blockedPeriods);
+        setPreview({ startDay: p.startDay, endDay: p.endDay, slotIndex: targetSlot, segments: p.segments });
       } else {
-        setPreview({ startDay: origStart, endDay: Math.max(origStart + 0.5, origEnd + snap), slotIndex: task.slotIndex });
+        // Resize snaps the last segment's right edge
+        setPreview({
+          startDay: origStart,
+          endDay: Math.max(origEnd - origWd + 0.5, origEnd + snap),
+          slotIndex: task.slotIndex,
+        });
       }
     }
 
     function onMouseUp() {
       setPreview((p) => {
         if (p) {
-          if (type === "move") callbacksRef.current.onMove(task.taskId, p.startDay, p.endDay, p.slotIndex);
-          else callbacksRef.current.onResize(task.taskId, p.startDay, p.endDay, p.endDay - p.startDay);
+          if (type === "move") {
+            callbacksRef.current.onMove(task.taskId, p.startDay, p.endDay, p.slotIndex);
+          } else {
+            // newDays = working days + delta on last segment end
+            const newDays = Math.max(0.5, origWd + (p.endDay - origEnd));
+            callbacksRef.current.onResize(task.taskId, p.startDay, p.endDay, newDays);
+          }
         }
         return null;
       });
@@ -141,117 +153,139 @@ function DraggableTaskBar({ task, y, barH, color, slotCount, disciplineBoundarie
     window.addEventListener("mouseup", onMouseUp);
   }
 
-  const dispStart = preview?.startDay ?? task.startDay;
-  const dispEnd   = preview?.endDay   ?? task.endDay;
-  const dispSlot  = preview?.slotIndex ?? task.slotIndex;
-  const x    = wdToX(dispStart);
-  const barW = Math.max(2, wdToX(dispEnd) - wdToX(dispStart) - 2);
-  const dispY = y + (dispSlot - task.slotIndex) * SLOT_H;
-  const maxChars = Math.floor((barW - 10) / 5.5);
-  const maxFeatureChars = Math.floor((barW - 10) / 4.8);
   const isDragging = dragType !== null;
-  const featureY = dispY + Math.round(barH * 0.3);
-  const taskY = dispY + Math.round(barH * 0.68);
+  const dispSlot  = preview?.slotIndex ?? task.slotIndex;
+  const dispY     = y + (dispSlot - task.slotIndex) * SLOT_H;
+
+  // Segments to render: use preview segments if dragging, else task segments, else single span
+  const dispSegments: { start: number; end: number }[] =
+    preview?.segments ?? task.segments ??
+    [{ start: preview?.startDay ?? task.startDay, end: preview?.endDay ?? task.endDay }];
 
   return (
     <g>
       <title>{task.featureName} — {task.label}{task.isPinned ? " · pinned" : ""}</title>
 
-      <rect
-        x={x} y={dispY} width={barW} height={barH} rx={3}
-        fill={color}
-        opacity={isDragging ? 0.55 : 0.9}
-        style={{ cursor: isDragging ? "grabbing" : "grab" }}
-        onMouseDown={(e) => { if (e.button !== 0) return; e.stopPropagation(); if (nameEdit === null) startDrag("move", e.clientX, e.clientY); }}
-        onDoubleClick={(e) => { e.stopPropagation(); setNameEdit(task.label); }}
-      />
+      {dispSegments.map((seg, i) => {
+        const isFirst = i === 0;
+        const isLast  = i === dispSegments.length - 1;
+        const sx = wdToX(seg.start);
+        const sw = Math.max(2, wdToX(seg.end) - sx - 2);
+        const maxChars        = Math.floor((sw - 10) / 5.5);
+        const maxFeatureChars = Math.floor((sw - 10) / 4.8);
+        const featureTextY    = dispY + Math.round(barH * 0.3);
+        const taskTextY       = dispY + Math.round(barH * 0.68);
 
-      {barW > 40 && (
-        <>
-          <text x={x + 5} y={featureY} dominantBaseline="middle" fontSize={9}
-            fill="rgba(255,255,255,0.65)"
-            style={{ pointerEvents: "none", userSelect: "none" }}>
-            {task.featureName.length > maxFeatureChars ? task.featureName.slice(0, maxFeatureChars) + "…" : task.featureName}
-          </text>
-          <text x={x + 5} y={taskY} dominantBaseline="middle" fontSize={11} fill="white"
-            style={{ pointerEvents: "none", userSelect: "none" }}>
-            {task.label.length > maxChars ? task.label.slice(0, maxChars) + "…" : task.label}
-          </text>
-        </>
-      )}
+        return (
+          <g key={i}>
+            {/* Dashed connector to next segment */}
+            {!isLast && (() => {
+              const nx = wdToX(dispSegments[i + 1].start);
+              const lineY = dispY + barH / 2;
+              return nx > sx + sw + 4
+                ? <line x1={sx + sw + 2} y1={lineY} x2={nx - 1} y2={lineY}
+                    stroke={color} strokeWidth={1.5} strokeDasharray="3 3" opacity={0.45}
+                    style={{ pointerEvents: "none" }} />
+                : null;
+            })()}
 
-      {barW > 16 && (
-        <rect
-          x={x + barW - RESIZE_HANDLE_W} y={dispY}
-          width={RESIZE_HANDLE_W} height={barH}
-          fill={isDragging && dragType === "resize" ? "rgba(255,255,255,0.25)" : "transparent"}
-          style={{ cursor: "ew-resize" }}
-          onMouseDown={(e) => { if (e.button !== 0) return; e.stopPropagation(); startDrag("resize", e.clientX, e.clientY); }}
-        />
-      )}
-
-      {task.isPinned && !isDragging && (
-        <circle cx={x + 5} cy={dispY + 4} r={2.5} fill="white" opacity={0.8}
-          style={{ pointerEvents: "none" }} />
-      )}
-
-      {isDragging && preview && (
-        <text x={x + barW / 2} y={dispY - 5} textAnchor="middle" fontSize={11} fill="#a78bfa" fontWeight="600"
-          style={{ pointerEvents: "none", userSelect: "none" }}>
-          {String(Math.round((preview.endDay - preview.startDay) * 2) / 2)}d
-          {preview.slotIndex !== task.slotIndex ? ` · slot ${preview.slotIndex + 1}` : ""}
-        </text>
-      )}
-
-      {nameEdit !== null && (
-        <foreignObject x={x} y={y} width={Math.max(barW, 180)} height={barH}>
-          <div style={{ display: "flex", height: "100%", gap: 2, padding: 2, boxSizing: "border-box" }}>
-            <input
-              type="text"
-              value={nameEdit}
-              autoFocus
-              onChange={(e) => setNameEdit(e.target.value)}
-              onBlur={commitRename}
-              onMouseDown={(e) => e.stopPropagation()}
-              onKeyDown={(e) => {
-                e.stopPropagation();
-                if (e.key === "Enter") commitRename();
-                if (e.key === "Escape") setNameEdit(null);
-              }}
-              style={{
-                flex: 1,
-                minWidth: 0,
-                background: "#1a1628",
-                border: "2px solid #7c3aed",
-                borderRadius: 3,
-                color: "white",
-                fontSize: 11,
-                padding: "0 5px",
-                outline: "none",
-                boxSizing: "border-box",
-              }}
+            <rect
+              x={sx} y={dispY} width={sw} height={barH} rx={3}
+              fill={color} opacity={isDragging ? 0.55 : 0.9}
+              style={{ cursor: isDragging ? "grabbing" : "grab" }}
+              onMouseDown={(e) => { if (e.button !== 0) return; e.stopPropagation(); if (nameEdit === null) startDrag("move", e.clientX, e.clientY); }}
+              onDoubleClick={(e) => { if (isFirst) { e.stopPropagation(); setNameEdit(task.label); } }}
             />
-            <button
-              type="button"
-              onMouseDown={(e) => e.stopPropagation()}
-              onClick={(e) => { e.stopPropagation(); setNameEdit(null); onEditTask(task); }}
-              style={{
-                flexShrink: 0,
-                background: "#2e2848",
-                border: "1px solid #3d366a",
-                borderRadius: 3,
-                color: "#9b93ba",
-                fontSize: 10,
-                padding: "0 6px",
-                cursor: "pointer",
-                whiteSpace: "nowrap",
-              }}
-            >
-              Edit all
-            </button>
-          </div>
-        </foreignObject>
-      )}
+
+            {/* Label only in first segment */}
+            {isFirst && sw > 40 && (
+              <>
+                <text x={sx + 5} y={featureTextY} dominantBaseline="middle" fontSize={9}
+                  fill="rgba(255,255,255,0.65)" style={{ pointerEvents: "none", userSelect: "none" }}>
+                  {task.featureName.length > maxFeatureChars ? task.featureName.slice(0, maxFeatureChars) + "…" : task.featureName}
+                </text>
+                <text x={sx + 5} y={taskTextY} dominantBaseline="middle" fontSize={11} fill="white"
+                  style={{ pointerEvents: "none", userSelect: "none" }}>
+                  {task.label.length > maxChars ? task.label.slice(0, maxChars) + "…" : task.label}
+                </text>
+              </>
+            )}
+
+            {/* Resize handle only on last segment */}
+            {isLast && sw > 16 && (
+              <rect
+                x={sx + sw - RESIZE_HANDLE_W} y={dispY}
+                width={RESIZE_HANDLE_W} height={barH}
+                fill={isDragging && dragType === "resize" ? "rgba(255,255,255,0.25)" : "transparent"}
+                style={{ cursor: "ew-resize" }}
+                onMouseDown={(e) => { if (e.button !== 0) return; e.stopPropagation(); startDrag("resize", e.clientX, e.clientY); }}
+              />
+            )}
+
+            {/* Pinned dot on first segment */}
+            {isFirst && task.isPinned && !isDragging && (
+              <circle cx={sx + 5} cy={dispY + 4} r={2.5} fill="white" opacity={0.8}
+                style={{ pointerEvents: "none" }} />
+            )}
+          </g>
+        );
+      })}
+
+      {/* Drag preview label — anchored above first segment */}
+      {isDragging && preview && (() => {
+        const firstSeg = dispSegments[0];
+        const sx = wdToX(firstSeg.start);
+        const sw = Math.max(2, wdToX(firstSeg.end) - sx - 2);
+        const previewDays = dragType === "move"
+          ? task.workingDays
+          : Math.max(0.5, task.workingDays + (preview.endDay - task.endDay));
+        return (
+          <text x={sx + sw / 2} y={dispY - 5} textAnchor="middle" fontSize={11} fill="#a78bfa" fontWeight="600"
+            style={{ pointerEvents: "none", userSelect: "none" }}>
+            {String(Math.round(previewDays * 2) / 2)}d
+            {dispSlot !== task.slotIndex ? ` · slot ${dispSlot + 1}` : ""}
+          </text>
+        );
+      })()}
+
+      {/* Inline rename — in first segment */}
+      {nameEdit !== null && (() => {
+        const firstSeg = dispSegments[0];
+        const sx = wdToX(firstSeg.start);
+        const sw = Math.max(2, wdToX(firstSeg.end) - sx - 2);
+        return (
+          <foreignObject x={sx} y={dispY} width={Math.max(sw, 180)} height={barH}>
+            <div style={{ display: "flex", height: "100%", gap: 2, padding: 2, boxSizing: "border-box" }}>
+              <input type="text" value={nameEdit} autoFocus
+                onChange={(e) => setNameEdit(e.target.value)}
+                onBlur={commitRename}
+                onMouseDown={(e) => e.stopPropagation()}
+                onKeyDown={(e) => {
+                  e.stopPropagation();
+                  if (e.key === "Enter") commitRename();
+                  if (e.key === "Escape") setNameEdit(null);
+                }}
+                style={{
+                  flex: 1, minWidth: 0, background: "#1a1628",
+                  border: "2px solid #7c3aed", borderRadius: 3,
+                  color: "white", fontSize: 11, padding: "0 5px",
+                  outline: "none", boxSizing: "border-box",
+                }}
+              />
+              <button type="button" onMouseDown={(e) => e.stopPropagation()}
+                onClick={(e) => { e.stopPropagation(); setNameEdit(null); onEditTask(task); }}
+                style={{
+                  flexShrink: 0, background: "#2e2848", border: "1px solid #3d366a",
+                  borderRadius: 3, color: "#9b93ba", fontSize: 10,
+                  padding: "0 6px", cursor: "pointer", whiteSpace: "nowrap",
+                }}
+              >
+                Edit all
+              </button>
+            </div>
+          </foreignObject>
+        );
+      })()}
     </g>
   );
 }
@@ -660,6 +694,7 @@ export function Timeline({ result, features, settings, viewMode, onToggleView }:
                         key={task.taskId} task={task} y={y} barH={barH} color={color}
                         slotCount={layout.capacity}
                         disciplineBoundaries={disciplineBoundaries}
+                        blockedPeriods={blockedPeriods}
                         wdToX={wdToX} effectiveDayW={effectiveDayW}
                         onMove={handleMove} onResize={handleResize} onClearPin={handleClearPin}
                         onEditTask={setEditingTask} onRenameTask={handleRenameTask}
