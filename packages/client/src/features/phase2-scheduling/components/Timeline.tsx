@@ -325,6 +325,28 @@ export function Timeline({ result, features, settings, viewMode, onToggleView }:
     }
 
     setOverride(taskId, { startDay, endDay, slotIndex: targetSlot });
+
+    // Push forward any tasks in the target slot that now overlap the dropped task.
+    // Only ever move tasks later — never earlier than their current position.
+    const targetTasks = tasks
+      .filter(t =>
+        t.taskId !== taskId &&
+        t.discipline === movedTask.discipline &&
+        t.slotIndex === targetSlot &&
+        !t.isPinned
+      )
+      .sort((a, b) => a.startDay - b.startDay);
+
+    let cursor = endDay;
+    for (const t of targetTasks) {
+      if (t.startDay < cursor) {
+        const placement = computeTaskPlacement(cursor, t.workingDays, blockedPeriods);
+        setOverride(t.taskId, { startDay: cursor, endDay: placement.endDay });
+        cursor = placement.endDay;
+      } else {
+        break;
+      }
+    }
   }
 
   function handleResize(taskId: string, startDay: number, endDay: number, newDays: number) {
