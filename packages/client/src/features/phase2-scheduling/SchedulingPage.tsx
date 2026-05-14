@@ -19,7 +19,7 @@ const FEATURE_PALETTE = [
 
 export function SchedulingPage() {
   const features = useEstimationsStore((s) => s.features);
-  const { settings, overrides, resources, updateSettings, addResource, updateResource, deleteResource } =
+  const { settings, overrides, resources, updateSettings, addResource, updateResource, deleteResource, condenseAllTasks } =
     useSchedulingStore();
   const milestones = useMilestonesStore((s) => s.milestones);
 
@@ -90,7 +90,16 @@ export function SchedulingPage() {
 
           {/* Timeline */}
           <section className="flex flex-col gap-3">
-            <h2 className="text-sm font-semibold text-[#9b93ba] uppercase tracking-wide">Schedule</h2>
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="text-sm font-semibold text-[#9b93ba] uppercase tracking-wide">Schedule</h2>
+              <button
+                onClick={condenseAllTasks}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-[#1d1930] border border-[#2e2848] text-[#9b93ba] hover:text-[#ece7ff] hover:border-[#7c3aed] transition-colors"
+                title="Remove all manual position pins and pack tasks back-to-back, skipping weekends and hardening periods"
+              >
+                Condense tasks
+              </button>
+            </div>
             <Timeline
               result={result}
               features={features}

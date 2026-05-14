@@ -54,13 +54,15 @@ const DISCIPLINE_ORDER: Discipline[] = ["Art", "Design", "Code", "Production", "
 
 type Overrides = Record<string, { startDay?: number; endDay?: number; notes?: string; assignedResourceId?: string; slotIndex?: number }>;
 
-function firstFreeStart(start: number, duration: number, blocks: BlockedPeriod[]): number {
+function firstFreeStart(start: number, blocks: BlockedPeriod[]): number {
   let s = start;
   let changed = true;
   while (changed) {
     changed = false;
     for (const b of blocks) {
-      if (s < b.end && s + duration > b.start) {
+      // Only push if the start falls *inside* a hardening period.
+      // Tasks that begin before hardening are allowed to straddle it.
+      if (s >= b.start && s < b.end) {
         s = b.end;
         changed = true;
       }
@@ -151,7 +153,7 @@ export function runScheduler(
           endDay = ov.endDay ?? startDay + wd;
           slots[slotIndex] = Math.max(slots[slotIndex], endDay);
         } else {
-          startDay = firstFreeStart(slots[slotIndex], wd, blockedPeriods);
+          startDay = firstFreeStart(slots[slotIndex], blockedPeriods);
           endDay = startDay + wd;
           slots[slotIndex] = endDay;
         }

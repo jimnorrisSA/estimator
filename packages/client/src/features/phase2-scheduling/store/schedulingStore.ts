@@ -50,6 +50,8 @@ interface SchedulingStore {
   addResource: (role: Discipline, name: string) => void;
   updateResource: (id: string, patch: Partial<Pick<Resource, "name" | "resourceType" | "dailyRate" | "allocationPct" | "rollOnDate" | "rollOffDate">>) => void;
   deleteResource: (id: string) => void;
+
+  condenseAllTasks: () => void;
 }
 
 function nextMonday(): string {
@@ -142,6 +144,22 @@ export const useSchedulingStore = create<SchedulingStore>()(
 
       deleteResource(id) {
         set((s) => ({ resources: s.resources.filter((r) => r.id !== id) }));
+      },
+
+      condenseAllTasks() {
+        set((s) => {
+          const nextOverrides: Record<string, TaskOverride> = {};
+          for (const [id, ov] of Object.entries(s.overrides)) {
+            // Strip position pins; preserve notes, resource assignment, slot
+            const kept: TaskOverride = { notes: ov.notes };
+            if (ov.assignedResourceId != null) kept.assignedResourceId = ov.assignedResourceId;
+            if (ov.slotIndex != null) kept.slotIndex = ov.slotIndex;
+            if (kept.notes || kept.assignedResourceId != null || kept.slotIndex != null) {
+              nextOverrides[id] = kept;
+            }
+          }
+          return { overrides: nextOverrides };
+        });
       },
     }),
     { name: "estimator-scheduling-v1" }
