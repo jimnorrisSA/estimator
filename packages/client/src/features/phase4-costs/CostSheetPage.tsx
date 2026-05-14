@@ -110,7 +110,7 @@ export function CostSheetPage() {
   const missingRates = resources.filter((r) => !effectiveRate(r, defaultDailyRate));
 
   return (
-    <div className="flex-1 overflow-y-auto bg-[#0d0b16] p-8 flex flex-col gap-8">
+    <div className="h-full overflow-y-auto bg-[#0d0b16] p-8 flex flex-col gap-8">
 
       {!hasResources && (
         <div className="flex flex-col items-center justify-center h-64 gap-3 text-center">
