@@ -26,7 +26,7 @@ interface Props {
 
 export function TeamSidebar({ resources, currency, defaultDailyRate, onAdd, onUpdate, onDelete }: Props) {
   const symbol = CURRENCY_SYMBOLS[currency];
-  const hasRates = resources.some((r) => r.dailyRate > 0 || (r.resourceType === "FTE" && defaultDailyRate > 0));
+  const hasRates = resources.some((r) => r.dailyRate > 0 || ((r.resourceType || "Contractor") === "FTE" && defaultDailyRate > 0));
 
   return (
     <div className="w-56 flex-shrink-0 border-l border-[#2e2848] bg-[#14112a] flex flex-col h-full">
@@ -171,7 +171,7 @@ function MemberRow({
   onDelete: (id: string) => void;
 }) {
   const [editing, setEditing] = useState(false);
-  const effectiveType: ResourceType = member.resourceType ?? "Contractor";
+  const effectiveType: ResourceType = (member.resourceType || "Contractor") as ResourceType;
   const [draftName, setDraftName] = useState(member.name);
   const [draftType, setDraftType] = useState<ResourceType>(effectiveType);
   const [draftRate, setDraftRate] = useState(String(member.dailyRate || ""));
@@ -181,7 +181,7 @@ function MemberRow({
   const [draftRollOff, setDraftRollOff] = useState(member.rollOffDate || "");
 
   function openEdit() {
-    const t: ResourceType = member.resourceType ?? "Contractor";
+    const t: ResourceType = (member.resourceType || "Contractor") as ResourceType;
     setDraftName(member.name);
     setDraftType(t);
     setDraftRate(String(member.dailyRate || ""));

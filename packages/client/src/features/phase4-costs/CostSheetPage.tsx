@@ -310,9 +310,9 @@ function FinancialOverview({
         </div>
       )}
 
-      {/* Stats grid — scrolls horizontally on narrow screens */}
-      <div className="px-6 py-5 bg-[#0d0b16] overflow-x-auto">
-        <div className="grid grid-cols-5 gap-6 min-w-[640px]">
+      {/* Stats — wrap naturally on narrow screens */}
+      <div className="px-6 py-5 bg-[#0d0b16]">
+        <div className="flex flex-wrap gap-6">
 
           <OverviewStat label="Total MM" sublabel="Man-months of work">
             <span className="text-2xl font-bold text-[#9b93ba] tabular-nums leading-tight">
@@ -378,7 +378,7 @@ function FinancialOverview({
 
 function OverviewStat({ label, sublabel, children }: { label: string; sublabel: string; children: React.ReactNode }) {
   return (
-    <div className="flex flex-col gap-1">
+    <div className="flex flex-col gap-1 flex-1 min-w-[140px]">
       <span className="text-xs font-semibold uppercase tracking-wide text-[#5c5575]">{label}</span>
       <span className="text-xs text-[#3a3456]">{sublabel}</span>
       <div className="mt-1">{children}</div>
