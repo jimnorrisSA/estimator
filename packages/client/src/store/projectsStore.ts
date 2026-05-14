@@ -56,7 +56,8 @@ const DEFAULT_SETTINGS: ScheduleSettings = {
   contingencyPct: 15,
   currency: "GBP",
   defaultDailyRate: 0,
-  exchangeRates: { USD: 1.27, EUR: 1.17, AUD: 1.94 },
+  exchangeRates: { USD: 1.35, EUR: 1.17, AUD: 1.94 },
+  revenueGBP: 0,
 };
 
 export function emptySnapshot(): ProjectSnapshot {

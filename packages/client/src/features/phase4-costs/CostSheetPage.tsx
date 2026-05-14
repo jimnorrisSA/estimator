@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Resource } from "@estimator/shared";
 import { useSchedulingStore, CURRENCY_SYMBOLS, type Currency } from "../phase2-scheduling/store/schedulingStore.js";
 import { parseISODate } from "../phase2-scheduling/utils/calendarUtils.js";
@@ -22,12 +22,7 @@ function countWorkingDays(startStr: string, endStr: string, mode: "four-week" | 
   return count;
 }
 
-function resourceWorkingDays(
-  r: Resource,
-  projectStart: string,
-  projectEnd: string,
-  mode: "four-week" | "actual"
-): number | null {
+function resourceWorkingDays(r: Resource, projectStart: string, projectEnd: string, mode: "four-week" | "actual"): number | null {
   const start = r.rollOnDate || projectStart;
   const end = r.rollOffDate || projectEnd;
   if (!start || !end) return null;
@@ -53,9 +48,9 @@ export function CostSheetPage() {
   const { currency, defaultDailyRate, contingencyPct, startDate, targetEndDate, calendarMode } = settings;
   const symbol = CURRENCY_SYMBOLS[currency];
   const convRate = currency === "GBP" ? 1 : (settings.exchangeRates?.[currency] ?? 1);
+  const revenueGBP = settings.revenueGBP ?? 0;
 
-  const fmt = (gbp: number) =>
-    `${symbol}${Math.round(gbp * convRate).toLocaleString()}`;
+  const fmt = (gbp: number) => `${symbol}${Math.round(gbp * convRate).toLocaleString()}`;
 
   const fteResources = resources.filter((r) => (r.resourceType ?? "Contractor") === "FTE");
   const contractorResources = resources.filter((r) => (r.resourceType ?? "Contractor") === "Contractor");
@@ -71,11 +66,21 @@ export function CostSheetPage() {
     return total;
   }
 
+  // Total man-months: sum of (working days × allocation%) / 20 per resource
+  let totalMM: number | null = 0;
+  for (const r of resources) {
+    const days = resourceWorkingDays(r, startDate, targetEndDate, calendarMode);
+    if (days === null) { totalMM = null; break; }
+    totalMM += days * ((r.allocationPct ?? 100) / 100) / 20;
+  }
+
   const fteSub = subtotal(fteResources);
   const contractorSub = subtotal(contractorResources);
   const grandTotal = fteSub !== null && contractorSub !== null ? fteSub + contractorSub : null;
   const contingencyAmount = grandTotal !== null ? grandTotal * (contingencyPct / 100) : null;
-  const totalWithContingency = grandTotal !== null && contingencyAmount !== null ? grandTotal + contingencyAmount : null;
+  const atCost = grandTotal !== null && contingencyAmount !== null ? grandTotal + contingencyAmount : null;
+  const profit = atCost !== null && revenueGBP > 0 ? revenueGBP - atCost : null;
+  const margin = profit !== null && revenueGBP > 0 ? (profit / revenueGBP) * 100 : null;
 
   const hasResources = resources.length > 0;
 
@@ -87,6 +92,22 @@ export function CostSheetPage() {
           <p className="text-[#5c5575] text-sm">No resources added yet.</p>
           <p className="text-[#3a3456] text-xs">Add team members in the Schedule tab to see cost breakdown here.</p>
         </div>
+      )}
+
+      {/* Financial Overview */}
+      {hasResources && (
+        <FinancialOverview
+          totalMM={totalMM}
+          atCost={atCost}
+          revenueGBP={revenueGBP}
+          profit={profit}
+          margin={margin}
+          symbol={symbol}
+          convRate={convRate}
+          currency={currency}
+          fmt={fmt}
+          onRevenueChange={(gbp) => updateSettings({ revenueGBP: gbp })}
+        />
       )}
 
       {/* FTE section */}
@@ -125,44 +146,25 @@ export function CostSheetPage() {
         />
       )}
 
-      {/* Summary */}
+      {/* Cost breakdown summary */}
       {hasResources && (
         <div className="rounded-2xl border border-[#2e2848] overflow-hidden">
           <div className="px-6 py-4 bg-[#14112a] border-b border-[#2e2848]">
-            <h2 className="text-sm font-bold uppercase tracking-widest text-[#9b93ba]">Summary</h2>
+            <h2 className="text-sm font-bold uppercase tracking-widest text-[#9b93ba]">Cost Breakdown</h2>
           </div>
           <div className="px-6 py-4 flex flex-col gap-2 bg-[#0d0b16]">
             {fteResources.length > 0 && (
-              <SummaryRow
-                label="FTE subtotal"
-                value={fteSub !== null ? fmt(fteSub) : null}
-                muted
-              />
+              <SummaryRow label="FTE subtotal" value={fteSub !== null ? fmt(fteSub) : null} muted />
             )}
             {contractorResources.length > 0 && (
-              <SummaryRow
-                label="Contractor subtotal"
-                value={contractorSub !== null ? fmt(contractorSub) : null}
-                muted
-              />
+              <SummaryRow label="Contractor subtotal" value={contractorSub !== null ? fmt(contractorSub) : null} muted />
             )}
             <div className="border-t border-[#2e2848] my-1" />
-            <SummaryRow
-              label="Total (ex. contingency)"
-              value={grandTotal !== null ? fmt(grandTotal) : null}
-            />
-            <SummaryRow
-              label={`Contingency (${contingencyPct}%)`}
-              value={contingencyAmount !== null ? fmt(contingencyAmount) : null}
-              muted
-            />
+            <SummaryRow label="Total before contingency" value={grandTotal !== null ? fmt(grandTotal) : null} />
+            <SummaryRow label={`Contingency (${contingencyPct}%)`} value={contingencyAmount !== null ? fmt(contingencyAmount) : null} muted />
             <div className="border-t border-[#2e2848] my-1" />
-            <SummaryRow
-              label="Total with contingency"
-              value={totalWithContingency !== null ? fmt(totalWithContingency) : null}
-              highlight
-            />
-            {grandTotal === null && (
+            <SummaryRow label="At Cost (total delivery cost)" value={atCost !== null ? fmt(atCost) : null} highlight />
+            {atCost === null && (
               <p className="text-xs text-[#5c5575] mt-1">
                 Set project start/end dates and roll-on/roll-off for all team members to see totals.
               </p>
@@ -178,6 +180,118 @@ export function CostSheetPage() {
         onChangeCurrency={(c) => updateSettings({ currency: c })}
         onChangeRate={(c, v) => updateSettings({ exchangeRates: { ...settings.exchangeRates, [c]: v } })}
       />
+    </div>
+  );
+}
+
+// ─── Financial overview ───────────────────────────────────────────────────────
+
+function FinancialOverview({
+  totalMM, atCost, revenueGBP, profit, margin,
+  symbol, convRate, currency, fmt, onRevenueChange,
+}: {
+  totalMM: number | null;
+  atCost: number | null;
+  revenueGBP: number;
+  profit: number | null;
+  margin: number | null;
+  symbol: string;
+  convRate: number;
+  currency: Currency;
+  fmt: (gbp: number) => string;
+  onRevenueChange: (gbp: number) => void;
+}) {
+  const [revDraft, setRevDraft] = useState(
+    revenueGBP > 0 ? String(Math.round(revenueGBP * convRate)) : ""
+  );
+
+  useEffect(() => {
+    setRevDraft(revenueGBP > 0 ? String(Math.round(revenueGBP * convRate)) : "");
+  }, [currency, convRate, revenueGBP]);
+
+  function commitRevenue() {
+    const v = parseFloat(revDraft);
+    const gbp = isNaN(v) || v <= 0 ? 0 : v / convRate;
+    onRevenueChange(gbp);
+  }
+
+  const profitPositive = profit !== null && profit >= 0;
+
+  return (
+    <div className="rounded-2xl border border-[#2e2848] overflow-hidden">
+      <div className="px-6 py-4 bg-[#14112a] border-b border-[#2e2848]">
+        <h2 className="text-sm font-bold uppercase tracking-widest text-[#9b93ba]">Financial Overview</h2>
+      </div>
+      <div className="px-6 py-5 bg-[#0d0b16] grid grid-cols-2 md:grid-cols-5 gap-6">
+
+        {/* Total MM */}
+        <OverviewStat
+          label="Total MM"
+          sublabel="Man-months of work"
+          value={totalMM !== null ? `${totalMM.toFixed(1)} MM` : "—"}
+          color="#9b93ba"
+        />
+
+        {/* At Cost */}
+        <OverviewStat
+          label="At Cost"
+          sublabel="Total delivery cost"
+          value={atCost !== null ? fmt(atCost) : "—"}
+          color="#a78bfa"
+        />
+
+        {/* Revenue */}
+        <div className="flex flex-col gap-1">
+          <span className="text-xs font-semibold uppercase tracking-wide text-[#5c5575]">Revenue</span>
+          <span className="text-xs text-[#3a3456]">Client contract value</span>
+          <div className="flex items-center gap-1 mt-1">
+            <span className="text-sm text-[#5c5575]">{symbol}</span>
+            <input
+              type="number"
+              min={0}
+              step={1000}
+              placeholder="0"
+              className="flex-1 min-w-0 text-lg font-bold bg-transparent border-b border-[#2e2848] focus:border-[#7c3aed] text-[#ece7ff] outline-none pb-0.5 tabular-nums placeholder:text-[#3a3456]"
+              value={revDraft}
+              onChange={(e) => setRevDraft(e.target.value)}
+              onBlur={commitRevenue}
+              onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
+            />
+          </div>
+          {revenueGBP > 0 && currency !== "GBP" && (
+            <span className="text-xs text-[#3a3456]">
+              = £{Math.round(revenueGBP).toLocaleString()} GBP
+            </span>
+          )}
+        </div>
+
+        {/* Profit */}
+        <OverviewStat
+          label="Profit"
+          sublabel="Revenue − At Cost"
+          value={profit !== null ? fmt(profit) : "—"}
+          color={profit === null ? "#5c5575" : profitPositive ? "#34d399" : "#f87171"}
+        />
+
+        {/* Margin */}
+        <OverviewStat
+          label="Margin"
+          sublabel="Profit as % of revenue"
+          value={margin !== null ? `${Math.round(margin)}%` : "—"}
+          color={margin === null ? "#5c5575" : margin >= 0 ? "#34d399" : "#f87171"}
+        />
+
+      </div>
+    </div>
+  );
+}
+
+function OverviewStat({ label, sublabel, value, color }: { label: string; sublabel: string; value: string; color: string }) {
+  return (
+    <div className="flex flex-col gap-1">
+      <span className="text-xs font-semibold uppercase tracking-wide text-[#5c5575]">{label}</span>
+      <span className="text-xs text-[#3a3456]">{sublabel}</span>
+      <span className="text-lg font-bold tabular-nums mt-1" style={{ color }}>{value}</span>
     </div>
   );
 }
@@ -212,18 +326,10 @@ function ResourceTable({
 }) {
   return (
     <div className="rounded-2xl border border-[#2e2848] overflow-hidden">
-      {/* Section header */}
-      <div
-        className="px-6 py-3 flex items-center justify-between border-b border-[#2e2848]"
-        style={{ background: accentBg }}
-      >
-        <h2 className="text-sm font-bold uppercase tracking-widest" style={{ color: accentColor }}>
-          {title}
-        </h2>
+      <div className="px-6 py-3 flex items-center justify-between border-b border-[#2e2848]" style={{ background: accentBg }}>
+        <h2 className="text-sm font-bold uppercase tracking-widest" style={{ color: accentColor }}>{title}</h2>
         <span className="text-xs text-[#5c5575]">{resources.length} member{resources.length !== 1 ? "s" : ""}</span>
       </div>
-
-      {/* Table */}
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
@@ -250,17 +356,13 @@ function ResourceTable({
                 <tr key={r.id} className="border-b border-[#2e2848] hover:bg-[#14112a] transition-colors">
                   <td className="px-4 py-3 font-medium text-[#ece7ff]">{r.name || "—"}</td>
                   <td className="px-4 py-3">
-                    <span
-                      className="text-xs px-2 py-0.5 rounded-full font-medium"
-                      style={{ background: `${DISCIPLINE_COLORS[r.role] ?? "#9ca3af"}20`, color: DISCIPLINE_COLORS[r.role] ?? "#9ca3af" }}
-                    >
+                    <span className="text-xs px-2 py-0.5 rounded-full font-medium"
+                      style={{ background: `${DISCIPLINE_COLORS[r.role] ?? "#9ca3af"}20`, color: DISCIPLINE_COLORS[r.role] ?? "#9ca3af" }}>
                       {r.role}
                     </span>
                   </td>
                   <td className="px-4 py-3 text-center">
-                    <span className={alloc < 100 ? "text-amber-400 font-medium" : "text-[#9b93ba]"}>
-                      {alloc}%
-                    </span>
+                    <span className={alloc < 100 ? "text-amber-400 font-medium" : "text-[#9b93ba]"}>{alloc}%</span>
                   </td>
                   <td className="px-4 py-3 tabular-nums">
                     {rate > 0 ? (
@@ -317,11 +419,7 @@ function SummaryRow({ label, value, muted, highlight }: { label: string; value: 
       <span className={`text-sm ${muted ? "text-[#5c5575]" : highlight ? "font-bold text-[#ece7ff]" : "text-[#9b93ba]"}`}>
         {label}
       </span>
-      <span
-        className={`tabular-nums text-sm ${
-          highlight ? "font-bold text-[#a78bfa] text-base" : muted ? "text-[#5c5575]" : "font-medium text-[#ece7ff]"
-        }`}
-      >
+      <span className={`tabular-nums text-sm ${highlight ? "font-bold text-[#a78bfa] text-base" : muted ? "text-[#5c5575]" : "font-medium text-[#ece7ff]"}`}>
         {value ?? <span className="text-[#3a3456]">—</span>}
       </span>
     </div>
@@ -348,12 +446,7 @@ const CURRENCIES: { value: Currency; label: string; symbol: string }[] = [
   { value: "AUD", label: "AUD", symbol: "A$" },
 ];
 
-function ExchangeRatesPanel({
-  currency,
-  exchangeRates,
-  onChangeCurrency,
-  onChangeRate,
-}: {
+function ExchangeRatesPanel({ currency, exchangeRates, onChangeCurrency, onChangeRate }: {
   currency: Currency;
   exchangeRates: Record<string, number>;
   onChangeCurrency: (c: Currency) => void;
@@ -366,44 +459,27 @@ function ExchangeRatesPanel({
         <p className="text-xs text-[#3a3456]">All costs are stored in GBP and converted for display</p>
       </div>
       <div className="px-6 py-5 bg-[#0d0b16] flex flex-wrap gap-8 items-start">
-
-        {/* Currency picker */}
         <div className="flex flex-col gap-2">
           <p className="text-xs font-semibold uppercase tracking-wide text-[#5c5575]">Display currency</p>
           <div className="flex rounded-lg border border-[#2e2848] overflow-hidden">
             {CURRENCIES.map((c) => (
-              <button
-                key={c.value}
-                type="button"
-                onClick={() => onChangeCurrency(c.value)}
-                className={`px-4 py-2 text-sm font-semibold transition-colors ${
-                  currency === c.value
-                    ? "bg-[#7c3aed] text-white"
-                    : "bg-[#1a1628] text-[#5c5575] hover:text-[#9b93ba]"
-                }`}
-              >
+              <button key={c.value} type="button" onClick={() => onChangeCurrency(c.value)}
+                className={`px-4 py-2 text-sm font-semibold transition-colors ${currency === c.value ? "bg-[#7c3aed] text-white" : "bg-[#1a1628] text-[#5c5575] hover:text-[#9b93ba]"}`}>
                 {c.symbol} {c.label}
               </button>
             ))}
           </div>
         </div>
-
-        {/* Rate inputs */}
         <div className="flex flex-col gap-3">
           <p className="text-xs font-semibold uppercase tracking-wide text-[#5c5575]">Rates (1 GBP =)</p>
           <div className="flex flex-wrap gap-4">
             {CURRENCIES.filter((c) => c.value !== "GBP").map((c) => (
-              <RateInput
-                key={c.value}
-                label={c.label}
-                symbol={c.symbol}
+              <RateInput key={c.value} label={c.label} symbol={c.symbol}
                 value={exchangeRates[c.value] ?? 1}
-                onChange={(v) => onChangeRate(c.value, v)}
-              />
+                onChange={(v) => onChangeRate(c.value, v)} />
             ))}
           </div>
         </div>
-
       </div>
     </div>
   );
@@ -423,16 +499,12 @@ function RateInput({ label, symbol, value, onChange }: { label: string; symbol: 
     <div className="flex flex-col gap-1">
       <label className="text-xs text-[#5c5575]">{label}</label>
       <div className="flex items-center gap-1.5">
-        <input
-          type="number"
-          min={0.01}
-          step={0.01}
+        <input type="number" min={0.01} step={0.01}
           className="border border-[#2e2848] bg-[#1a1628] text-[#ece7ff] rounded-lg px-3 py-1.5 text-sm w-24 focus:outline-none focus:ring-2 focus:ring-[#7c3aed]"
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           onBlur={commit}
-          onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
-        />
+          onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }} />
         <span className="text-sm text-[#5c5575]">{symbol}</span>
       </div>
     </div>
