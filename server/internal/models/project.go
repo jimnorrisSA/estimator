@@ -95,11 +95,19 @@ type Milestone struct {
 	UpdatedAt       time.Time           `bson:"updated_at"                     json:"updatedAt"`
 }
 
+type ResourceType string
+
+const (
+	ResourceTypeFTE        ResourceType = "FTE"
+	ResourceTypeContractor ResourceType = "Contractor"
+)
+
 type Resource struct {
 	ID               primitive.ObjectID `bson:"_id"                             json:"id"`
 	ProjectID        primitive.ObjectID `bson:"project_id"                      json:"projectId"`
 	Name             string             `bson:"name"                            json:"name"`
 	Role             Discipline         `bson:"role"                            json:"role"`
+	ResourceType     ResourceType       `bson:"resource_type"                   json:"resourceType"`
 	RollOnDate       time.Time          `bson:"roll_on_date"                    json:"rollOnDate"`
 	RollOffDate      time.Time          `bson:"roll_off_date"                   json:"rollOffDate"`
 	AllocationPct    float64            `bson:"allocation_pct"                  json:"allocationPct"`

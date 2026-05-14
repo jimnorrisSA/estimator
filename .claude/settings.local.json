@@ -39,7 +39,12 @@
       "PowerShell(go build *)",
       "Bash(git push *)",
       "Bash(git rm *)",
-      "Bash(git log *)"
+      "Bash(git log *)",
+      "Bash(xargs grep -l \"cost\\\\|Cost\\\\|rate\\\\|Rate\")",
+      "Bash(powershell *)",
+      "Bash(git -C \"C:\\\\Users\\\\jnorris\\\\git\\\\estimator\" status)",
+      "Bash(git -C \"C:\\\\Users\\\\jnorris\\\\git\\\\estimator\" diff --stat)",
+      "Bash(git *)"
     ]
   }
 }

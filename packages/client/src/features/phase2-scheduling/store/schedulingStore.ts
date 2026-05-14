@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import type { Discipline, Resource } from "@estimator/shared";
+import type { Discipline, Resource, ResourceType } from "@estimator/shared";
 
 export type CalendarMode = "four-week" | "actual";
 export type Currency = "GBP" | "USD" | "EUR" | "AUD";
@@ -47,7 +47,7 @@ interface SchedulingStore {
   assignResource: (taskId: string, resourceId: string | null) => void;
 
   addResource: (role: Discipline, name: string) => void;
-  updateResource: (id: string, patch: Partial<Pick<Resource, "name" | "dailyRate" | "allocationPct" | "rollOnDate" | "rollOffDate">>) => void;
+  updateResource: (id: string, patch: Partial<Pick<Resource, "name" | "resourceType" | "dailyRate" | "allocationPct" | "rollOnDate" | "rollOffDate">>) => void;
   deleteResource: (id: string) => void;
 }
 
@@ -59,12 +59,13 @@ function nextMonday(): string {
   return d.toISOString().slice(0, 10);
 }
 
-function makeResource(role: Discipline, name: string): Resource {
+function makeResource(role: Discipline, name: string, resourceType: ResourceType = "Contractor"): Resource {
   return {
     id: crypto.randomUUID(),
     projectId: "local",
     name,
     role,
+    resourceType,
     rollOnDate: "",
     rollOffDate: "",
     allocationPct: 100,

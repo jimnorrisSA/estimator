@@ -119,6 +119,7 @@ export function SchedulingPage() {
       <TeamSidebar
         resources={resources}
         currency={settings.currency}
+        defaultDailyRate={settings.defaultDailyRate}
         onAdd={addResource}
         onUpdate={updateResource}
         onDelete={deleteResource}
