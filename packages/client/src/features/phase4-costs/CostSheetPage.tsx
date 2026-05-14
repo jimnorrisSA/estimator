@@ -24,13 +24,18 @@ function countWorkingDays(startStr: string, endStr: string, mode: "four-week" | 
 
 function resourceWorkingDays(r: Resource, projectStart: string, projectEnd: string, mode: "four-week" | "actual"): number | null {
   const start = r.rollOnDate || projectStart;
-  const end = r.rollOffDate || projectEnd;
+  const end   = r.rollOffDate || projectEnd;
   if (!start || !end) return null;
   return countWorkingDays(start, end, mode);
 }
 
+// Use || (not ??) so that empty-string resourceType also falls back to "Contractor"
+function resourceTypeSafe(r: Resource): "FTE" | "Contractor" {
+  return (r.resourceType || "Contractor") as "FTE" | "Contractor";
+}
+
 function effectiveRate(r: Resource, defaultRate: number): number {
-  if (r.resourceType === "FTE" && !r.dailyRate) return defaultRate;
+  if (resourceTypeSafe(r) === "FTE" && !r.dailyRate) return defaultRate;
   return r.dailyRate;
 }
 
@@ -45,7 +50,7 @@ const fmtUSD = (gbp: number, rate: number) => `$${Math.round(gbp * rate).toLocal
 function Dual({ gbp, usdRate, color, size = "sm" }: { gbp: number; usdRate: number; color?: string; size?: "sm" | "lg" }) {
   return (
     <div className="flex flex-col items-end gap-0.5">
-      <span className={`tabular-nums font-semibold ${size === "lg" ? "text-base" : "text-sm"}`} style={{ color: color ?? "#ece7ff" }}>
+      <span className={`tabular-nums font-semibold ${size === "lg" ? "text-lg" : "text-sm"}`} style={{ color: color ?? "#ece7ff" }}>
         {fmtGBP(gbp)}
       </span>
       <span className="tabular-nums text-xs text-[#5c5575]">{fmtUSD(gbp, usdRate)}</span>
@@ -58,11 +63,11 @@ function Dual({ gbp, usdRate, color, size = "sm" }: { gbp: number; usdRate: numb
 export function CostSheetPage() {
   const { settings, resources, updateSettings } = useSchedulingStore();
   const { defaultDailyRate, contingencyPct, startDate, targetEndDate, calendarMode } = settings;
-  const usdRate = settings.exchangeRates?.USD ?? 1.35;
+  const usdRate    = settings.exchangeRates?.USD ?? 1.35;
   const revenueGBP = settings.revenueGBP ?? 0;
 
   const [contingencyEnabled, setContingencyEnabled] = useState(true);
-  const [contingencyDraft, setContingencyDraft] = useState(String(contingencyPct));
+  const [contingencyDraft,   setContingencyDraft]   = useState(String(contingencyPct));
 
   useEffect(() => { setContingencyDraft(String(contingencyPct)); }, [contingencyPct]);
 
@@ -73,13 +78,9 @@ export function CostSheetPage() {
     setContingencyDraft(String(pct));
   }
 
-  const fteResources = resources.filter((r) => (r.resourceType ?? "Contractor") === "FTE");
-  const contractorResources = resources.filter((r) => (r.resourceType ?? "Contractor") === "Contractor");
-
-  // Returns partial sum even when some resources have unknown dates
-  function subtotal(list: Resource[]): { sum: number; excluded: number } {
-    let sum = 0;
-    let excluded = 0;
+  // Partial sums: resources with unknown dates are excluded but don't block the total
+  function computeSubtotals(list: Resource[]): { sum: number; excluded: number } {
+    let sum = 0, excluded = 0;
     for (const r of list) {
       const days = resourceWorkingDays(r, startDate, targetEndDate, calendarMode);
       const cost = resourceCost(r, days, defaultDailyRate);
@@ -89,58 +90,76 @@ export function CostSheetPage() {
     return { sum, excluded };
   }
 
-  let totalMM = 0;
-  let totalMMExcluded = 0;
+  const fteResources        = resources.filter((r) => resourceTypeSafe(r) === "FTE");
+  const contractorResources = resources.filter((r) => resourceTypeSafe(r) === "Contractor");
+
+  let totalMM = 0, totalMMExcluded = 0;
   for (const r of resources) {
     const days = resourceWorkingDays(r, startDate, targetEndDate, calendarMode);
     if (days === null) { totalMMExcluded++; continue; }
     totalMM += days * ((r.allocationPct ?? 100) / 100) / 20;
   }
 
-  const fteSub = subtotal(fteResources);
-  const contractorSub = subtotal(contractorResources);
+  const fteSub        = computeSubtotals(fteResources);
+  const contractorSub = computeSubtotals(contractorResources);
   const totalExcluded = fteSub.excluded + contractorSub.excluded;
-  const grandTotal = fteSub.sum + contractorSub.sum;
+  const grandTotal    = fteSub.sum + contractorSub.sum;
   const contingencyAmount = contingencyEnabled ? grandTotal * (contingencyPct / 100) : 0;
-  const atCost = grandTotal + contingencyAmount;
-  const profit = revenueGBP > 0 ? revenueGBP - atCost : null;
-  const margin = profit !== null && revenueGBP > 0 ? (profit / revenueGBP) * 100 : null;
+  const atCost  = grandTotal + contingencyAmount;
+  const profit  = revenueGBP > 0 ? revenueGBP - atCost : null;
+  const margin  = profit !== null && revenueGBP > 0 ? (profit / revenueGBP) * 100 : null;
 
-  const hasResources = resources.length > 0;
   const missingRates = resources.filter((r) => !effectiveRate(r, defaultDailyRate));
+  const missingDates = !startDate || !targetEndDate;
 
-  return (
-    <div className="h-full overflow-y-auto bg-[#0d0b16] p-8 flex flex-col gap-8">
-
-      {!hasResources && (
-        <div className="flex flex-col items-center justify-center h-64 gap-3 text-center">
+  if (resources.length === 0) {
+    return (
+      <div className="h-full overflow-y-auto bg-[#0d0b16] flex items-center justify-center">
+        <div className="text-center flex flex-col gap-2">
           <p className="text-[#5c5575] text-sm">No resources added yet.</p>
           <p className="text-[#3a3456] text-xs">Add team members in the Schedule tab to see cost breakdown here.</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="h-full overflow-y-auto bg-[#0d0b16] p-8 flex flex-col gap-6">
+
+      {/* Missing dates banner */}
+      {missingDates && (
+        <div className="rounded-xl border border-amber-900/40 bg-amber-950/20 px-5 py-3 flex items-start gap-3">
+          <span className="text-amber-400 text-sm mt-0.5">⚠</span>
+          <div>
+            <p className="text-sm text-amber-300 font-medium">Project dates not set</p>
+            <p className="text-xs text-amber-600 mt-0.5">
+              Set a start date and target end date in Schedule → Settings to calculate working days and costs.
+              Resources without individual roll-on/off dates will use the project dates.
+            </p>
+          </div>
         </div>
       )}
 
       {/* Financial Overview */}
-      {hasResources && (
-        <FinancialOverview
-          totalMM={totalMM}
-          totalMMExcluded={totalMMExcluded}
-          atCost={atCost}
-          revenueGBP={revenueGBP}
-          profit={profit}
-          margin={margin}
-          usdRate={usdRate}
-          missingRates={missingRates.map((r) => r.name || "Unnamed")}
-          onRevenueChange={(gbp) => updateSettings({ revenueGBP: gbp })}
-          onUsdRateChange={(v) => updateSettings({ exchangeRates: { ...settings.exchangeRates, USD: v } })}
-        />
-      )}
+      <FinancialOverview
+        totalMM={totalMM}
+        totalMMExcluded={totalMMExcluded}
+        atCost={atCost}
+        revenueGBP={revenueGBP}
+        profit={profit}
+        margin={margin}
+        usdRate={usdRate}
+        missingRates={missingRates.map((r) => r.name || "Unnamed")}
+        onRevenueChange={(gbp) => updateSettings({ revenueGBP: gbp })}
+        onUsdRateChange={(v) => updateSettings({ exchangeRates: { ...settings.exchangeRates, USD: v } })}
+      />
 
       {/* FTE section */}
       {fteResources.length > 0 && (
         <ResourceTable
           title="FTE"
           accentColor="#6ee7b7"
-          accentBg="rgba(16,185,129,0.12)"
+          accentBg="rgba(16,185,129,0.10)"
           resources={fteResources}
           projectStart={startDate}
           projectEnd={targetEndDate}
@@ -157,7 +176,7 @@ export function CostSheetPage() {
         <ResourceTable
           title="Contractors"
           accentColor="#a78bfa"
-          accentBg="rgba(124,58,237,0.12)"
+          accentBg="rgba(124,58,237,0.10)"
           resources={contractorResources}
           projectStart={startDate}
           projectEnd={targetEndDate}
@@ -169,84 +188,90 @@ export function CostSheetPage() {
         />
       )}
 
-      {/* Cost Breakdown */}
-      {hasResources && (
-        <div className="rounded-2xl border border-[#2e2848] overflow-hidden">
-          <div className="px-6 py-4 bg-[#14112a] border-b border-[#2e2848] flex items-center justify-between gap-4">
-            <h2 className="text-sm font-bold uppercase tracking-widest text-[#9b93ba] shrink-0">Cost Breakdown</h2>
-
-            {/* Contingency toggle */}
-            <label className="flex items-center gap-2 cursor-pointer select-none">
-              <input
-                type="checkbox"
-                checked={contingencyEnabled}
-                onChange={(e) => setContingencyEnabled(e.target.checked)}
-                className="w-4 h-4 accent-[#7c3aed] cursor-pointer"
-              />
-              <span className="text-xs text-[#9b93ba]">Contingency</span>
-              <input
-                type="number" min={0} max={100} step={1}
-                className="w-14 border border-[#2e2848] bg-[#1a1628] text-[#ece7ff] rounded px-2 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-[#7c3aed] disabled:opacity-40 tabular-nums"
-                value={contingencyDraft}
-                disabled={!contingencyEnabled}
-                onChange={(e) => setContingencyDraft(e.target.value)}
-                onBlur={commitContingency}
-                onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
-              />
-              <span className="text-xs text-[#5c5575]">%</span>
-            </label>
-
-            <div className="flex gap-6 text-xs font-semibold uppercase tracking-wide text-[#3a3456] ml-auto">
-              <span className="w-24 text-right">GBP</span>
-              <span className="w-24 text-right">USD</span>
-            </div>
+      {/* Cost Summary */}
+      <div className="rounded-2xl border border-[#2e2848] overflow-hidden">
+        <div className="px-6 py-4 bg-[#14112a] border-b border-[#2e2848] flex flex-wrap items-center gap-4">
+          <div>
+            <h2 className="text-sm font-bold uppercase tracking-widest text-[#9b93ba]">Cost Summary</h2>
+            <p className="text-xs text-[#3a3456] mt-0.5">Total project delivery cost including contingency</p>
           </div>
 
-          <div className="px-6 py-4 flex flex-col gap-2 bg-[#0d0b16]">
-            {fteResources.length > 0 && (
-              <SummaryRow label="FTE subtotal" gbp={fteSub.sum} usdRate={usdRate} muted />
-            )}
-            {contractorResources.length > 0 && (
-              <SummaryRow label="Contractor subtotal" gbp={contractorSub.sum} usdRate={usdRate} muted />
-            )}
-            <div className="border-t border-[#2e2848] my-1" />
-            <SummaryRow label="Total before contingency" gbp={grandTotal} usdRate={usdRate} />
-            {contingencyEnabled && (
-              <SummaryRow label={`Contingency (${contingencyPct}%)`} gbp={contingencyAmount} usdRate={usdRate} muted />
-            )}
-            <div className="border-t border-[#2e2848] my-1" />
-            <SummaryRow label="At Cost" gbp={atCost} usdRate={usdRate} highlight />
-            {totalExcluded > 0 && (
-              <p className="text-xs text-amber-400 mt-1">
-                ⚠ {totalExcluded} member{totalExcluded !== 1 ? "s" : ""} excluded from totals — set project start/end dates or individual roll-on/roll-off dates.
-              </p>
-            )}
+          {/* Contingency toggle */}
+          <label className="flex items-center gap-2 cursor-pointer select-none ml-auto">
+            <input
+              type="checkbox"
+              checked={contingencyEnabled}
+              onChange={(e) => setContingencyEnabled(e.target.checked)}
+              className="w-4 h-4 accent-[#7c3aed] cursor-pointer"
+            />
+            <span className="text-xs text-[#9b93ba]">Contingency</span>
+            <input
+              type="number" min={0} max={100} step={1}
+              className="w-14 border border-[#2e2848] bg-[#1a1628] text-[#ece7ff] rounded px-2 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-[#7c3aed] disabled:opacity-40 tabular-nums"
+              value={contingencyDraft}
+              disabled={!contingencyEnabled}
+              onChange={(e) => setContingencyDraft(e.target.value)}
+              onBlur={commitContingency}
+              onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
+            />
+            <span className="text-xs text-[#5c5575]">%</span>
+          </label>
+
+          <div className="flex gap-6 text-xs font-semibold uppercase tracking-wide text-[#3a3456]">
+            <span className="w-24 text-right">GBP</span>
+            <span className="w-24 text-right">USD</span>
           </div>
         </div>
-      )}
+
+        <div className="px-6 py-4 flex flex-col gap-2 bg-[#0d0b16]">
+          {fteResources.length > 0 && (
+            <SummaryRow label="FTE subtotal" gbp={fteSub.sum} usdRate={usdRate} muted />
+          )}
+          {contractorResources.length > 0 && (
+            <SummaryRow label="Contractor subtotal" gbp={contractorSub.sum} usdRate={usdRate} muted />
+          )}
+          {fteResources.length > 0 && contractorResources.length > 0 && (
+            <>
+              <div className="border-t border-[#2e2848] my-1" />
+              <SummaryRow label="Total before contingency" gbp={grandTotal} usdRate={usdRate} />
+            </>
+          )}
+          {contingencyEnabled && (
+            <SummaryRow label={`Contingency (${contingencyPct}%)`} gbp={contingencyAmount} usdRate={usdRate} muted />
+          )}
+          <div className="border-t border-[#2e2848] my-1" />
+          <SummaryRow label="At Cost" gbp={atCost} usdRate={usdRate} highlight />
+
+          {totalExcluded > 0 && (
+            <p className="text-xs text-amber-400 mt-1">
+              ⚠ {totalExcluded} member{totalExcluded !== 1 ? "s" : ""} excluded — set project dates or individual roll-on/off dates.
+            </p>
+          )}
+          {!missingDates && grandTotal === 0 && missingRates.length > 0 && (
+            <p className="text-xs text-[#5c5575] mt-1">
+              All team members have no daily rate set. Add rates in the Schedule tab or set a default daily rate in Settings.
+            </p>
+          )}
+        </div>
+      </div>
 
     </div>
   );
 }
 
-// ─── Financial overview ───────────────────────────────────────────────────────
+// ─── Financial Overview ───────────────────────────────────────────────────────
 
 function FinancialOverview({
   totalMM, totalMMExcluded, atCost, revenueGBP, profit, margin,
   usdRate, missingRates, onRevenueChange, onUsdRateChange,
 }: {
-  totalMM: number;
-  totalMMExcluded: number;
-  atCost: number;
-  revenueGBP: number;
-  profit: number | null;
-  margin: number | null;
-  usdRate: number;
-  missingRates: string[];
+  totalMM: number; totalMMExcluded: number; atCost: number;
+  revenueGBP: number; profit: number | null; margin: number | null;
+  usdRate: number; missingRates: string[];
   onRevenueChange: (gbp: number) => void;
   onUsdRateChange: (v: number) => void;
 }) {
-  const [revDraft, setRevDraft] = useState(revenueGBP > 0 ? String(Math.round(revenueGBP * usdRate)) : "");
+  const [revDraft,  setRevDraft]  = useState(revenueGBP > 0 ? String(Math.round(revenueGBP * usdRate)) : "");
   const [rateDraft, setRateDraft] = useState(String(usdRate));
 
   useEffect(() => {
@@ -285,64 +310,55 @@ function FinancialOverview({
         </div>
       )}
 
-      {/* Label row */}
-      <div className="px-6 pt-5 pb-1 bg-[#0d0b16] grid grid-cols-5 gap-4">
-        <OverviewLabel label="Total MM" sublabel="Man-months" />
-        <OverviewLabel label="At Cost" sublabel="Total delivery cost" />
-        <OverviewLabel label="Revenue" sublabel="Client contract (USD)" />
-        <OverviewLabel label="Profit" sublabel="Revenue − At Cost" />
-        <OverviewLabel label="Margin" sublabel="Profit as % of revenue" />
-      </div>
+      {/* Stats grid — scrolls horizontally on narrow screens */}
+      <div className="px-6 py-5 bg-[#0d0b16] overflow-x-auto">
+        <div className="grid grid-cols-5 gap-6 min-w-[640px]">
 
-      {/* Value row */}
-      <div className="px-6 pb-5 bg-[#0d0b16] grid grid-cols-5 gap-4 items-end">
+          <OverviewStat label="Total MM" sublabel="Man-months of work">
+            <span className="text-2xl font-bold text-[#9b93ba] tabular-nums leading-tight">
+              {totalMM.toFixed(1)}<span className="text-base font-normal text-[#5c5575] ml-1">MM</span>
+            </span>
+            {totalMMExcluded > 0 && <span className="text-xs text-amber-400">+{totalMMExcluded} excluded</span>}
+          </OverviewStat>
 
-        <div className="flex flex-col gap-0.5 pt-2">
-          <span className="text-xl font-bold text-[#9b93ba] tabular-nums">
-            {totalMM.toFixed(1)} <span className="text-sm font-normal text-[#5c5575]">MM</span>
-          </span>
-          {totalMMExcluded > 0 && (
-            <span className="text-xs text-amber-400">+{totalMMExcluded} excluded</span>
-          )}
-        </div>
+          <OverviewStat label="At Cost" sublabel="Total delivery cost">
+            <Dual gbp={atCost} usdRate={usdRate} color="#a78bfa" size="lg" />
+          </OverviewStat>
 
-        <div className="pt-2">
-          <Dual gbp={atCost} usdRate={usdRate} color="#a78bfa" size="lg" />
-        </div>
+          <OverviewStat label="Revenue" sublabel="Client contract (USD)">
+            <div className="flex items-baseline gap-1 mt-1">
+              <span className="text-sm text-[#5c5575]">$</span>
+              <input
+                type="number" min={0} step={1000} placeholder="0"
+                className="flex-1 min-w-0 text-2xl font-bold bg-transparent border-b border-[#2e2848] focus:border-[#7c3aed] text-[#ece7ff] outline-none pb-0.5 tabular-nums placeholder:text-[#3a3456] w-full"
+                value={revDraft}
+                onChange={(e) => setRevDraft(e.target.value)}
+                onBlur={commitRevenue}
+                onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
+              />
+            </div>
+            {revenueGBP > 0 && (
+              <span className="text-xs text-[#5c5575] tabular-nums">≈ {fmtGBP(revenueGBP)}</span>
+            )}
+          </OverviewStat>
 
-        {/* Revenue — input in USD */}
-        <div className="flex flex-col gap-1 pt-2">
-          <div className="flex items-center gap-1">
-            <span className="text-sm text-[#5c5575]">$</span>
-            <input
-              type="number" min={0} step={1000} placeholder="0"
-              className="flex-1 min-w-0 text-xl font-bold bg-transparent border-b border-[#2e2848] focus:border-[#7c3aed] text-[#ece7ff] outline-none pb-0.5 tabular-nums placeholder:text-[#3a3456]"
-              value={revDraft}
-              onChange={(e) => setRevDraft(e.target.value)}
-              onBlur={commitRevenue}
-              onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
-            />
-          </div>
-          {revenueGBP > 0 && (
-            <span className="text-xs text-[#5c5575] tabular-nums">= {fmtGBP(revenueGBP)}</span>
-          )}
-        </div>
+          <OverviewStat label="Profit" sublabel="Revenue − At Cost">
+            {profit !== null
+              ? <Dual gbp={profit} usdRate={usdRate} color={profitColor} size="lg" />
+              : <span className="text-2xl font-bold text-[#3a3456] leading-tight">—</span>}
+          </OverviewStat>
 
-        <div className="pt-2">
-          {profit !== null
-            ? <Dual gbp={profit} usdRate={usdRate} color={profitColor} size="lg" />
-            : <span className="text-xl font-bold text-[#3a3456]">—</span>}
-        </div>
+          <OverviewStat label="Margin" sublabel="Profit ÷ Revenue">
+            <span className="text-2xl font-bold tabular-nums leading-tight" style={{ color: marginColor }}>
+              {margin !== null ? `${Math.round(margin)}%` : "—"}
+            </span>
+          </OverviewStat>
 
-        <div className="pt-2">
-          <span className="text-xl font-bold tabular-nums" style={{ color: marginColor }}>
-            {margin !== null ? `${Math.round(margin)}%` : "—"}
-          </span>
         </div>
       </div>
 
-      {/* Exchange rate — inline at bottom of card */}
-      <div className="px-6 py-3 bg-[#0d0b16] border-t border-[#2e2848] flex items-center gap-3">
+      {/* Exchange rate */}
+      <div className="px-6 py-3 bg-[#0d0b16] border-t border-[#2e2848] flex flex-wrap items-center gap-3">
         <span className="text-xs text-[#5c5575]">Exchange rate:</span>
         <span className="text-xs text-[#9b93ba]">1 GBP =</span>
         <input
@@ -354,17 +370,18 @@ function FinancialOverview({
           onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
         />
         <span className="text-xs text-[#5c5575]">USD</span>
-        <span className="text-xs text-[#3a3456] ml-1">— all amounts stored in GBP, USD shown for reference</span>
+        <span className="text-xs text-[#3a3456]">— costs stored in GBP; USD shown for reference</span>
       </div>
     </div>
   );
 }
 
-function OverviewLabel({ label, sublabel }: { label: string; sublabel: string }) {
+function OverviewStat({ label, sublabel, children }: { label: string; sublabel: string; children: React.ReactNode }) {
   return (
-    <div className="flex flex-col gap-0.5">
+    <div className="flex flex-col gap-1">
       <span className="text-xs font-semibold uppercase tracking-wide text-[#5c5575]">{label}</span>
       <span className="text-xs text-[#3a3456]">{sublabel}</span>
+      <div className="mt-1">{children}</div>
     </div>
   );
 }
@@ -398,18 +415,18 @@ function ResourceTable({
               <Th>Role</Th>
               <Th align="center">Allocation</Th>
               <Th>Rate / day</Th>
-              <Th>Roll-on → Roll-off</Th>
+              <Th>Dates</Th>
               <Th align="right">Working days</Th>
               <Th align="right">Total cost</Th>
             </tr>
           </thead>
           <tbody>
             {resources.map((r) => {
-              const days = resourceWorkingDays(r, projectStart, projectEnd, calendarMode);
+              const days    = resourceWorkingDays(r, projectStart, projectEnd, calendarMode);
               const costGbp = resourceCost(r, days, defaultDailyRate);
-              const rate = effectiveRate(r, defaultDailyRate);
-              const isDefaultRate = r.resourceType === "FTE" && !r.dailyRate;
-              const alloc = r.allocationPct ?? 100;
+              const rate    = effectiveRate(r, defaultDailyRate);
+              const isDefaultRate = resourceTypeSafe(r) === "FTE" && !r.dailyRate;
+              const alloc   = r.allocationPct ?? 100;
 
               return (
                 <tr key={r.id} className="border-b border-[#2e2848] hover:bg-[#14112a] transition-colors">
@@ -435,8 +452,8 @@ function ResourceTable({
                       <span className="text-[#3a3456]">No rate set</span>
                     )}
                   </td>
-                  <td className="px-4 py-3 text-[#9b93ba] text-xs">
-                    {formatDateRange(r.rollOnDate, r.rollOffDate) ?? <span className="text-[#3a3456]">Project dates</span>}
+                  <td className="px-4 py-3 text-[#9b93ba] text-xs whitespace-nowrap">
+                    {formatDateRange(r.rollOnDate, r.rollOffDate) ?? <span className="text-[#3a3456] italic">Using project dates</span>}
                   </td>
                   <td className="px-4 py-3 tabular-nums text-right text-[#9b93ba]">
                     {days !== null ? days.toLocaleString() : <span className="text-[#3a3456]">—</span>}
@@ -444,20 +461,23 @@ function ResourceTable({
                   <td className="px-4 py-3 text-right">
                     {costGbp !== null && costGbp > 0
                       ? <Dual gbp={costGbp} usdRate={usdRate} color={accentColor} />
-                      : costGbp === 0
+                      : costGbp === 0 && rate === 0
                         ? <span className="text-[#3a3456] text-sm">No rate</span>
-                        : <span className="text-[#3a3456] text-sm">—</span>}
+                        : costGbp === 0
+                          ? <Dual gbp={0} usdRate={usdRate} color="#3a3456" />
+                          : <span className="text-[#3a3456] text-sm">—</span>}
                   </td>
                 </tr>
               );
             })}
           </tbody>
           <tfoot>
-            <tr className="border-t border-[#2e2848]" style={{ background: accentBg }}>
-              <td colSpan={6} className="px-4 py-2.5 text-xs font-semibold uppercase tracking-wide" style={{ color: accentColor }}>
-                {title} subtotal{excluded > 0 && <span className="ml-2 font-normal opacity-60">({excluded} excluded — no dates)</span>}
+            <tr className="border-t-2 border-[#2e2848]" style={{ background: accentBg }}>
+              <td colSpan={6} className="px-4 py-3 text-xs font-semibold uppercase tracking-wide" style={{ color: accentColor }}>
+                Subtotal
+                {excluded > 0 && <span className="ml-2 font-normal opacity-60 normal-case">({excluded} member{excluded !== 1 ? "s" : ""} excluded — no dates)</span>}
               </td>
-              <td className="px-4 py-2.5 text-right">
+              <td className="px-4 py-3 text-right">
                 <Dual gbp={subtotal} usdRate={usdRate} color={accentColor} size="lg" />
               </td>
             </tr>
