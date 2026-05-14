@@ -74,29 +74,17 @@ interface TaskBarProps {
   onResize: (taskId: string, startDay: number, endDay: number, newDays: number) => void;
   onClearPin: (taskId: string) => void;
   onEditTask: (task: ScheduledTask) => void;
-  onRenameTask: (taskId: string, label: string) => void;
 }
 
-function DraggableTaskBar({ task, y, barH, color, slotCount, disciplineBoundaries, wdToX, effectiveDayW, blockedPeriods, onMove, onResize, onClearPin, onEditTask, onRenameTask }: TaskBarProps) {
+function DraggableTaskBar({ task, y, barH, color, slotCount, disciplineBoundaries, wdToX, effectiveDayW, blockedPeriods, onMove, onResize, onClearPin, onEditTask }: TaskBarProps) {
   const [preview, setPreview] = useState<{
     startDay: number; endDay: number; slotIndex: number;
     segments?: { start: number; end: number }[];
   } | null>(null);
   const [dragType, setDragType] = useState<"move" | "resize" | null>(null);
-  const [nameEdit, setNameEdit] = useState<string | null>(null);
 
-  const callbacksRef = useRef({ onMove, onResize, onClearPin, onEditTask, onRenameTask });
-  callbacksRef.current = { onMove, onResize, onClearPin, onEditTask, onRenameTask };
-
-  function commitRename() {
-    setNameEdit((val) => {
-      if (val !== null) {
-        const trimmed = val.trim();
-        if (trimmed && trimmed !== task.label) callbacksRef.current.onRenameTask(task.taskId, trimmed);
-      }
-      return null;
-    });
-  }
+  const callbacksRef = useRef({ onMove, onResize, onClearPin, onEditTask });
+  callbacksRef.current = { onMove, onResize, onClearPin, onEditTask };
 
   function startDrag(type: "move" | "resize", clientX: number, clientY: number) {
     const origStart = task.startDay;
@@ -193,8 +181,8 @@ function DraggableTaskBar({ task, y, barH, color, slotCount, disciplineBoundarie
               x={sx} y={dispY} width={sw} height={barH} rx={3}
               fill={color} opacity={isDragging ? 0.55 : 0.9}
               style={{ cursor: isDragging ? "grabbing" : "grab" }}
-              onMouseDown={(e) => { if (e.button !== 0) return; e.stopPropagation(); if (nameEdit === null) startDrag("move", e.clientX, e.clientY); }}
-              onDoubleClick={(e) => { if (isFirst) { e.stopPropagation(); setNameEdit(task.label); } }}
+              onMouseDown={(e) => { if (e.button !== 0) return; e.stopPropagation(); startDrag("move", e.clientX, e.clientY); }}
+              onDoubleClick={(e) => { if (isFirst) { e.stopPropagation(); callbacksRef.current.onEditTask(task); } }}
             />
 
             {/* Label only in first segment */}
@@ -248,44 +236,6 @@ function DraggableTaskBar({ task, y, barH, color, slotCount, disciplineBoundarie
         );
       })()}
 
-      {/* Inline rename — in first segment */}
-      {nameEdit !== null && (() => {
-        const firstSeg = dispSegments[0];
-        const sx = wdToX(firstSeg.start);
-        const sw = Math.max(2, wdToX(firstSeg.end) - sx - 2);
-        return (
-          <foreignObject x={sx} y={dispY} width={Math.max(sw, 180)} height={barH}>
-            <div style={{ display: "flex", height: "100%", gap: 2, padding: 2, boxSizing: "border-box" }}>
-              <input type="text" value={nameEdit} autoFocus
-                onChange={(e) => setNameEdit(e.target.value)}
-                onBlur={commitRename}
-                onMouseDown={(e) => e.stopPropagation()}
-                onKeyDown={(e) => {
-                  e.stopPropagation();
-                  if (e.key === "Enter") commitRename();
-                  if (e.key === "Escape") setNameEdit(null);
-                }}
-                style={{
-                  flex: 1, minWidth: 0, background: "#1a1628",
-                  border: "2px solid #7c3aed", borderRadius: 3,
-                  color: "white", fontSize: 11, padding: "0 5px",
-                  outline: "none", boxSizing: "border-box",
-                }}
-              />
-              <button type="button" onMouseDown={(e) => e.stopPropagation()}
-                onClick={(e) => { e.stopPropagation(); setNameEdit(null); onEditTask(task); }}
-                style={{
-                  flexShrink: 0, background: "#2e2848", border: "1px solid #3d366a",
-                  borderRadius: 3, color: "#9b93ba", fontSize: 10,
-                  padding: "0 6px", cursor: "pointer", whiteSpace: "nowrap",
-                }}
-              >
-                Edit all
-              </button>
-            </div>
-          </foreignObject>
-        );
-      })()}
     </g>
   );
 }
@@ -424,11 +374,6 @@ export function Timeline({ result, features, settings, viewMode, onToggleView }:
 
   function handleClearPin(taskId: string) {
     clearOverride(taskId);
-  }
-
-  function handleRenameTask(taskId: string, label: string) {
-    const t = tasks.find((t) => t.taskId === taskId);
-    if (t) updateTaskLabel(t.featureId, t.groupId, taskId, label);
   }
 
   function handleSaveTask(changes: {
@@ -697,7 +642,7 @@ export function Timeline({ result, features, settings, viewMode, onToggleView }:
                         blockedPeriods={blockedPeriods}
                         wdToX={wdToX} effectiveDayW={effectiveDayW}
                         onMove={handleMove} onResize={handleResize} onClearPin={handleClearPin}
-                        onEditTask={setEditingTask} onRenameTask={handleRenameTask}
+                        onEditTask={setEditingTask}
                       />
                     );
                   })
