@@ -83,7 +83,7 @@ function AppContent() {
     if (!entry) return;
     const { snapshot } = entry;
     useEstimationsStore.setState({
-      features: snapshot.features,
+      features: snapshot.features ?? [],
       selectedId: null,
       selectedIds: [],
       _past: [],
@@ -91,10 +91,14 @@ function AppContent() {
     });
     useSchedulingStore.setState({
       settings: snapshot.schedulingSettings,
-      overrides: snapshot.overrides,
-      resources: snapshot.resources,
+      overrides: snapshot.overrides ?? {},
+      // Normalise resourceType — old snapshots may have "" from a persist bug
+      resources: (snapshot.resources ?? []).map((r) => ({
+        ...r,
+        resourceType: (r.resourceType || "Contractor") as "FTE" | "Contractor",
+      })),
     });
-    useMilestonesStore.setState({ milestones: snapshot.milestones });
+    useMilestonesStore.setState({ milestones: snapshot.milestones ?? [] });
   }
 
   function handleEnterApp() {
