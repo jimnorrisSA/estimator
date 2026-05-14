@@ -24,6 +24,7 @@ const TABS: { phase: Phase; label: string; sub: string }[] = [
 function AppContent() {
   const [view, setView] = useState<AppView>("landing");
   const [activePhase, setActivePhase] = useState<Phase>(1);
+  const [saveState, setSaveState] = useState<"idle" | "saving" | "saved">("idle");
 
   const { getActiveProject, saveActiveSnapshot, pushToServer } =
     useProjectsStore();
@@ -45,7 +46,7 @@ function AppContent() {
   }, []);
 
   // Collect the current phase store states into a snapshot and save locally + server
-  function saveCurrentProject() {
+  async function saveCurrentProject() {
     const active = useProjectsStore.getState().getActiveProject();
     if (!active) return;
     const snapshot = {
@@ -59,12 +60,19 @@ function AppContent() {
     if (active.checkedOutBy && active.apiId) {
       // Save first, then release the lock — order matters
       const apiId = active.apiId;
-      pushToServer(active.id).then(() => {
-        api.projects.checkin(apiId).catch(() => {});
-      });
+      await pushToServer(active.id);
+      api.projects.checkin(apiId).catch(() => {});
     } else {
-      pushToServer(active.id);
+      await pushToServer(active.id);
     }
+  }
+
+  async function handleSave() {
+    if (saveState === "saving") return;
+    setSaveState("saving");
+    await saveCurrentProject();
+    setSaveState("saved");
+    setTimeout(() => setSaveState("idle"), 2000);
   }
 
   // Load a project's snapshot into all phase stores
@@ -101,13 +109,13 @@ function AppContent() {
     setActivePhase(1);
   }
 
-  function handleBackToProjects() {
-    saveCurrentProject();
+  async function handleBackToProjects() {
+    await saveCurrentProject();
     setView("projects");
   }
 
-  function handleBackToLanding() {
-    saveCurrentProject();
+  async function handleBackToLanding() {
+    await saveCurrentProject();
     setView("landing");
   }
 
@@ -177,6 +185,18 @@ function AppContent() {
             </span>
           )}
           {activePhase === 2 && <ExportMenu />}
+          <button
+            onClick={handleSave}
+            disabled={saveState === "saving"}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all disabled:opacity-60"
+            style={
+              saveState === "saved"
+                ? { background: "rgba(34,197,94,0.15)", border: "1px solid rgba(34,197,94,0.4)", color: "#86efac" }
+                : { background: "rgba(124,58,237,0.15)", border: "1px solid rgba(124,58,237,0.4)", color: "#a78bfa" }
+            }
+          >
+            {saveState === "saving" ? "Saving…" : saveState === "saved" ? "Saved ✓" : "Save"}
+          </button>
         </div>
 
         {/* Future phase tab */}
