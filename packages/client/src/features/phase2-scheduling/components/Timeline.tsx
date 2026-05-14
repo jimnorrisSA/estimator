@@ -101,7 +101,18 @@ function DraggableTaskBar({ task, y, barH, color, slotCount, disciplineBoundarie
         let s = Math.max(0, origStart + snap);
         const slotDelta = Math.round(dy / SLOT_H);
         const targetSlot = Math.max(0, Math.min(slotCount - 1, task.slotIndex + slotDelta));
-        // Snap past any task boundary in the target slot
+        // Snap start to another task's end, or snap end to another task's start
+        let best = 1.5; // working-day snap radius
+        let snapped = s;
+        for (const b of disciplineBoundaries) {
+          if (b.slotIndex !== targetSlot) continue;
+          const d1 = Math.abs(s - b.endDay);
+          if (d1 < best) { best = d1; snapped = b.endDay; }
+          const d2 = Math.abs(s + origWd - b.startDay);
+          if (d2 < best) { best = d2; snapped = Math.max(0, b.startDay - origWd); }
+        }
+        s = snapped;
+        // Push past any remaining overlap
         for (const b of disciplineBoundaries) {
           if (b.slotIndex === targetSlot && s < b.endDay && s + origWd > b.startDay) {
             s = b.endDay; break;
@@ -301,66 +312,19 @@ export function Timeline({ result, features, settings, viewMode, onToggleView }:
 
     const isSameSlot = targetSlot === movedTask.slotIndex;
 
-    if (!isSameSlot) {
-      // Cross-slot move: freeze both slots to prevent scheduler repacking either.
-      const affectedTasks = tasks.filter(
-        (t) =>
-          t.discipline === movedTask.discipline &&
-          (t.slotIndex === movedTask.slotIndex || t.slotIndex === targetSlot) &&
-          t.taskId !== taskId
-      );
-      for (const t of affectedTasks) {
-        if (!t.isPinned) setOverride(t.taskId, { startDay: t.startDay, endDay: t.endDay });
-      }
-      setOverride(taskId, { startDay, endDay, slotIndex: targetSlot });
-      return;
-    }
-
-    // Same-slot move: freeze, align neighbours, push forward.
-    const slotTasks = tasks
-      .filter(
-        (t) =>
-          t.discipline === movedTask.discipline &&
-          t.slotIndex === movedTask.slotIndex &&
-          t.taskId !== taskId
-      )
-      .sort((a, b) => a.startDay - b.startDay);
-
-    for (const t of slotTasks) {
+    // Freeze all tasks in the affected slots at their current positions so the
+    // scheduler doesn't repack them. Only the dragged task moves — no cascade.
+    const affectedTasks = tasks.filter(
+      (t) =>
+        t.taskId !== taskId &&
+        t.discipline === movedTask.discipline &&
+        (t.slotIndex === movedTask.slotIndex || (!isSameSlot && t.slotIndex === targetSlot))
+    );
+    for (const t of affectedTasks) {
       if (!t.isPinned) setOverride(t.taskId, { startDay: t.startDay, endDay: t.endDay });
     }
 
-    // Snap predecessor to end at newStart (no backward cascade)
-    const beforeInsert = slotTasks.filter((t) => t.startDay < startDay);
-    if (beforeInsert.length > 0) {
-      const taskBefore = beforeInsert[beforeInsert.length - 1];
-      if (!taskBefore.isPinned) {
-        const dur = taskBefore.endDay - taskBefore.startDay;
-        const newBeforeStart = Math.max(0, startDay - dur);
-        setOverride(taskBefore.taskId, { startDay: newBeforeStart, endDay: newBeforeStart + dur });
-      }
-    }
-
     setOverride(taskId, { startDay, endDay, slotIndex: targetSlot });
-
-    // Push immediate successor to start right after the inserted task
-    const afterInsert = slotTasks.filter((t) => t.startDay >= startDay);
-    if (afterInsert.length === 0) return;
-
-    const [firstAfter, ...rest] = afterInsert;
-    const firstDur = firstAfter.endDay - firstAfter.startDay;
-    setOverride(firstAfter.taskId, { startDay: endDay, endDay: endDay + firstDur });
-
-    let cursor = endDay + firstDur;
-    for (const t of rest) {
-      if (t.startDay < cursor) {
-        const dur = t.endDay - t.startDay;
-        setOverride(t.taskId, { startDay: cursor, endDay: cursor + dur });
-        cursor += dur;
-      } else {
-        break;
-      }
-    }
   }
 
   function handleResize(taskId: string, startDay: number, endDay: number, newDays: number) {
