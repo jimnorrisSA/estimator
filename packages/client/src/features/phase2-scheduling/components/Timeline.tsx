@@ -112,10 +112,19 @@ function DraggableTaskBar({ task, y, barH, color, slotCount, disciplineBoundarie
           if (d2 < best) { best = d2; snapped = Math.max(0, b.startDay - origWd); }
         }
         s = snapped;
-        // Push past any remaining overlap
-        for (const b of disciplineBoundaries) {
-          if (b.slotIndex === targetSlot && s < b.endDay && s + origWd > b.startDay) {
-            s = b.endDay; break;
+        // Push past remaining overlaps only when not snapped to a task boundary.
+        // When a snap fires the user is intentionally inserting — the drop handler pushes.
+        if (best >= 1.5) {
+          let moved = true;
+          while (moved) {
+            moved = false;
+            for (const b of disciplineBoundaries) {
+              if (b.slotIndex === targetSlot && s < b.endDay && s + origWd > b.startDay) {
+                s = b.endDay;
+                moved = true;
+                break;
+              }
+            }
           }
         }
         const p = computeTaskPlacement(s, origWd, blockedPeriods);
@@ -339,6 +348,7 @@ export function Timeline({ result, features, settings, viewMode, onToggleView }:
 
     let cursor = endDay;
     for (const t of targetTasks) {
+      if (t.endDay <= startDay) continue; // task ends at or before insertion point — leave it
       if (t.startDay < cursor) {
         const placement = computeTaskPlacement(cursor, t.workingDays, blockedPeriods);
         setOverride(t.taskId, { startDay: cursor, endDay: placement.endDay });
