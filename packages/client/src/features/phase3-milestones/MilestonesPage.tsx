@@ -160,7 +160,7 @@ interface StripProps {
   milestones: Milestone[];
   settings: { startDate: string };
   onAdd: (title: string, startDate: string, endDate: string) => void;
-  onUpdate: (id: string, patch: Partial<Pick<Milestone, "title" | "startDate" | "endDate" | "color" | "hardeningDays">>) => void;
+  onUpdate: (id: string, patch: Partial<Pick<Milestone, "title" | "startDate" | "endDate" | "color" | "hardeningDays" | "sprintLengthWeeks">>) => void;
   onDelete: (id: string) => void;
 }
 
@@ -264,7 +264,7 @@ function MilestoneStrip({ milestones, settings, onAdd, onUpdate, onDelete }: Str
 
 function MilestoneList({ milestones, onUpdate, onDelete }: {
   milestones: Milestone[];
-  onUpdate: (id: string, patch: Partial<Pick<Milestone, "title" | "startDate" | "endDate" | "color" | "hardeningDays">>) => void;
+  onUpdate: (id: string, patch: Partial<Pick<Milestone, "title" | "startDate" | "endDate" | "color" | "hardeningDays" | "sprintLengthWeeks">>) => void;
   onDelete: (id: string) => void;
 }) {
   return (
@@ -276,6 +276,7 @@ function MilestoneList({ milestones, onUpdate, onDelete }: {
             <th className="px-4 py-2 font-medium">Start</th>
             <th className="px-4 py-2 font-medium">End</th>
             <th className="px-4 py-2 font-medium text-center">Hardening</th>
+            <th className="px-4 py-2 font-medium text-center">Sprints</th>
             <th className="px-4 py-2 font-medium w-16" />
           </tr>
         </thead>
@@ -298,7 +299,7 @@ function MilestoneList({ milestones, onUpdate, onDelete }: {
 function MilestoneRow({ milestone: m, zebra, onUpdate, onDelete }: {
   milestone: Milestone;
   zebra: boolean;
-  onUpdate: (id: string, patch: Partial<Pick<Milestone, "title" | "startDate" | "endDate" | "color" | "hardeningDays">>) => void;
+  onUpdate: (id: string, patch: Partial<Pick<Milestone, "title" | "startDate" | "endDate" | "color" | "hardeningDays" | "sprintLengthWeeks">>) => void;
   onDelete: (id: string) => void;
 }) {
   const [editingTitle, setEditingTitle] = useState(false);
@@ -373,6 +374,25 @@ function MilestoneRow({ milestone: m, zebra, onUpdate, onDelete }: {
         </div>
       </td>
 
+      {/* Sprint length */}
+      <td className="px-4 py-2.5 text-center">
+        <div className="flex items-center justify-center gap-0.5">
+          {([undefined, 2, 3] as const).map((v) => (
+            <button
+              key={String(v)}
+              className={`px-2 py-0.5 text-xs rounded transition-colors ${
+                m.sprintLengthWeeks === v
+                  ? "bg-[#7c3aed] text-white font-semibold"
+                  : "bg-[#1d1930] text-[#5c5575] hover:text-[#9b93ba]"
+              }`}
+              onClick={() => onUpdate(m.id, { sprintLengthWeeks: v })}
+            >
+              {v == null ? "—" : `${v}w`}
+            </button>
+          ))}
+        </div>
+      </td>
+
       {/* Delete */}
       <td className="px-4 py-2.5 text-center">
         <button
@@ -389,7 +409,7 @@ function MilestoneRow({ milestone: m, zebra, onUpdate, onDelete }: {
 
 function MilestoneChip({ milestone, onUpdate, onDelete }: {
   milestone: Milestone;
-  onUpdate: (id: string, patch: Partial<Pick<Milestone, "title" | "startDate" | "endDate" | "color" | "hardeningDays">>) => void;
+  onUpdate: (id: string, patch: Partial<Pick<Milestone, "title" | "startDate" | "endDate" | "color" | "hardeningDays" | "sprintLengthWeeks">>) => void;
   onDelete: (id: string) => void;
 }) {
   const [editing, setEditing] = useState(false);

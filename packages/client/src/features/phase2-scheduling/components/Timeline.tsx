@@ -589,15 +589,39 @@ export function Timeline({ result, features, settings, viewMode, onToggleView, r
                     const x = wdToX(startDay);
                     const w = Math.max(4, wdToX(endDay) - wdToX(startDay) - 2);
                     const barH = milestoneH - 8;
-                    const maxChars = Math.floor((w - 10) / 5.5);
+                    const sprintDays = (m.sprintLengthWeeks ?? 0) * 5;
+                    const sprintCount = sprintDays > 0 ? Math.ceil((endDay - startDay) / sprintDays) : 0;
                     return (
                       <g key={m.id}>
                         <rect x={x} y={HEADER_H + 4} width={w} height={barH} rx={3} fill={m.color} opacity={0.85} />
-                        {w > 30 && (
-                          <text x={x + 5} y={HEADER_H + 4 + barH / 2} dominantBaseline="middle" fontSize={10} fontWeight="600" fill="white" style={{ pointerEvents: "none", userSelect: "none" }}>
-                            {m.title.length > maxChars ? m.title.slice(0, maxChars) + "…" : m.title}
-                          </text>
-                        )}
+                        {sprintCount > 0
+                          ? Array.from({ length: sprintCount }, (_, i) => {
+                              const sx = wdToX(startDay + i * sprintDays);
+                              const ex = wdToX(Math.min(startDay + (i + 1) * sprintDays, endDay));
+                              const sw = ex - sx;
+                              return (
+                                <g key={`sp-${i}`} style={{ pointerEvents: "none" }}>
+                                  {i > 0 && (
+                                    <line x1={sx} y1={HEADER_H + 6} x2={sx} y2={HEADER_H + 2 + barH}
+                                      stroke="white" strokeWidth={0.75} opacity={0.4} />
+                                  )}
+                                  {sw > 20 && (
+                                    <text x={sx + sw / 2} y={HEADER_H + 4 + barH / 2}
+                                      textAnchor="middle" dominantBaseline="middle"
+                                      fontSize={9} fontWeight="600" fill="white" opacity={0.85}
+                                      style={{ userSelect: "none" }}>
+                                      S{i + 1}
+                                    </text>
+                                  )}
+                                </g>
+                              );
+                            })
+                          : w > 30 && (
+                              <text x={x + 5} y={HEADER_H + 4 + barH / 2} dominantBaseline="middle" fontSize={10} fontWeight="600" fill="white" style={{ pointerEvents: "none", userSelect: "none" }}>
+                                {m.title.length > Math.floor((w - 10) / 5.5) ? m.title.slice(0, Math.floor((w - 10) / 5.5)) + "…" : m.title}
+                              </text>
+                            )
+                        }
                       </g>
                     );
                   })}
@@ -617,6 +641,25 @@ export function Timeline({ result, features, settings, viewMode, onToggleView, r
                       x={0} y={HEADER_H + milestoneH + row.rowY} width={chartW} height={SUMMARY_ROW_H}
                       fill={i % 2 === 0 ? "#1d1930" : "#201c32"} />
                   ))}
+
+              {/* Sprint column bands — alternating tint per sprint within milestone range */}
+              {milestoneH > 0 && milestones.flatMap((m) => {
+                const sprintDays = (m.sprintLengthWeeks ?? 0) * 5;
+                if (!sprintDays) return [];
+                const { startDay, endDay } = milestoneWorkingDays(m, settings.calendarMode, settings.startDate, cal);
+                const bandsH = svgH - HEADER_H - milestoneH - BOTTOM_PAD;
+                const count = Math.ceil((endDay - startDay) / sprintDays);
+                return Array.from({ length: count }, (_, i) => {
+                  if (i % 2 === 0) return null;
+                  const sx = wdToX(startDay + i * sprintDays);
+                  const ex = wdToX(Math.min(startDay + (i + 1) * sprintDays, endDay));
+                  return (
+                    <rect key={`sprint-band-${m.id}-${i}`}
+                      x={sx} y={HEADER_H + milestoneH} width={Math.max(0, ex - sx)} height={bandsH}
+                      fill={m.color} opacity={0.07} style={{ pointerEvents: "none" }} />
+                  );
+                });
+              })}
 
               {/* Weekend strips — full-height overlay so task bars naturally bridge Fri→Mon */}
               {weekendStrips.map((wx) => (
