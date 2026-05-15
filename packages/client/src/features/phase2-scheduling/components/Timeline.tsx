@@ -91,6 +91,8 @@ function DraggableTaskBar({ task, y, barH, color, slotCount, disciplineBoundarie
     const origEnd   = task.endDay;   // last segment end for segmented tasks
     const origWd    = task.workingDays;
     setDragType(type);
+    document.body.style.userSelect = "none";
+    document.body.style.cursor = type === "move" ? "grabbing" : "ew-resize";
 
     function onMouseMove(e: MouseEvent) {
       const dx = e.clientX - clientX;
@@ -153,6 +155,8 @@ function DraggableTaskBar({ task, y, barH, color, slotCount, disciplineBoundarie
         return null;
       });
       setDragType(null);
+      document.body.style.userSelect = "";
+      document.body.style.cursor = "";
       window.removeEventListener("mousemove", onMouseMove);
       window.removeEventListener("mouseup", onMouseUp);
     }
@@ -201,7 +205,7 @@ function DraggableTaskBar({ task, y, barH, color, slotCount, disciplineBoundarie
               x={sx} y={dispY} width={sw} height={barH} rx={3}
               fill={color} opacity={isDragging ? 0.55 : 0.9}
               style={{ cursor: isDragging ? "grabbing" : "grab" }}
-              onMouseDown={(e) => { if (e.button !== 0) return; e.stopPropagation(); startDrag("move", e.clientX, e.clientY); }}
+              onMouseDown={(e) => { if (e.button !== 0) return; e.stopPropagation(); e.preventDefault(); startDrag("move", e.clientX, e.clientY); }}
               onDoubleClick={(e) => { if (isFirst) { e.stopPropagation(); callbacksRef.current.onEditTask(task); } }}
             />
 
@@ -226,7 +230,7 @@ function DraggableTaskBar({ task, y, barH, color, slotCount, disciplineBoundarie
                 width={RESIZE_HANDLE_W} height={barH}
                 fill={isDragging && dragType === "resize" ? "rgba(255,255,255,0.25)" : "transparent"}
                 style={{ cursor: "ew-resize" }}
-                onMouseDown={(e) => { if (e.button !== 0) return; e.stopPropagation(); startDrag("resize", e.clientX, e.clientY); }}
+                onMouseDown={(e) => { if (e.button !== 0) return; e.stopPropagation(); e.preventDefault(); startDrag("resize", e.clientX, e.clientY); }}
               />
             )}
 
