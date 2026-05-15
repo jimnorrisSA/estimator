@@ -650,13 +650,12 @@ export function Timeline({ result, features, settings, viewMode, onToggleView, r
                 const bandsH = svgH - HEADER_H - milestoneH - BOTTOM_PAD;
                 const count = Math.ceil((endDay - startDay) / sprintDays);
                 return Array.from({ length: count }, (_, i) => {
-                  if (i % 2 === 0) return null;
                   const sx = wdToX(startDay + i * sprintDays);
                   const ex = wdToX(Math.min(startDay + (i + 1) * sprintDays, endDay));
                   return (
                     <rect key={`sprint-band-${m.id}-${i}`}
                       x={sx} y={HEADER_H + milestoneH} width={Math.max(0, ex - sx)} height={bandsH}
-                      fill={m.color} opacity={0.07} style={{ pointerEvents: "none" }} />
+                      fill={m.color} opacity={i % 2 === 0 ? 0.05 : 0.12} style={{ pointerEvents: "none" }} />
                   );
                 });
               })}
