@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import type { Feature, EstimateUnit } from "@estimator/shared";
-import type { ScheduleResult, ScheduledTask, BlockedPeriod } from "../utils/scheduler.js";
+import type { ScheduleResult, ScheduledTask, BlockedPeriod, ResourceWindow } from "../utils/scheduler.js";
 import { computeTaskPlacement } from "../utils/scheduler.js";
 import type { ScheduleSettings } from "../store/schedulingStore.js";
 import { useSchedulingStore } from "../store/schedulingStore.js";
@@ -270,9 +270,10 @@ interface Props {
   settings: ScheduleSettings;
   viewMode: "detailed" | "summary";
   onToggleView: () => void;
+  resourceWindows: Record<string, ResourceWindow>;
 }
 
-export function Timeline({ result, features, settings, viewMode, onToggleView }: Props) {
+export function Timeline({ result, features, settings, viewMode, onToggleView, resourceWindows }: Props) {
   const { tasks, disciplines, capacities, projectEndDay, slotContingency, blockedPeriods } = result;
 
   const { setOverride, clearOverride, resources } = useSchedulingStore();
@@ -384,10 +385,34 @@ export function Timeline({ result, features, settings, viewMode, onToggleView }:
     if (changes.estimateValue !== editingTask.estimateValue || changes.estimateUnit !== editingTask.estimateUnit) {
       updateTaskEstimate(featureId, groupId, taskId, changes.estimateValue, changes.estimateUnit);
     }
-    setOverride(taskId, {
-      assignedResourceId: changes.assignedResourceId ?? undefined,
-      notes: changes.notes,
-    });
+
+    const newResourceId = changes.assignedResourceId ?? undefined;
+    let targetSlotIndex: number | undefined;
+    if (newResourceId) {
+      const discRes = resources.filter(r => r.role === editingTask.discipline);
+      const idx = discRes.findIndex(r => r.id === newResourceId);
+      if (idx >= 0) targetSlotIndex = idx;
+    }
+
+    if (targetSlotIndex !== undefined && targetSlotIndex !== editingTask.slotIndex) {
+      // Freeze all other discipline tasks at their current positions
+      for (const t of tasks) {
+        if (t.taskId === taskId || t.discipline !== editingTask.discipline) continue;
+        setOverride(t.taskId, { startDay: t.startDay, endDay: t.endDay, slotIndex: t.slotIndex });
+      }
+      setOverride(taskId, {
+        assignedResourceId: newResourceId,
+        notes: changes.notes,
+        slotIndex: targetSlotIndex,
+        startDay: editingTask.startDay,
+        endDay: editingTask.endDay,
+      });
+    } else {
+      setOverride(taskId, {
+        assignedResourceId: newResourceId,
+        notes: changes.notes,
+      });
+    }
   }
 
   const featureColors = useMemo(
@@ -430,6 +455,12 @@ export function Timeline({ result, features, settings, viewMode, onToggleView }:
       return layout;
     });
   }, [disciplines, capacities]);
+
+  const disciplineResources = useMemo(() => {
+    const map: Record<string, typeof resources[number][]> = {};
+    for (const d of disciplines) map[d] = resources.filter(r => r.role === d);
+    return map;
+  }, [disciplines, resources]);
 
   const detailedH =
     rowLayouts.length > 0
@@ -483,26 +514,50 @@ export function Timeline({ result, features, settings, viewMode, onToggleView }:
               </>
             )}
             {viewMode === "detailed"
-              ? rowLayouts.map((layout) => (
-                  <g key={layout.discipline}>
-                    <text
-                      x={LABEL_W - 12}
-                      y={HEADER_H + milestoneH + layout.rowY + layout.height / 2 - (layout.capacity > 1 ? 8 : 0)}
-                      textAnchor="end" dominantBaseline="middle" fontSize={13} fill="#c5bedf" fontWeight="600"
-                    >
-                      {layout.discipline}
-                    </text>
-                    {layout.capacity > 1 && (
+              ? rowLayouts.map((layout, layoutIdx) => {
+                  const discResources = disciplineResources[layout.discipline] ?? [];
+                  return (
+                    <g key={layout.discipline}>
+                      {/* Discipline name — small and dim at top of group */}
                       <text
-                        x={LABEL_W - 12}
-                        y={HEADER_H + milestoneH + layout.rowY + layout.height / 2 + 9}
-                        textAnchor="end" dominantBaseline="middle" fontSize={11} fill="#5c5575"
+                        x={LABEL_W - 8}
+                        y={HEADER_H + milestoneH + layout.rowY + 11}
+                        textAnchor="end" dominantBaseline="middle" fontSize={10} fill="#5c5575" fontStyle="italic"
                       >
-                        ×{layout.capacity} people
+                        {layout.discipline}
                       </text>
-                    )}
-                  </g>
-                ))
+                      {/* Per-slot resource names */}
+                      {Array.from({ length: layout.capacity }, (_, i) => {
+                        const resource = discResources[i];
+                        const slotCenterY = HEADER_H + milestoneH + layout.rowY + ROW_VPAD + i * SLOT_H + (SLOT_H - 4) / 2;
+                        const name = resource
+                          ? (resource.name.length > 12 ? resource.name.slice(0, 12) + "…" : resource.name)
+                          : null;
+                        return (
+                          <text
+                            key={i}
+                            x={LABEL_W - 8}
+                            y={slotCenterY}
+                            textAnchor="end" dominantBaseline="middle"
+                            fontSize={11}
+                            fill={resource ? "#c5bedf" : "#3d366a"}
+                            fontWeight={resource ? "600" : "400"}
+                          >
+                            {name ?? "—"}
+                          </text>
+                        );
+                      })}
+                      {/* Separator line between discipline groups */}
+                      {layoutIdx < rowLayouts.length - 1 && (
+                        <line
+                          x1={0} y1={HEADER_H + milestoneH + layout.rowY + layout.height + ROW_GAP / 2}
+                          x2={LABEL_W} y2={HEADER_H + milestoneH + layout.rowY + layout.height + ROW_GAP / 2}
+                          stroke="#2e2848" strokeWidth={1}
+                        />
+                      )}
+                    </g>
+                  );
+                })
               : summaryRows.map((row) => (
                   <text
                     key={row.featureId}
@@ -518,6 +573,12 @@ export function Timeline({ result, features, settings, viewMode, onToggleView }:
           {/* Scrollable chart */}
           <div className="overflow-x-auto flex-1" style={{ background: "#14112a" }}>
             <svg data-chart-svg width={chartW} height={svgH}>
+
+              <defs>
+                <pattern id="dz-hatch" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+                  <line x1="0" y1="0" x2="0" y2="8" stroke="#1e1a2e" strokeWidth="3.5" />
+                </pattern>
+              </defs>
 
               {/* Milestone lane */}
               {milestoneH > 0 && (
@@ -598,6 +659,46 @@ export function Timeline({ result, features, settings, viewMode, onToggleView }:
                   </g>
                 );
               })}
+
+              {/* Dead zone overlays — resource roll-on/roll-off unavailability */}
+              {viewMode === "detailed" && rowLayouts.flatMap((layout) =>
+                Array.from({ length: layout.capacity }, (_, i) => {
+                  const resource = (disciplineResources[layout.discipline] ?? [])[i];
+                  if (!resource) return null;
+                  const win = resourceWindows[resource.id];
+                  if (!win) return null;
+                  const zy = HEADER_H + milestoneH + layout.rowY + ROW_VPAD + i * SLOT_H;
+                  const zh = SLOT_H - 4;
+                  const zones: React.ReactNode[] = [];
+                  if (win.startDay > 0) {
+                    const x = 0;
+                    const w = wdToX(win.startDay);
+                    if (w > 0) {
+                      zones.push(
+                        <g key={`dz-before-${resource.id}`}>
+                          <title>{resource.name} — not yet available</title>
+                          <rect x={x} y={zy} width={w} height={zh} fill="url(#dz-hatch)" opacity={0.85} style={{ pointerEvents: "none" }} />
+                          <rect x={x} y={zy} width={w} height={zh} fill="#09070f" opacity={0.55} style={{ pointerEvents: "none" }} />
+                        </g>
+                      );
+                    }
+                  }
+                  if (win.endDay !== null) {
+                    const x = wdToX(win.endDay);
+                    const w = chartW - x;
+                    if (w > 0) {
+                      zones.push(
+                        <g key={`dz-after-${resource.id}`}>
+                          <title>{resource.name} — rolled off</title>
+                          <rect x={x} y={zy} width={w} height={zh} fill="url(#dz-hatch)" opacity={0.85} style={{ pointerEvents: "none" }} />
+                          <rect x={x} y={zy} width={w} height={zh} fill="#09070f" opacity={0.55} style={{ pointerEvents: "none" }} />
+                        </g>
+                      );
+                    }
+                  }
+                  return zones.length > 0 ? zones : null;
+                }).filter(Boolean)
+              )}
 
               {/* Date headers */}
               {settings.calendarMode === "four-week" ? (

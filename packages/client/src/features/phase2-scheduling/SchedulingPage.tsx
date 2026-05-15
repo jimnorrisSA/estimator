@@ -106,6 +106,7 @@ export function SchedulingPage() {
               settings={settings}
               viewMode={viewMode}
               onToggleView={() => setViewMode((v) => (v === "detailed" ? "summary" : "detailed"))}
+              resourceWindows={resourceWindows}
             />
           </section>
 

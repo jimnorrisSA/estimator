@@ -3,6 +3,7 @@ import { useMilestonesStore, type Milestone } from "./store/milestonesStore.js";
 import { useEstimationsStore } from "../phase1-estimations/store/estimationsStore.js";
 import { useSchedulingStore, CURRENCY_SYMBOLS, getConversionRate } from "../phase2-scheduling/store/schedulingStore.js";
 import { runScheduler } from "../phase2-scheduling/utils/scheduler.js";
+import type { ResourceWindow } from "../phase2-scheduling/utils/scheduler.js";
 import { buildWorkingDayCalendar, dateToWorkingDay, parseISODate } from "../phase2-scheduling/utils/calendarUtils.js";
 import { Timeline } from "../phase2-scheduling/components/Timeline.js";
 
@@ -34,6 +35,20 @@ export function MilestonesPage() {
       }),
     [milestones, settings.calendarMode, settings.startDate, cal]
   );
+
+  const resourceWindows = useMemo(() => {
+    const map: Record<string, ResourceWindow> = {};
+    for (const r of resources) {
+      const startDay = r.rollOnDate
+        ? dateToWorkingDay(r.rollOnDate, settings.calendarMode, settings.startDate, cal)
+        : 0;
+      const endDay = r.rollOffDate
+        ? dateToWorkingDay(r.rollOffDate, settings.calendarMode, settings.startDate, cal)
+        : null;
+      if (startDay > 0 || endDay !== null) map[r.id] = { startDay, endDay };
+    }
+    return map;
+  }, [resources, settings.calendarMode, settings.startDate, cal]);
 
   const result = useMemo(
     () => runScheduler(features, settings.contingencyPct, overrides, resources, settings.defaultDailyRate, blockedPeriods),
@@ -86,6 +101,7 @@ export function MilestonesPage() {
           settings={settings}
           viewMode={viewMode}
           onToggleView={() => setViewMode((v) => (v === "detailed" ? "summary" : "detailed"))}
+          resourceWindows={resourceWindows}
         />
 
         {/* Cost breakdown */}
