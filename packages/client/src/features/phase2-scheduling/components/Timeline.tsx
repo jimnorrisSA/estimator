@@ -319,30 +319,23 @@ export function Timeline({ result, features, settings, viewMode, onToggleView }:
       return;
     }
 
-    const isSameSlot = targetSlot === movedTask.slotIndex;
-
-    // Freeze all tasks in the affected slots at their current positions so the
-    // scheduler doesn't repack them. Only the dragged task moves — no cascade.
-    const affectedTasks = tasks.filter(
-      (t) =>
-        t.taskId !== taskId &&
-        t.discipline === movedTask.discipline &&
-        (t.slotIndex === movedTask.slotIndex || (!isSameSlot && t.slotIndex === targetSlot))
-    );
-    for (const t of affectedTasks) {
-      if (!t.isPinned) setOverride(t.taskId, { startDay: t.startDay, endDay: t.endDay });
+    // Freeze every task in the discipline at its current rendered position,
+    // including slotIndex. This prevents the scheduler from repacking any slot
+    // on the next render — only the dragged task and explicitly pushed tasks move.
+    for (const t of tasks) {
+      if (t.taskId === taskId || t.discipline !== movedTask.discipline) continue;
+      setOverride(t.taskId, { startDay: t.startDay, endDay: t.endDay, slotIndex: t.slotIndex });
     }
 
     setOverride(taskId, { startDay, endDay, slotIndex: targetSlot });
 
-    // Push forward any tasks in the target slot that now overlap the dropped task.
-    // Only ever move tasks later — never earlier than their current position.
+    // Push forward tasks in the target slot that overlap the dropped position.
+    // Pinned tasks are included — intentional insertion should displace whatever is in the way.
     const targetTasks = tasks
       .filter(t =>
         t.taskId !== taskId &&
         t.discipline === movedTask.discipline &&
-        t.slotIndex === targetSlot &&
-        !t.isPinned
+        t.slotIndex === targetSlot
       )
       .sort((a, b) => a.startDay - b.startDay);
 
