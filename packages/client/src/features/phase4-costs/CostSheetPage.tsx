@@ -67,16 +67,37 @@ export function CostSheetPage() {
   const usdRate    = settings.exchangeRates?.USD ?? 1.35;
   const revenueGBP = settings.revenueGBP ?? 0;
 
+  const agencyFeePct   = settings.agencyFeePct   ?? 10;
+  const agencyFeeLabel = settings.agencyFeeLabel ?? "DDM";
+
   const [contingencyEnabled, setContingencyEnabled] = useState(true);
   const [contingencyDraft,   setContingencyDraft]   = useState(String(contingencyPct));
+  const [agencyFeeEnabled,   setAgencyFeeEnabled]   = useState(true);
+  const [agencyFeePctDraft,  setAgencyFeePctDraft]  = useState(String(agencyFeePct));
+  const [agencyFeeLabelDraft, setAgencyFeeLabelDraft] = useState(agencyFeeLabel);
 
   useEffect(() => { setContingencyDraft(String(contingencyPct)); }, [contingencyPct]);
+  useEffect(() => { setAgencyFeePctDraft(String(agencyFeePct)); }, [agencyFeePct]);
+  useEffect(() => { setAgencyFeeLabelDraft(agencyFeeLabel); }, [agencyFeeLabel]);
 
   function commitContingency() {
     const v = parseFloat(contingencyDraft);
     const pct = isNaN(v) || v < 0 ? 0 : v;
     updateSettings({ contingencyPct: pct });
     setContingencyDraft(String(pct));
+  }
+
+  function commitAgencyFeePct() {
+    const v = parseFloat(agencyFeePctDraft);
+    const pct = isNaN(v) || v < 0 ? 0 : v;
+    updateSettings({ agencyFeePct: pct });
+    setAgencyFeePctDraft(String(pct));
+  }
+
+  function commitAgencyFeeLabel() {
+    const label = agencyFeeLabelDraft.trim() || "Agency";
+    updateSettings({ agencyFeeLabel: label });
+    setAgencyFeeLabelDraft(label);
   }
 
   // Partial sums: resources with unknown dates are excluded but don't block the total
@@ -106,8 +127,10 @@ export function CostSheetPage() {
   const totalExcluded = fteSub.excluded + contractorSub.excluded;
   const grandTotal    = fteSub.sum + contractorSub.sum;
   const contingencyAmount = contingencyEnabled ? grandTotal * (contingencyPct / 100) : 0;
-  const atCost  = grandTotal + contingencyAmount;
-  const profit  = revenueGBP > 0 ? revenueGBP - atCost : null;
+  const atCost        = grandTotal + contingencyAmount;
+  const agencyFeeAmount = agencyFeeEnabled ? atCost * (agencyFeePct / 100) : 0;
+  const totalDelivery = atCost + agencyFeeAmount;
+  const profit  = revenueGBP > 0 ? revenueGBP - totalDelivery : null;
   const margin  = profit !== null && revenueGBP > 0 ? (profit / revenueGBP) * 100 : null;
 
   const missingRates = resources.filter((r) => !effectiveRate(r, defaultMonthlyRate));
@@ -145,7 +168,7 @@ export function CostSheetPage() {
       <FinancialOverview
         totalMM={totalMM}
         totalMMExcluded={totalMMExcluded}
-        atCost={atCost}
+        atCost={totalDelivery}
         revenueGBP={revenueGBP}
         profit={profit}
         margin={margin}
@@ -196,7 +219,7 @@ export function CostSheetPage() {
         <div className="px-6 py-4 bg-[#14112a] border-b border-[#2e2848] flex flex-wrap items-center gap-4">
           <div>
             <h2 className="text-sm font-bold uppercase tracking-widest text-[#9b93ba]">Cost Summary</h2>
-            <p className="text-xs text-[#3a3456] mt-0.5">Total project delivery cost including contingency</p>
+            <p className="text-xs text-[#3a3456] mt-0.5">Total project delivery cost including all fees</p>
           </div>
 
           {/* Contingency toggle */}
@@ -215,6 +238,37 @@ export function CostSheetPage() {
               disabled={!contingencyEnabled}
               onChange={(e) => setContingencyDraft(e.target.value)}
               onBlur={commitContingency}
+              onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
+            />
+            <span className="text-xs text-[#5c5575]">%</span>
+          </label>
+
+          {/* Agency fee toggle */}
+          <label className="flex items-center gap-2 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={agencyFeeEnabled}
+              onChange={(e) => setAgencyFeeEnabled(e.target.checked)}
+              className="w-4 h-4 accent-[#7c3aed] cursor-pointer"
+            />
+            <input
+              type="text"
+              className="w-16 border border-[#2e2848] bg-[#1a1628] text-[#ece7ff] rounded px-2 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-[#7c3aed] disabled:opacity-40"
+              value={agencyFeeLabelDraft}
+              disabled={!agencyFeeEnabled}
+              onChange={(e) => setAgencyFeeLabelDraft(e.target.value)}
+              onBlur={commitAgencyFeeLabel}
+              onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
+              title="Agency name"
+            />
+            <span className="text-xs text-[#5c5575]">fee</span>
+            <input
+              type="number" min={0} max={100} step={0.5}
+              className="w-14 border border-[#2e2848] bg-[#1a1628] text-[#ece7ff] rounded px-2 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-[#7c3aed] disabled:opacity-40 tabular-nums"
+              value={agencyFeePctDraft}
+              disabled={!agencyFeeEnabled}
+              onChange={(e) => setAgencyFeePctDraft(e.target.value)}
+              onBlur={commitAgencyFeePct}
               onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
             />
             <span className="text-xs text-[#5c5575]">%</span>
@@ -242,8 +296,14 @@ export function CostSheetPage() {
           {contingencyEnabled && (
             <SummaryRow label={`Contingency (${contingencyPct}%)`} gbp={contingencyAmount} usdRate={usdRate} muted />
           )}
+          {agencyFeeEnabled && (
+            <>
+              <div className="border-t border-[#2e2848] my-1" />
+              <SummaryRow label={`${agencyFeeLabel} fee (${agencyFeePct}% of at-cost)`} gbp={agencyFeeAmount} usdRate={usdRate} muted />
+            </>
+          )}
           <div className="border-t border-[#2e2848] my-1" />
-          <SummaryRow label="At Cost" gbp={atCost} usdRate={usdRate} highlight />
+          <SummaryRow label="Total delivery cost" gbp={totalDelivery} usdRate={usdRate} highlight />
 
           {totalExcluded > 0 && (
             <p className="text-xs text-amber-400 mt-1">

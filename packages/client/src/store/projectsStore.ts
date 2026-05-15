@@ -57,6 +57,8 @@ const DEFAULT_SETTINGS: ScheduleSettings = {
   currency: "GBP",
   defaultMonthlyRate: 6700,
   workingDaysPerMonth: 22,
+  agencyFeePct: 10,
+  agencyFeeLabel: "DDM",
   exchangeRates: { USD: 1.35, EUR: 1.17, AUD: 1.94 },
   revenueGBP: 0,
 };

@@ -21,6 +21,8 @@ export interface ScheduleSettings {
   currency: Currency;
   defaultMonthlyRate: number; // fallback rate when task has no assigned resource
   workingDaysPerMonth: number; // used to convert monthly rate → daily cost (typically 22)
+  agencyFeePct: number;   // % charged by the finder agency on total delivery cost (default 10)
+  agencyFeeLabel: string; // agency name shown on cost sheet (default "DDM")
   exchangeRates: Record<string, number>; // GBP → X conversion rates
   revenueGBP: number; // client revenue stored in GBP
 }
@@ -92,6 +94,8 @@ export const useSchedulingStore = create<SchedulingStore>()(
         currency: "GBP",
         defaultMonthlyRate: 6700,
         workingDaysPerMonth: 22,
+        agencyFeePct: 10,
+        agencyFeeLabel: "DDM",
         exchangeRates: { USD: 1.35, EUR: 1.17, AUD: 1.94 },
         revenueGBP: 0,
       },
