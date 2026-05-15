@@ -184,7 +184,13 @@ export function runScheduler(
           slotIndex = candidates.reduce((best, i) => (slots[i] < slots[best] ? i : best), candidates[0]);
         }
 
-        const placementStart = isPinned && ov.startDay != null ? ov.startDay : slots[slotIndex];
+        let placementStart = isPinned && ov.startDay != null ? ov.startDay : slots[slotIndex];
+        // Always respect roll-on date — a pinned position before the resource joins is invalid.
+        const slotRes = disciplineResources[discipline][slotIndex];
+        if (slotRes) {
+          const win = resourceWindows[slotRes.id];
+          if (win && placementStart < win.startDay) placementStart = win.startDay;
+        }
         const placement = computeTaskPlacement(placementStart, wd, blockedPeriods);
         const { startDay, endDay } = placement;
 
