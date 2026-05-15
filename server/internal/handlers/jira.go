@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
@@ -23,6 +24,25 @@ const jiraOAuthStateKey = "jira_oauth_state"
 //   - JIRA_OAUTH_CLIENT_SECRET
 //   - JIRA_OAUTH_REDIRECT_URI
 //   - JIRA_TOKEN_ENCRYPTION_KEY  (64 hex chars = 32 bytes)
+// RegisterJiraTopLevelRoutes registers the OAuth callback on a fixed path outside
+// the /projects/:id/ group so a single redirect URI can be registered with Atlassian.
+// Call this on the root router group (no auth middleware — Atlassian redirects here).
+func RegisterJiraTopLevelRoutes(r *gin.Engine, db *mongo.Database) {
+	cfg := jira.OAuthConfig{
+		ClientID:     os.Getenv("JIRA_OAUTH_CLIENT_ID"),
+		ClientSecret: os.Getenv("JIRA_OAUTH_CLIENT_SECRET"),
+		RedirectURI:  os.Getenv("JIRA_OAUTH_REDIRECT_URI"),
+	}
+	encKeyHex := os.Getenv("JIRA_TOKEN_ENCRYPTION_KEY")
+	encKey, err := hex.DecodeString(encKeyHex)
+	if err != nil || len(encKey) != 32 {
+		encKey = make([]byte, 32)
+	}
+	svc := jira.NewService(db, cfg, encKey)
+	h := &jiraHandler{svc: svc, db: db}
+	r.GET("/api/jira/oauth/callback", h.oauthCallback)
+}
+
 func RegisterJiraRoutes(rg *gin.RouterGroup, db *mongo.Database) {
 	cfg := jira.OAuthConfig{
 		ClientID:     os.Getenv("JIRA_OAUTH_CLIENT_ID"),
@@ -33,8 +53,6 @@ func RegisterJiraRoutes(rg *gin.RouterGroup, db *mongo.Database) {
 	encKeyHex := os.Getenv("JIRA_TOKEN_ENCRYPTION_KEY")
 	encKey, err := hex.DecodeString(encKeyHex)
 	if err != nil || len(encKey) != 32 {
-		// Fall back to a zero key in dev so the server still starts.
-		// Production must have a valid 64-char hex key.
 		encKey = make([]byte, 32)
 	}
 
@@ -44,7 +62,6 @@ func RegisterJiraRoutes(rg *gin.RouterGroup, db *mongo.Database) {
 	project := rg.Group("/projects/:id/jira")
 	{
 		project.GET("/oauth/start", h.oauthStart)
-		project.GET("/oauth/callback", h.oauthCallback)
 		project.DELETE("/disconnect", h.disconnect)
 
 		project.POST("/import/project", h.importProject)
@@ -133,9 +150,15 @@ func (h *jiraHandler) oauthCallback(c *gin.Context) {
 	session.Delete(jiraOAuthStateKey)
 	session.Save() //nolint:errcheck
 
-	// Decode project ID from the state suffix.
-	projectID, ok := projectIDFromParam(c)
-	if !ok {
+	// Extract project ID from the state suffix (<random>_<projectIDHex>).
+	parts := strings.SplitN(state, "_", 2)
+	if len(parts) != 2 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "malformed state"})
+		return
+	}
+	projectID, err := primitive.ObjectIDFromHex(parts[1])
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid project id in state"})
 		return
 	}
 
