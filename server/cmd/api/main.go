@@ -103,6 +103,7 @@ func main() {
 
 	api := r.Group("/api", middleware.RequireAuth())
 	handlers.RegisterProjectRoutes(api, database)
+	handlers.RegisterJiraRoutes(api, database)
 
 	port := os.Getenv("PORT")
 	if port == "" {

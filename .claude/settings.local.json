@@ -44,7 +44,8 @@
       "Bash(powershell *)",
       "Bash(git -C \"C:\\\\Users\\\\jnorris\\\\git\\\\estimator\" status)",
       "Bash(git -C \"C:\\\\Users\\\\jnorris\\\\git\\\\estimator\" diff --stat)",
-      "Bash(git *)"
+      "Bash(git *)",
+      "Bash(go vet *)"
     ]
   }
 }
