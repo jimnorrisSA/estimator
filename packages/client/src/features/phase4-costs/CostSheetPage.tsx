@@ -62,7 +62,8 @@ function Dual({ gbp, usdRate, color, size = "sm" }: { gbp: number; usdRate: numb
 
 export function CostSheetPage() {
   const { settings, resources, updateSettings } = useSchedulingStore();
-  const { defaultMonthlyRate, contingencyPct, startDate, targetEndDate, calendarMode, workingDaysPerMonth } = settings;
+  const { defaultMonthlyRate, contingencyPct, startDate, targetEndDate, calendarMode } = settings;
+  const workingDaysPerMonth = settings.workingDaysPerMonth ?? 22;
   const usdRate    = settings.exchangeRates?.USD ?? 1.35;
   const revenueGBP = settings.revenueGBP ?? 0;
 

@@ -164,6 +164,16 @@ export const useSchedulingStore = create<SchedulingStore>()(
         });
       },
     }),
-    { name: "estimator-scheduling-v1" }
+    {
+      name: "estimator-scheduling-v1",
+      merge: (persisted, current) => ({
+        ...current,
+        ...(persisted as Partial<SchedulingStore>),
+        settings: {
+          ...current.settings,
+          ...((persisted as Partial<SchedulingStore>)?.settings ?? {}),
+        },
+      }),
+    }
   )
 );
