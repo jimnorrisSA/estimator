@@ -51,8 +51,8 @@ export function MilestonesPage() {
   }, [resources, settings.calendarMode, settings.startDate, cal]);
 
   const result = useMemo(
-    () => runScheduler(features, settings.contingencyPct, overrides, resources, settings.defaultDailyRate, blockedPeriods, resourceWindows),
-    [features, settings.contingencyPct, overrides, resources, settings.defaultDailyRate, blockedPeriods, resourceWindows]
+    () => runScheduler(features, settings.contingencyPct, overrides, resources, settings.defaultMonthlyRate, blockedPeriods, resourceWindows, settings.workingDaysPerMonth),
+    [features, settings.contingencyPct, overrides, resources, settings.defaultMonthlyRate, blockedPeriods, resourceWindows, settings.workingDaysPerMonth]
   );
 
   const hasCosts = result.tasks.some((t) => t.cost > 0);

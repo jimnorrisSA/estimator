@@ -56,7 +56,7 @@ export interface Resource {
   rollOnDate: string;
   rollOffDate: string;
   allocationPct: number;
-  dailyRate: number;        // 0 on FTE means "use project default rate"
+  monthlyRate: number;      // 0 on FTE means "use project default monthly rate"
   currency: string;
   notes: string;
   plantasticUserId?: string;

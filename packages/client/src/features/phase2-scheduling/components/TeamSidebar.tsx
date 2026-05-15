@@ -13,20 +13,20 @@ const DISCIPLINE_STYLES: Record<Discipline, { dot: string; badge: string }> = {
   Custom:     { dot: "bg-gray-500",   badge: "bg-gray-800 text-gray-400" },
 };
 
-type ResourcePatch = Partial<Pick<Resource, "name" | "resourceType" | "dailyRate" | "allocationPct" | "rollOnDate" | "rollOffDate">>;
+type ResourcePatch = Partial<Pick<Resource, "name" | "resourceType" | "monthlyRate" | "allocationPct" | "rollOnDate" | "rollOffDate">>;
 
 interface Props {
   resources: Resource[];
   currency: Currency;
-  defaultDailyRate: number;
+  defaultMonthlyRate: number;
   onAdd: (role: Discipline, name: string) => void;
   onUpdate: (id: string, patch: ResourcePatch) => void;
   onDelete: (id: string) => void;
 }
 
-export function TeamSidebar({ resources, currency, defaultDailyRate, onAdd, onUpdate, onDelete }: Props) {
+export function TeamSidebar({ resources, currency, defaultMonthlyRate, onAdd, onUpdate, onDelete }: Props) {
   const symbol = CURRENCY_SYMBOLS[currency];
-  const hasRates = resources.some((r) => r.dailyRate > 0 || ((r.resourceType || "Contractor") === "FTE" && defaultDailyRate > 0));
+  const hasRates = resources.some((r) => r.monthlyRate > 0 || ((r.resourceType || "Contractor") === "FTE" && defaultMonthlyRate > 0));
 
   return (
     <div className="w-56 flex-shrink-0 border-l border-[#2e2848] bg-[#14112a] flex flex-col h-full">
@@ -51,7 +51,7 @@ export function TeamSidebar({ resources, currency, defaultDailyRate, onAdd, onUp
             discipline={discipline}
             members={resources.filter((r) => r.role === discipline)}
             symbol={symbol}
-            defaultDailyRate={defaultDailyRate}
+            defaultMonthlyRate={defaultMonthlyRate}
             onAdd={(name) => onAdd(discipline, name)}
             onUpdate={onUpdate}
             onDelete={onDelete}
@@ -61,7 +61,7 @@ export function TeamSidebar({ resources, currency, defaultDailyRate, onAdd, onUp
 
       {/* Total cost footer */}
       {hasRates && (
-        <TotalCostFooter resources={resources} symbol={symbol} defaultDailyRate={defaultDailyRate} />
+        <TotalCostFooter resources={resources} symbol={symbol} defaultMonthlyRate={defaultMonthlyRate} />
       )}
     </div>
   );
@@ -73,7 +73,7 @@ function DisciplineSection({
   discipline,
   members,
   symbol,
-  defaultDailyRate,
+  defaultMonthlyRate,
   onAdd,
   onUpdate,
   onDelete,
@@ -81,7 +81,7 @@ function DisciplineSection({
   discipline: Discipline;
   members: Resource[];
   symbol: string;
-  defaultDailyRate: number;
+  defaultMonthlyRate: number;
   onAdd: (name: string) => void;
   onUpdate: (id: string, patch: ResourcePatch) => void;
   onDelete: (id: string) => void;
@@ -112,7 +112,7 @@ function DisciplineSection({
             key={m.id}
             member={m}
             symbol={symbol}
-            defaultDailyRate={defaultDailyRate}
+            defaultMonthlyRate={defaultMonthlyRate}
             onUpdate={onUpdate}
             onDelete={onDelete}
           />
@@ -160,13 +160,13 @@ function formatDateHint(rollOnDate: string, rollOffDate: string): string | null 
 function MemberRow({
   member,
   symbol,
-  defaultDailyRate,
+  defaultMonthlyRate,
   onUpdate,
   onDelete,
 }: {
   member: Resource;
   symbol: string;
-  defaultDailyRate: number;
+  defaultMonthlyRate: number;
   onUpdate: (id: string, patch: ResourcePatch) => void;
   onDelete: (id: string) => void;
 }) {
@@ -174,8 +174,8 @@ function MemberRow({
   const effectiveType: ResourceType = (member.resourceType || "Contractor") as ResourceType;
   const [draftName, setDraftName] = useState(member.name);
   const [draftType, setDraftType] = useState<ResourceType>(effectiveType);
-  const [draftRate, setDraftRate] = useState(String(member.dailyRate || ""));
-  const [useDefault, setUseDefault] = useState(effectiveType === "FTE" && !member.dailyRate);
+  const [draftRate, setDraftRate] = useState(String(member.monthlyRate || ""));
+  const [useDefault, setUseDefault] = useState(effectiveType === "FTE" && !member.monthlyRate);
   const [draftAlloc, setDraftAlloc] = useState(String(member.allocationPct ?? 100));
   const [draftRollOn, setDraftRollOn] = useState(member.rollOnDate || "");
   const [draftRollOff, setDraftRollOff] = useState(member.rollOffDate || "");
@@ -184,8 +184,8 @@ function MemberRow({
     const t: ResourceType = (member.resourceType || "Contractor") as ResourceType;
     setDraftName(member.name);
     setDraftType(t);
-    setDraftRate(String(member.dailyRate || ""));
-    setUseDefault(t === "FTE" && !member.dailyRate);
+    setDraftRate(String(member.monthlyRate || ""));
+    setUseDefault(t === "FTE" && !member.monthlyRate);
     setDraftAlloc(String(member.allocationPct ?? 100));
     setDraftRollOn(member.rollOnDate || "");
     setDraftRollOff(member.rollOffDate || "");
@@ -194,7 +194,7 @@ function MemberRow({
 
   function handleTypeChange(t: ResourceType) {
     setDraftType(t);
-    if (t === "FTE") setUseDefault(!member.dailyRate);
+    if (t === "FTE") setUseDefault(!member.monthlyRate);
   }
 
   function commitEdit() {
@@ -204,7 +204,7 @@ function MemberRow({
     onUpdate(member.id, {
       name,
       resourceType: draftType,
-      dailyRate: rate,
+      monthlyRate: rate,
       allocationPct: alloc,
       rollOnDate: draftRollOn || "",
       rollOffDate: draftRollOff || "",
@@ -213,7 +213,7 @@ function MemberRow({
   }
 
   const dateHint = formatDateHint(member.rollOnDate, member.rollOffDate);
-  const displayRate = effectiveType === "FTE" && !member.dailyRate ? defaultDailyRate : member.dailyRate;
+  const displayRate = effectiveType === "FTE" && !member.monthlyRate ? defaultMonthlyRate : member.monthlyRate;
   const allocLabel = (member.allocationPct ?? 100) < 100 ? ` · ${member.allocationPct}%` : "";
 
   if (editing) {
@@ -259,7 +259,7 @@ function MemberRow({
               />
               <span className="text-xs text-[#9b93ba]">
                 Use project default
-                {defaultDailyRate > 0 && ` (${symbol}${defaultDailyRate.toLocaleString()})`}
+                {defaultMonthlyRate > 0 && ` (${symbol}${defaultMonthlyRate.toLocaleString()}/mo)`}
               </span>
             </label>
             {!useDefault && (
@@ -284,7 +284,7 @@ function MemberRow({
               className="flex-1 text-sm border border-[#2e2848] bg-[#1a1628] text-[#ece7ff] rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-[#7c3aed] placeholder:text-[#3a3456]"
               value={draftRate}
               onChange={(e) => setDraftRate(e.target.value)}
-              placeholder="Daily rate"
+              placeholder="Monthly rate"
               onKeyDown={(e) => { if (e.key === "Enter") commitEdit(); if (e.key === "Escape") setEditing(false); }}
             />
           </div>
@@ -391,11 +391,11 @@ function MemberRow({
 
 // ─── Cost footer ──────────────────────────────────────────────────────────────
 
-function TotalCostFooter({ resources, symbol, defaultDailyRate }: { resources: Resource[]; symbol: string; defaultDailyRate: number }) {
+function TotalCostFooter({ resources, symbol, defaultMonthlyRate }: { resources: Resource[]; symbol: string; defaultMonthlyRate: number }) {
   const byDiscipline = DISCIPLINES.map((d) => ({
     discipline: d,
     members: resources.filter((r) => r.role === d).filter((r) => {
-      const rate = (r.resourceType === "FTE" && !r.dailyRate) ? defaultDailyRate : r.dailyRate;
+      const rate = (r.resourceType === "FTE" && !r.monthlyRate) ? defaultMonthlyRate : r.monthlyRate;
       return rate > 0;
     }),
   })).filter((g) => g.members.length > 0);
@@ -403,11 +403,11 @@ function TotalCostFooter({ resources, symbol, defaultDailyRate }: { resources: R
   if (byDiscipline.length === 0) return null;
 
   const effectiveRate = (r: Resource) =>
-    (r.resourceType === "FTE" && !r.dailyRate) ? defaultDailyRate : r.dailyRate;
+    (r.resourceType === "FTE" && !r.monthlyRate) ? defaultMonthlyRate : r.monthlyRate;
 
   return (
     <div className="border-t border-[#2e2848] px-4 py-3 flex flex-col gap-1">
-      <p className="text-xs font-semibold text-[#5c5575] uppercase tracking-wide mb-1">Daily team cost</p>
+      <p className="text-xs font-semibold text-[#5c5575] uppercase tracking-wide mb-1">Monthly team cost</p>
       {byDiscipline.map(({ discipline, members }) => {
         const total = members.reduce((s, m) => s + effectiveRate(m), 0);
         return (
@@ -420,7 +420,7 @@ function TotalCostFooter({ resources, symbol, defaultDailyRate }: { resources: R
         );
       })}
       <div className="flex justify-between text-sm font-semibold pt-1 border-t border-[#2e2848] mt-0.5">
-        <span className="text-[#9b93ba]">Total / day</span>
+        <span className="text-[#9b93ba]">Total / month</span>
         <span className="text-[#a78bfa] tabular-nums">
           {symbol}{resources.reduce((s, r) => s + effectiveRate(r), 0).toLocaleString()}
         </span>

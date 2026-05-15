@@ -56,8 +56,8 @@ export function SchedulingPage() {
   }, [resources, settings.calendarMode, settings.startDate, cal]);
 
   const result = useMemo(
-    () => runScheduler(features, settings.contingencyPct, overrides, resources, settings.defaultDailyRate, blockedPeriods, resourceWindows),
-    [features, settings.contingencyPct, overrides, resources, settings.defaultDailyRate, blockedPeriods, resourceWindows]
+    () => runScheduler(features, settings.contingencyPct, overrides, resources, settings.defaultMonthlyRate, blockedPeriods, resourceWindows, settings.workingDaysPerMonth),
+    [features, settings.contingencyPct, overrides, resources, settings.defaultMonthlyRate, blockedPeriods, resourceWindows, settings.workingDaysPerMonth]
   );
 
   const symbol = CURRENCY_SYMBOLS[settings.currency];
@@ -129,7 +129,7 @@ export function SchedulingPage() {
       <TeamSidebar
         resources={resources}
         currency={settings.currency}
-        defaultDailyRate={settings.defaultDailyRate}
+        defaultMonthlyRate={settings.defaultMonthlyRate}
         onAdd={addResource}
         onUpdate={updateResource}
         onDelete={deleteResource}

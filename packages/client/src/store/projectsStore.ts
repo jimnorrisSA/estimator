@@ -55,7 +55,8 @@ const DEFAULT_SETTINGS: ScheduleSettings = {
   calendarMode: "four-week",
   contingencyPct: 15,
   currency: "GBP",
-  defaultDailyRate: 0,
+  defaultMonthlyRate: 6700,
+  workingDaysPerMonth: 22,
   exchangeRates: { USD: 1.35, EUR: 1.17, AUD: 1.94 },
   revenueGBP: 0,
 };

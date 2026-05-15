@@ -19,35 +19,23 @@ export function SettingsPanel({ settings, onChange }: Props) {
   const conversionRate = settings.currency === "GBP" ? 1 : (settings.exchangeRates?.[settings.currency] ?? 1);
 
   const toDisplay = (gbp: number) => Math.round(gbp * conversionRate);
-  const toGbp = (display: number) => display / conversionRate;
 
-  const [dayDraft, setDayDraft] = useState(
-    settings.defaultDailyRate > 0 ? String(toDisplay(settings.defaultDailyRate)) : ""
-  );
   const [monthDraft, setMonthDraft] = useState(
-    settings.defaultDailyRate > 0 ? String(toDisplay(settings.defaultDailyRate * 20)) : ""
+    settings.defaultMonthlyRate > 0 ? String(toDisplay(settings.defaultMonthlyRate)) : ""
   );
   useEffect(() => {
-    setDayDraft(settings.defaultDailyRate > 0 ? String(Math.round(settings.defaultDailyRate * conversionRate)) : "");
-    setMonthDraft(settings.defaultDailyRate > 0 ? String(Math.round(settings.defaultDailyRate * 20 * conversionRate)) : "");
-  }, [settings.currency, settings.exchangeRates, settings.defaultDailyRate, conversionRate]);
+    setMonthDraft(settings.defaultMonthlyRate > 0 ? String(Math.round(settings.defaultMonthlyRate * conversionRate)) : "");
+  }, [settings.currency, settings.exchangeRates, settings.defaultMonthlyRate, conversionRate]);
 
-  function commitDayRate(raw: string) {
-    const v = parseFloat(raw);
-    const displayVal = isNaN(v) || v < 0 ? 0 : v;
-    const gbp = toGbp(displayVal);
-    onChange({ defaultDailyRate: gbp });
-    setDayDraft(gbp > 0 ? String(Math.round(gbp * conversionRate)) : "");
-    setMonthDraft(gbp > 0 ? String(Math.round(gbp * 20 * conversionRate)) : "");
-  }
+  const [wdpmDraft, setWdpmDraft] = useState(String(settings.workingDaysPerMonth ?? 22));
+  useEffect(() => { setWdpmDraft(String(settings.workingDaysPerMonth ?? 22)); }, [settings.workingDaysPerMonth]);
 
   function commitMonthRate(raw: string) {
     const v = parseFloat(raw);
-    const displayMonthly = isNaN(v) || v < 0 ? 0 : v;
-    const gbp = toGbp(displayMonthly) / 20;
-    onChange({ defaultDailyRate: gbp });
-    setMonthDraft(displayMonthly > 0 ? String(Math.round(displayMonthly)) : "");
-    setDayDraft(gbp > 0 ? String(Math.round(gbp * conversionRate)) : "");
+    const monthly = isNaN(v) || v < 0 ? 0 : v;
+    const gbp = monthly / conversionRate;
+    onChange({ defaultMonthlyRate: gbp });
+    setMonthDraft(monthly > 0 ? String(Math.round(monthly)) : "");
   }
 
   return (
@@ -136,40 +124,40 @@ export function SettingsPanel({ settings, onChange }: Props) {
         </select>
       </Field>
 
-      <Field label={`Default rate (${symbol})`}>
-        <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1">
-            <span className="text-xs text-[#5c5575]">Day</span>
-            <span className="text-sm text-[#5c5575]">{symbol}</span>
-            <input
-              type="number"
-              min={0}
-              step={50}
-              placeholder="400"
-              className="border border-[#2e2848] bg-[#1a1628] text-[#ece7ff] rounded-lg px-2 py-1.5 text-sm w-24 focus:outline-none focus:ring-2 focus:ring-[#7c3aed] placeholder:text-[#3a3456]"
-              value={dayDraft}
-              onChange={(e) => setDayDraft(e.target.value)}
-              onBlur={() => commitDayRate(dayDraft)}
-              onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
-            />
-          </div>
-          <span className="text-[#3a3456] text-sm">·</span>
-          <div className="flex items-center gap-1">
-            <span className="text-xs text-[#5c5575]">Month</span>
-            <span className="text-sm text-[#5c5575]">{symbol}</span>
-            <input
-              type="number"
-              min={0}
-              step={500}
-              placeholder="8000"
-              className="border border-[#2e2848] bg-[#1a1628] text-[#ece7ff] rounded-lg px-2 py-1.5 text-sm w-28 focus:outline-none focus:ring-2 focus:ring-[#7c3aed] placeholder:text-[#3a3456]"
-              value={monthDraft}
-              onChange={(e) => setMonthDraft(e.target.value)}
-              onBlur={() => commitMonthRate(monthDraft)}
-              onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
-            />
-          </div>
+      <Field label={`Default monthly rate (${symbol})`}>
+        <div className="flex items-center gap-1">
+          <span className="text-sm text-[#5c5575]">{symbol}</span>
+          <input
+            type="number"
+            min={0}
+            step={500}
+            placeholder="e.g. 6700"
+            className="border border-[#2e2848] bg-[#1a1628] text-[#ece7ff] rounded-lg px-2 py-1.5 text-sm w-28 focus:outline-none focus:ring-2 focus:ring-[#7c3aed] placeholder:text-[#3a3456]"
+            value={monthDraft}
+            onChange={(e) => setMonthDraft(e.target.value)}
+            onBlur={() => commitMonthRate(monthDraft)}
+            onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
+          />
         </div>
+      </Field>
+
+      <Field label="Working days / month">
+        <input
+          type="number"
+          min={1}
+          max={31}
+          step={1}
+          className="border border-[#2e2848] bg-[#1a1628] text-[#ece7ff] rounded-lg px-3 py-1.5 text-sm w-20 focus:outline-none focus:ring-2 focus:ring-[#7c3aed]"
+          value={wdpmDraft}
+          onChange={(e) => setWdpmDraft(e.target.value)}
+          onBlur={() => {
+            const v = parseInt(wdpmDraft, 10);
+            const clamped = isNaN(v) || v < 1 ? 22 : Math.min(v, 31);
+            onChange({ workingDaysPerMonth: clamped });
+            setWdpmDraft(String(clamped));
+          }}
+          onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
+        />
       </Field>
 
     </div>

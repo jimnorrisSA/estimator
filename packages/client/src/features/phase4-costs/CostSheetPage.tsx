@@ -35,13 +35,13 @@ function resourceTypeSafe(r: Resource): "FTE" | "Contractor" {
 }
 
 function effectiveRate(r: Resource, defaultRate: number): number {
-  if (resourceTypeSafe(r) === "FTE" && !r.dailyRate) return defaultRate;
-  return r.dailyRate;
+  if (resourceTypeSafe(r) === "FTE" && !r.monthlyRate) return defaultRate;
+  return r.monthlyRate;
 }
 
-function resourceCost(r: Resource, days: number | null, defaultRate: number): number | null {
+function resourceCost(r: Resource, days: number | null, defaultRate: number, wdpm: number): number | null {
   if (days === null) return null;
-  return days * effectiveRate(r, defaultRate) * ((r.allocationPct ?? 100) / 100);
+  return (days / wdpm) * effectiveRate(r, defaultRate) * ((r.allocationPct ?? 100) / 100);
 }
 
 const fmtGBP = (gbp: number) => `£${Math.round(gbp).toLocaleString()}`;
@@ -62,7 +62,7 @@ function Dual({ gbp, usdRate, color, size = "sm" }: { gbp: number; usdRate: numb
 
 export function CostSheetPage() {
   const { settings, resources, updateSettings } = useSchedulingStore();
-  const { defaultDailyRate, contingencyPct, startDate, targetEndDate, calendarMode } = settings;
+  const { defaultMonthlyRate, contingencyPct, startDate, targetEndDate, calendarMode, workingDaysPerMonth } = settings;
   const usdRate    = settings.exchangeRates?.USD ?? 1.35;
   const revenueGBP = settings.revenueGBP ?? 0;
 
@@ -83,7 +83,7 @@ export function CostSheetPage() {
     let sum = 0, excluded = 0;
     for (const r of list) {
       const days = resourceWorkingDays(r, startDate, targetEndDate, calendarMode);
-      const cost = resourceCost(r, days, defaultDailyRate);
+      const cost = resourceCost(r, days, defaultMonthlyRate, workingDaysPerMonth);
       if (cost === null) { excluded++; continue; }
       sum += cost;
     }
@@ -97,7 +97,7 @@ export function CostSheetPage() {
   for (const r of resources) {
     const days = resourceWorkingDays(r, startDate, targetEndDate, calendarMode);
     if (days === null) { totalMMExcluded++; continue; }
-    totalMM += days * ((r.allocationPct ?? 100) / 100) / 20;
+    totalMM += days * ((r.allocationPct ?? 100) / 100) / workingDaysPerMonth;
   }
 
   const fteSub        = computeSubtotals(fteResources);
@@ -109,7 +109,7 @@ export function CostSheetPage() {
   const profit  = revenueGBP > 0 ? revenueGBP - atCost : null;
   const margin  = profit !== null && revenueGBP > 0 ? (profit / revenueGBP) * 100 : null;
 
-  const missingRates = resources.filter((r) => !effectiveRate(r, defaultDailyRate));
+  const missingRates = resources.filter((r) => !effectiveRate(r, defaultMonthlyRate));
   const missingDates = !startDate || !targetEndDate;
 
   if (resources.length === 0) {
@@ -164,7 +164,8 @@ export function CostSheetPage() {
           projectStart={startDate}
           projectEnd={targetEndDate}
           calendarMode={calendarMode}
-          defaultDailyRate={defaultDailyRate}
+          defaultMonthlyRate={defaultMonthlyRate}
+          workingDaysPerMonth={workingDaysPerMonth}
           usdRate={usdRate}
           subtotal={fteSub.sum}
           excluded={fteSub.excluded}
@@ -181,7 +182,8 @@ export function CostSheetPage() {
           projectStart={startDate}
           projectEnd={targetEndDate}
           calendarMode={calendarMode}
-          defaultDailyRate={defaultDailyRate}
+          defaultMonthlyRate={defaultMonthlyRate}
+          workingDaysPerMonth={workingDaysPerMonth}
           usdRate={usdRate}
           subtotal={contractorSub.sum}
           excluded={contractorSub.excluded}
@@ -249,7 +251,7 @@ export function CostSheetPage() {
           )}
           {!missingDates && grandTotal === 0 && missingRates.length > 0 && (
             <p className="text-xs text-[#5c5575] mt-1">
-              All team members have no daily rate set. Add rates in the Schedule tab or set a default daily rate in Settings.
+              All team members have no monthly rate set. Add rates in the Schedule tab or set a default monthly rate in Settings.
             </p>
           )}
         </div>
@@ -394,12 +396,12 @@ const DISCIPLINE_COLORS: Record<string, string> = {
 
 function ResourceTable({
   title, accentColor, accentBg, resources, projectStart, projectEnd,
-  calendarMode, defaultDailyRate, usdRate, subtotal, excluded,
+  calendarMode, defaultMonthlyRate, workingDaysPerMonth, usdRate, subtotal, excluded,
 }: {
   title: string; accentColor: string; accentBg: string;
   resources: Resource[]; projectStart: string; projectEnd: string;
-  calendarMode: "four-week" | "actual"; defaultDailyRate: number;
-  usdRate: number; subtotal: number; excluded: number;
+  calendarMode: "four-week" | "actual"; defaultMonthlyRate: number;
+  workingDaysPerMonth: number; usdRate: number; subtotal: number; excluded: number;
 }) {
   return (
     <div className="rounded-2xl border border-[#2e2848] overflow-hidden">
@@ -414,7 +416,7 @@ function ResourceTable({
               <Th>Name</Th>
               <Th>Role</Th>
               <Th align="center">Allocation</Th>
-              <Th>Rate / day</Th>
+              <Th>Rate / month</Th>
               <Th>Dates</Th>
               <Th align="right">Working days</Th>
               <Th align="right">Total cost</Th>
@@ -423,9 +425,9 @@ function ResourceTable({
           <tbody>
             {resources.map((r) => {
               const days    = resourceWorkingDays(r, projectStart, projectEnd, calendarMode);
-              const costGbp = resourceCost(r, days, defaultDailyRate);
-              const rate    = effectiveRate(r, defaultDailyRate);
-              const isDefaultRate = resourceTypeSafe(r) === "FTE" && !r.dailyRate;
+              const costGbp = resourceCost(r, days, defaultMonthlyRate, workingDaysPerMonth);
+              const rate    = effectiveRate(r, defaultMonthlyRate);
+              const isDefaultRate = resourceTypeSafe(r) === "FTE" && !r.monthlyRate;
               const alloc   = r.allocationPct ?? 100;
 
               return (

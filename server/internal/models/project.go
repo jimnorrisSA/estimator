@@ -111,7 +111,7 @@ type Resource struct {
 	RollOnDate       time.Time          `bson:"roll_on_date"                    json:"rollOnDate"`
 	RollOffDate      time.Time          `bson:"roll_off_date"                   json:"rollOffDate"`
 	AllocationPct    float64            `bson:"allocation_pct"                  json:"allocationPct"`
-	DailyRate        float64            `bson:"daily_rate"                      json:"dailyRate"`
+	MonthlyRate      float64            `bson:"monthly_rate"                    json:"monthlyRate"`
 	Currency         string             `bson:"currency"                        json:"currency"`
 	Notes            string             `bson:"notes"                           json:"notes"`
 	PlantasticUserID string             `bson:"plantastic_user_id,omitempty"    json:"plantasticUserId,omitempty"`

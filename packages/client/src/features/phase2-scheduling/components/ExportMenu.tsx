@@ -24,8 +24,8 @@ export function ExportMenu() {
   const { settings, overrides, resources } = useSchedulingStore();
 
   const result = useMemo(
-    () => runScheduler(features, settings.contingencyPct, overrides, resources, settings.defaultDailyRate),
-    [features, settings.contingencyPct, overrides, resources, settings.defaultDailyRate]
+    () => runScheduler(features, settings.contingencyPct, overrides, resources, settings.defaultMonthlyRate, [], {}, settings.workingDaysPerMonth),
+    [features, settings.contingencyPct, overrides, resources, settings.defaultMonthlyRate, settings.workingDaysPerMonth]
   );
   const tasks = result.tasks;
 

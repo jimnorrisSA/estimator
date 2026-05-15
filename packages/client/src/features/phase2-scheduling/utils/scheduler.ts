@@ -115,9 +115,10 @@ export function runScheduler(
   contingencyPct: number,
   overrides: Overrides,
   resources: Resource[],
-  defaultDailyRate = 0,
+  defaultMonthlyRate = 0,
   blockedPeriods: BlockedPeriod[] = [],
-  resourceWindows: Record<string, ResourceWindow> = {}
+  resourceWindows: Record<string, ResourceWindow> = {},
+  workingDaysPerMonth = 22
 ): ScheduleResult {
   const disciplineSet = new Set<Discipline>();
   for (const f of features)
@@ -132,11 +133,11 @@ export function runScheduler(
     capacities[d] = count > 0 ? count : 1;
   }
 
-  // Daily rate per slot: resources[d][slotIndex].dailyRate
+  // Monthly rate per slot: resources[d][slotIndex].monthlyRate
   const ratesByDiscipline: Record<string, number[]> = {};
   for (const d of disciplines) {
     const dr = resources.filter((r) => r.role === d);
-    ratesByDiscipline[d] = Array.from({ length: capacities[d] }, (_, i) => dr[i]?.dailyRate ?? 0);
+    ratesByDiscipline[d] = Array.from({ length: capacities[d] }, (_, i) => dr[i]?.monthlyRate ?? 0);
   }
 
   // Resources ordered per discipline — slot i maps to disciplineResources[d][i]
@@ -204,7 +205,7 @@ export function runScheduler(
         const assignedResource = assignedResourceId
           ? resources.find((r) => r.id === assignedResourceId)
           : undefined;
-        const rate = assignedResource?.dailyRate ?? ratesByDiscipline[discipline][slotIndex] ?? defaultDailyRate;
+        const monthlyRate = assignedResource?.monthlyRate || ratesByDiscipline[discipline][slotIndex] || defaultMonthlyRate;
 
         tasks.push({
           taskId: task.id,
@@ -222,7 +223,7 @@ export function runScheduler(
           segments: placement.segments,
           isPinned,
           notes: ov?.notes ?? "",
-          cost: wd * rate,
+          cost: wd * (monthlyRate / workingDaysPerMonth),
           assignedResourceId,
         });
       }

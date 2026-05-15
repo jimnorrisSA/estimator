@@ -19,7 +19,8 @@ export interface ScheduleSettings {
   calendarMode: CalendarMode;
   contingencyPct: number;
   currency: Currency;
-  defaultDailyRate: number; // fallback rate when task has no assigned resource
+  defaultMonthlyRate: number; // fallback rate when task has no assigned resource
+  workingDaysPerMonth: number; // used to convert monthly rate → daily cost (typically 22)
   exchangeRates: Record<string, number>; // GBP → X conversion rates
   revenueGBP: number; // client revenue stored in GBP
 }
@@ -48,7 +49,7 @@ interface SchedulingStore {
   assignResource: (taskId: string, resourceId: string | null) => void;
 
   addResource: (role: Discipline, name: string) => void;
-  updateResource: (id: string, patch: Partial<Pick<Resource, "name" | "resourceType" | "dailyRate" | "allocationPct" | "rollOnDate" | "rollOffDate">>) => void;
+  updateResource: (id: string, patch: Partial<Pick<Resource, "name" | "resourceType" | "monthlyRate" | "allocationPct" | "rollOnDate" | "rollOffDate">>) => void;
   deleteResource: (id: string) => void;
 
   condenseAllTasks: () => void;
@@ -72,7 +73,7 @@ function makeResource(role: Discipline, name: string, resourceType: ResourceType
     rollOnDate: "",
     rollOffDate: "",
     allocationPct: 100,
-    dailyRate: 0,
+    monthlyRate: 0,
     currency: "GBP",
     notes: "",
     updatedAt: new Date().toISOString(),
@@ -89,7 +90,8 @@ export const useSchedulingStore = create<SchedulingStore>()(
         calendarMode: "four-week",
         contingencyPct: 15,
         currency: "GBP",
-        defaultDailyRate: 0,
+        defaultMonthlyRate: 6700,
+        workingDaysPerMonth: 22,
         exchangeRates: { USD: 1.35, EUR: 1.17, AUD: 1.94 },
         revenueGBP: 0,
       },
