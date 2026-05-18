@@ -145,15 +145,16 @@ func (svc *Service) ExportEstimates(ctx context.Context, projectID primitive.Obj
 			if !wantAll && !wantSet[f.ID] {
 				continue
 			}
-			r := svc.exportSnapshotFeatureWithClient(ctx, client, projectID, intg, f, userEmail)
-			results = append(results, r)
-			changes = append(changes, SyncChange{
-				EstimatorID:  r.EstimatorID,
-				JiraKey:      r.JiraKey,
-				Action:       r.Status,
-				Reason:       r.Reason,
-				ErrorMessage: r.ErrorMessage,
-			})
+			for _, r := range svc.exportSnapshotFeatureWithClient(ctx, client, projectID, intg, f, userEmail) {
+				results = append(results, r)
+				changes = append(changes, SyncChange{
+					EstimatorID:  r.EstimatorID,
+					JiraKey:      r.JiraKey,
+					Action:       r.Status,
+					Reason:       r.Reason,
+					ErrorMessage: r.ErrorMessage,
+				})
+			}
 		}
 	}
 
@@ -337,8 +338,9 @@ func (svc *Service) exportFeatureWithClient(ctx context.Context, client *Client,
 	}
 }
 
-// exportSnapshotFeatureWithClient exports a client-side snapshot feature to Jira.
-func (svc *Service) exportSnapshotFeatureWithClient(ctx context.Context, client *Client, projectID primitive.ObjectID, intg JiraIntegration, f snapshotFeature, userEmail string) ExportResult {
+// exportSnapshotFeatureWithClient exports a snapshot feature as a Jira Epic and its tasks as Stories.
+// Returns one result per item (first entry is the Epic, remaining are Stories).
+func (svc *Service) exportSnapshotFeatureWithClient(ctx context.Context, client *Client, projectID primitive.ObjectID, intg JiraIntegration, f snapshotFeature, userEmail string) []ExportResult {
 	tshirtSize, cost, disciplines := aggregateSnapshotFeature(f)
 
 	var mapping JiraMapping
@@ -349,54 +351,127 @@ func (svc *Service) exportSnapshotFeatureWithClient(ctx context.Context, client 
 	}).Decode(&mapping)
 
 	now := time.Now().UTC()
+	var epicKey string
+	var epicResult ExportResult
 
 	if err == nil {
+		// Update existing Epic.
 		fields := BuildEstimateUpdateBody(tshirtSize, cost, disciplines)
 		fields["summary"] = f.Name
 		if updateErr := client.UpdateIssue(ctx, mapping.JiraIssueKey, fields); updateErr != nil {
-			return ExportResult{EstimatorID: f.ID, JiraKey: mapping.JiraIssueKey, Status: "error", ErrorMessage: updateErr.Error()}
+			return []ExportResult{{EstimatorID: f.ID, JiraKey: mapping.JiraIssueKey, Status: "error", ErrorMessage: updateErr.Error()}}
 		}
 		svc.mappings.UpdateOne(ctx, bson.M{"_id": mapping.ID}, bson.M{"$set": bson.M{ //nolint:errcheck
 			"last_synced_at": now,
 			"last_synced_by": userEmail,
 			"updated_at":     now,
 		}})
-		return ExportResult{EstimatorID: f.ID, JiraKey: mapping.JiraIssueKey, Status: "updated"}
+		epicKey = mapping.JiraIssueKey
+		epicResult = ExportResult{EstimatorID: f.ID, JiraKey: epicKey, Status: "updated"}
+	} else if err != mongo.ErrNoDocuments {
+		return []ExportResult{{EstimatorID: f.ID, Status: "error", ErrorMessage: fmt.Sprintf("mapping lookup: %v", err)}}
+	} else {
+		// Create new Epic.
+		if intg.JiraProjectKey == "" {
+			return []ExportResult{{EstimatorID: f.ID, Status: "skipped", Reason: "no jira_project_key configured — cannot create new issues"}}
+		}
+		body := BuildJiraIssueBody(intg.JiraProjectKey, "Epic", f.Name, 0)
+		created, createErr := client.CreateIssue(ctx, body)
+		if createErr != nil {
+			return []ExportResult{{EstimatorID: f.ID, Status: "error", ErrorMessage: createErr.Error()}}
+		}
+		svc.mappings.InsertOne(ctx, JiraMapping{ //nolint:errcheck
+			ID:            primitive.NewObjectID(),
+			ProjectID:     projectID,
+			EstimatorType: "feature",
+			EstimatorID:   f.ID,
+			JiraIssueKey:  created.Key,
+			JiraIssueID:   created.ID,
+			JiraIssueType: "epic",
+			Direction:     "export",
+			Origin:        "estimator",
+			LastSyncedAt:  now,
+			LastSyncedBy:  userEmail,
+			CreatedAt:     now,
+			UpdatedAt:     now,
+		})
+		epicKey = created.Key
+		epicResult = ExportResult{EstimatorID: f.ID, JiraKey: epicKey, Status: "created"}
+	}
+
+	results := []ExportResult{epicResult}
+
+	// Export each task as a Story linked to the Epic.
+	for _, g := range f.Groups {
+		for _, t := range g.Tasks {
+			r := svc.exportSnapshotTaskWithClient(ctx, client, projectID, intg, t, g.Discipline, epicKey, userEmail)
+			results = append(results, r)
+		}
+	}
+	return results
+}
+
+// exportSnapshotTaskWithClient exports a single snapshot task as a Jira Story linked to the given Epic.
+func (svc *Service) exportSnapshotTaskWithClient(ctx context.Context, client *Client, projectID primitive.ObjectID, intg JiraIntegration, t snapshotTask, discipline, epicKey, userEmail string) ExportResult {
+	var mapping JiraMapping
+	err := svc.mappings.FindOne(ctx, bson.M{
+		"project_id":     projectID,
+		"estimator_id":   t.ID,
+		"estimator_type": "task",
+	}).Decode(&mapping)
+
+	now := time.Now().UTC()
+	tshirtSize := StoryPointsToTShirtSize(t.Estimate.Value * snapshotWorkingDays[t.Estimate.Unit])
+	labels := []string{"estimate:" + tshirtSize, "discipline:" + discipline}
+
+	if err == nil {
+		// Update existing Story.
+		if updateErr := client.UpdateIssue(ctx, mapping.JiraIssueKey, map[string]interface{}{
+			"summary": t.Label,
+			"labels":  labels,
+		}); updateErr != nil {
+			return ExportResult{EstimatorID: t.ID, JiraKey: mapping.JiraIssueKey, Status: "error", ErrorMessage: updateErr.Error()}
+		}
+		svc.mappings.UpdateOne(ctx, bson.M{"_id": mapping.ID}, bson.M{"$set": bson.M{ //nolint:errcheck
+			"last_synced_at": now,
+			"last_synced_by": userEmail,
+			"updated_at":     now,
+		}})
+		return ExportResult{EstimatorID: t.ID, JiraKey: mapping.JiraIssueKey, Status: "updated"}
 	}
 
 	if err != mongo.ErrNoDocuments {
-		return ExportResult{EstimatorID: f.ID, Status: "error", ErrorMessage: fmt.Sprintf("mapping lookup: %v", err)}
+		return ExportResult{EstimatorID: t.ID, Status: "error", ErrorMessage: fmt.Sprintf("task mapping lookup: %v", err)}
 	}
 
-	if intg.JiraProjectKey == "" {
-		return ExportResult{EstimatorID: f.ID, Status: "skipped", Reason: "no jira_project_key configured — cannot create new issues"}
+	// Create new Story.
+	body := BuildJiraIssueBody(intg.JiraProjectKey, "Story", t.Label, 0)
+	if epicKey != "" {
+		if fields, ok := body["fields"].(map[string]interface{}); ok {
+			fields["parent"] = map[string]string{"key": epicKey}
+			fields["labels"] = labels
+		}
 	}
-
-	storyPoints := TShirtSizeToStoryPoints(tshirtSize)
-	body := BuildJiraIssueBody(intg.JiraProjectKey, "Epic", f.Name, storyPoints)
 	created, createErr := client.CreateIssue(ctx, body)
 	if createErr != nil {
-		return ExportResult{EstimatorID: f.ID, Status: "error", ErrorMessage: createErr.Error()}
+		return ExportResult{EstimatorID: t.ID, Status: "error", ErrorMessage: createErr.Error()}
 	}
-
-	newMapping := JiraMapping{
+	svc.mappings.InsertOne(ctx, JiraMapping{ //nolint:errcheck
 		ID:            primitive.NewObjectID(),
 		ProjectID:     projectID,
-		EstimatorType: "feature",
-		EstimatorID:   f.ID,
+		EstimatorType: "task",
+		EstimatorID:   t.ID,
 		JiraIssueKey:  created.Key,
 		JiraIssueID:   created.ID,
-		JiraIssueType: "epic",
+		JiraIssueType: "story",
 		Direction:     "export",
 		Origin:        "estimator",
 		LastSyncedAt:  now,
 		LastSyncedBy:  userEmail,
 		CreatedAt:     now,
 		UpdatedAt:     now,
-	}
-	svc.mappings.InsertOne(ctx, newMapping) //nolint:errcheck
-
-	return ExportResult{EstimatorID: f.ID, JiraKey: created.Key, Status: "created"}
+	})
+	return ExportResult{EstimatorID: t.ID, JiraKey: created.Key, Status: "created"}
 }
 
 // ---------------------------------------------------------------------------
