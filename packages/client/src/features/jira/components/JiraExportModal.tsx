@@ -41,8 +41,8 @@ export function JiraExportModal({ projectId, onClose, onExported }: Props) {
         setState("error");
         return;
       }
-      const data = (await res.json()) as ExportResult[];
-      setResults(data);
+      const data = (await res.json()) as ExportResult[] | null;
+      setResults(data ?? []);
       setState("done");
       onExported();
     } catch (e) {

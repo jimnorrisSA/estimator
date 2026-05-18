@@ -302,6 +302,9 @@ func (h *jiraHandler) exportEstimates(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+	if results == nil {
+		results = []jira.ExportResult{}
+	}
 	c.JSON(http.StatusOK, results)
 }
 
