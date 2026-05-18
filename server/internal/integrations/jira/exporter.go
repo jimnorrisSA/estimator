@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/soulassembly/estimator/internal/models"
@@ -262,31 +263,39 @@ func (svc *Service) exportFeatureWithClient(ctx context.Context, client *Client,
 	// Build estimate data from postits.
 	tshirtSize, cost, disciplines := aggregateFeatureEstimates(feature)
 
+	staleMapping := false
 	if err == nil {
 		// Update existing Jira issue.
 		fields := BuildEstimateUpdateBody(tshirtSize, cost, disciplines)
 		fields["summary"] = feature.Name
 		if updateErr := client.UpdateIssue(ctx, mapping.JiraIssueKey, fields); updateErr != nil {
-			return ExportResult{
-				EstimatorID:  feature.ID.Hex(),
-				JiraKey:      mapping.JiraIssueKey,
-				Status:       "error",
-				ErrorMessage: updateErr.Error(),
+			if strings.Contains(updateErr.Error(), "404") {
+				// Issue deleted in Jira — drop the stale mapping and create a fresh one below.
+				svc.mappings.DeleteOne(ctx, bson.M{"_id": mapping.ID}) //nolint:errcheck
+				staleMapping = true
+			} else {
+				return ExportResult{
+					EstimatorID:  feature.ID.Hex(),
+					JiraKey:      mapping.JiraIssueKey,
+					Status:       "error",
+					ErrorMessage: updateErr.Error(),
+				}
 			}
-		}
-		svc.mappings.UpdateOne(ctx, bson.M{"_id": mapping.ID}, bson.M{"$set": bson.M{ //nolint:errcheck
-			"last_synced_at": now,
-			"last_synced_by": userEmail,
-			"updated_at":     now,
-		}})
-		return ExportResult{
-			EstimatorID: feature.ID.Hex(),
-			JiraKey:     mapping.JiraIssueKey,
-			Status:      "updated",
+		} else {
+			svc.mappings.UpdateOne(ctx, bson.M{"_id": mapping.ID}, bson.M{"$set": bson.M{ //nolint:errcheck
+				"last_synced_at": now,
+				"last_synced_by": userEmail,
+				"updated_at":     now,
+			}})
+			return ExportResult{
+				EstimatorID: feature.ID.Hex(),
+				JiraKey:     mapping.JiraIssueKey,
+				Status:      "updated",
+			}
 		}
 	}
 
-	if err != mongo.ErrNoDocuments {
+	if err != mongo.ErrNoDocuments && !staleMapping {
 		return ExportResult{
 			EstimatorID:  feature.ID.Hex(),
 			Status:       "error",
