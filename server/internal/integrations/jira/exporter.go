@@ -452,14 +452,16 @@ func (svc *Service) exportSnapshotTaskWithClient(ctx context.Context, client *Cl
 		return ExportResult{EstimatorID: t.ID, Status: "error", ErrorMessage: createErr.Error()}
 	}
 
-	// Try to link to parent Epic. Attempt next-gen style (parent field) first,
-	// then classic style (customfield_10014 Epic Link). Failures are non-fatal.
+	// Link to parent Epic. Classic projects use customfield_10014 (Epic Link);
+	// next-gen projects use the parent field. Try each separately so a failure
+	// on one doesn't prevent the other from being applied.
 	if epicKey != "" {
-		updateFields := map[string]interface{}{
-			"parent":            map[string]string{"key": epicKey},
+		client.UpdateIssue(ctx, created.Key, map[string]interface{}{ //nolint:errcheck
 			"customfield_10014": epicKey,
-		}
-		client.UpdateIssue(ctx, created.Key, updateFields) //nolint:errcheck
+		})
+		client.UpdateIssue(ctx, created.Key, map[string]interface{}{ //nolint:errcheck
+			"parent": map[string]string{"key": epicKey},
+		})
 	}
 	svc.mappings.InsertOne(ctx, JiraMapping{ //nolint:errcheck
 		ID:            primitive.NewObjectID(),
