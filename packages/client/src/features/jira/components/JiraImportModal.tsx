@@ -54,11 +54,9 @@ export function JiraImportModal({ projectId, defaultProjectKey, onClose, onImpor
             <div className="bg-[#14112a] border border-[#2e2848] rounded-lg p-4 flex flex-col gap-2">
               <p className="text-sm font-semibold text-[#86efac]">Import complete</p>
               <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm text-[#9b93ba]">
-                <span>Features created</span><span className="text-[#ece7ff] font-semibold">{result.features_created}</span>
-                <span>Features updated</span><span className="text-[#ece7ff] font-semibold">{result.features_updated}</span>
-                <span>Tasks created</span><span className="text-[#ece7ff] font-semibold">{result.tasks_created}</span>
-                <span>Tasks updated</span><span className="text-[#ece7ff] font-semibold">{result.tasks_updated}</span>
-                <span>Skipped</span><span className="text-[#ece7ff] font-semibold">{result.skipped}</span>
+                <span>Epics imported</span><span className="text-[#ece7ff] font-semibold">{result.epicsImported}</span>
+                <span>Stories created</span><span className="text-[#ece7ff] font-semibold">{result.storiesCreated}</span>
+                <span>Mappings added</span><span className="text-[#ece7ff] font-semibold">{result.mappingsAdded}</span>
               </div>
               {result.errors.length > 0 && (
                 <div className="mt-1 border-t border-[#2e2848] pt-2">

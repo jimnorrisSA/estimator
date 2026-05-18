@@ -42,58 +42,51 @@ export function JiraConflictModal({ projectId, conflicts, onClose, onResolved }:
       className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/60 backdrop-blur-sm"
       onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div className="bg-[#1a1628] border border-[#2e2848] rounded-xl shadow-xl p-6 w-[620px] max-h-[80vh] flex flex-col gap-4">
-        {/* Header */}
+      <div className="bg-[#1a1628] border border-[#2e2848] rounded-xl shadow-xl p-6 w-[560px] max-h-[80vh] flex flex-col gap-4">
         <div className="flex items-center justify-between flex-shrink-0">
           <div>
             <h2 className="text-base font-semibold text-[#ece7ff]">Resolve sync conflicts</h2>
             <p className="text-xs text-[#5c5575] mt-0.5">
-              {conflicts.length} conflict{conflicts.length !== 1 ? "s" : ""} — choose which version to keep
+              {conflicts.length} conflict{conflicts.length !== 1 ? "s" : ""} — choose which version wins
             </p>
           </div>
           <button onClick={onClose} className="text-[#3a3456] hover:text-[#9b93ba] text-xl leading-none transition-colors">×</button>
         </div>
 
-        {/* Conflict list */}
-        <div className="flex-1 overflow-y-auto flex flex-col gap-3 min-h-0">
+        <div className="flex-1 overflow-y-auto flex flex-col gap-2 min-h-0">
           {conflicts.map((c) => {
-            const winner = decisions[c.mapping_id];
+            const winner = decisions[c.id];
             return (
-              <div key={c.mapping_id} className="bg-[#14112a] border border-[#2e2848] rounded-lg p-4 flex flex-col gap-3">
+              <div key={c.id} className="bg-[#14112a] border border-[#2e2848] rounded-lg p-4 flex flex-col gap-3">
                 <div className="flex items-center gap-2">
-                  <span className="text-xs font-mono text-[#7c3aed] bg-[#2e2848] px-1.5 py-0.5 rounded">
-                    {c.jira_issue_key}
+                  <span className="text-xs font-mono text-[#a78bfa] bg-[#2e2848] px-1.5 py-0.5 rounded">
+                    {c.jiraIssueKey}
                   </span>
-                  {c.field && (
-                    <span className="text-xs text-[#5c5575]">Field: {c.field}</span>
-                  )}
+                  <span className="text-xs text-[#5c5575] capitalize">{c.estimatorType}</span>
+                  <span className="text-xs text-[#3a3456] ml-auto">{c.direction}</span>
                 </div>
                 <div className="grid grid-cols-2 gap-2">
                   <button
-                    onClick={() => pick(c.mapping_id, "estimator")}
+                    onClick={() => pick(c.id, "estimator")}
                     className={`p-3 rounded-lg border text-left transition-all ${
                       winner === "estimator"
                         ? "border-[#7c3aed] bg-[#2e2848]"
                         : "border-[#2e2848] bg-[#1d1930] hover:border-[#5b4b8a]"
                     }`}
                   >
-                    <p className="text-xs font-semibold text-[#7c3aed] mb-1">Estimator</p>
-                    <p className="text-sm text-[#ece7ff] break-words leading-snug">
-                      {c.estimator_value || c.estimator_label || "—"}
-                    </p>
+                    <p className="text-xs font-semibold text-[#7c3aed] mb-1">Keep Estimator</p>
+                    <p className="text-xs text-[#9b93ba] leading-snug">Use values from this tool</p>
                   </button>
                   <button
-                    onClick={() => pick(c.mapping_id, "jira")}
+                    onClick={() => pick(c.id, "jira")}
                     className={`p-3 rounded-lg border text-left transition-all ${
                       winner === "jira"
                         ? "border-blue-500 bg-blue-500/10"
                         : "border-[#2e2848] bg-[#1d1930] hover:border-[#5b4b8a]"
                     }`}
                   >
-                    <p className="text-xs font-semibold text-blue-400 mb-1">Jira</p>
-                    <p className="text-sm text-[#ece7ff] break-words leading-snug">
-                      {c.jira_value || c.jira_summary || "—"}
-                    </p>
+                    <p className="text-xs font-semibold text-blue-400 mb-1">Keep Jira</p>
+                    <p className="text-xs text-[#9b93ba] leading-snug">Use values from Jira</p>
                   </button>
                 </div>
               </div>
@@ -107,11 +100,8 @@ export function JiraConflictModal({ projectId, conflicts, onClose, onResolved }:
           </p>
         )}
 
-        {/* Footer */}
         <div className="flex justify-between items-center flex-shrink-0">
-          <span className="text-xs text-[#5c5575]">
-            {decidedCount} of {conflicts.length} decided
-          </span>
+          <span className="text-xs text-[#5c5575]">{decidedCount} of {conflicts.length} decided</span>
           <div className="flex gap-2">
             <button
               onClick={onClose}

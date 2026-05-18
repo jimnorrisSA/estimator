@@ -72,9 +72,9 @@ export function JiraExportModal({ projectId, onClose, onExported }: Props) {
                 <p className="px-4 py-3 text-sm text-[#5c5575]">No results returned.</p>
               ) : results.map((r, i) => (
                 <div key={i} className="px-4 py-2.5 flex items-center gap-3">
-                  <span className={`w-2 h-2 rounded-full flex-shrink-0 ${r.error ? "bg-red-500" : "bg-green-500"}`} />
-                  <span className="text-sm text-[#9b93ba] font-mono">{r.jira_issue_key || r.feature_id}</span>
-                  <span className="text-xs text-[#5c5575] ml-auto">{r.error ?? r.action}</span>
+                  <span className={`w-2 h-2 rounded-full flex-shrink-0 ${r.errorMessage ? "bg-red-500" : "bg-green-500"}`} />
+                  <span className="text-sm text-[#9b93ba] font-mono">{r.jiraKey || r.estimatorId}</span>
+                  <span className="text-xs text-[#5c5575] ml-auto">{r.errorMessage ?? r.status}</span>
                 </div>
               ))}
             </div>

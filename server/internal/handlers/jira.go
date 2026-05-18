@@ -73,6 +73,7 @@ func RegisterJiraRoutes(rg *gin.RouterGroup, db *mongo.Database) {
 		project.POST("/export/task/:taskId", h.exportTask)
 
 		project.GET("/sync/status", h.syncStatus)
+		project.GET("/sync/conflicts", h.syncConflicts)
 		project.GET("/sync/history", h.syncHistory)
 		project.POST("/sync/resolve", h.syncResolve)
 		project.POST("/sync/validate", h.syncValidate)
@@ -360,6 +361,29 @@ func (h *jiraHandler) syncStatus(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, state)
+}
+
+func (h *jiraHandler) syncConflicts(c *gin.Context) {
+	projectID, ok := projectIDFromParam(c)
+	if !ok {
+		return
+	}
+
+	col := h.db.Collection("jira_mappings")
+	cur, err := col.Find(c.Request.Context(), bson.M{"project_id": projectID, "conflict": true})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	var mappings []jira.JiraMapping
+	if err := cur.All(c.Request.Context(), &mappings); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if mappings == nil {
+		mappings = []jira.JiraMapping{}
+	}
+	c.JSON(http.StatusOK, mappings)
 }
 
 func (h *jiraHandler) syncHistory(c *gin.Context) {

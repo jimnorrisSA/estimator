@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useProjectsStore } from "../../../store/projectsStore.js";
 import { useJiraStore } from "../store/jiraStore.js";
 import { api } from "../../../lib/api.js";
+import type { PendingConflict } from "../store/jiraStore.js";
 import { JiraImportModal } from "./JiraImportModal.js";
 import { JiraExportModal } from "./JiraExportModal.js";
 import { JiraConflictModal } from "./JiraConflictModal.js";
@@ -10,6 +11,8 @@ export function JiraMenu() {
   const [open, setOpen] = useState(false);
   const [modal, setModal] = useState<"import" | "export" | "conflicts" | null>(null);
   const [connecting, setConnecting] = useState(false);
+  const [conflicts, setConflicts] = useState<PendingConflict[]>([]);
+  const [justConnected, setJustConnected] = useState(false);
 
   const getActiveProject = useProjectsStore((s) => s.getActiveProject);
   const activeProject = getActiveProject();
@@ -17,19 +20,45 @@ export function JiraMenu() {
 
   const { syncState, config, loading, fetchSyncState, fetchConfig } = useJiraStore();
 
-  const refresh = useCallback(() => {
+  const refresh = useCallback(async () => {
     if (!projectId) return;
-    fetchSyncState(projectId);
+    await fetchSyncState(projectId);
     fetchConfig(projectId);
   }, [projectId, fetchSyncState, fetchConfig]);
 
+  // Fetch actual conflict records when count > 0
+  const fetchConflicts = useCallback(async () => {
+    if (!projectId || !syncState || syncState.pendingConflicts === 0) {
+      setConflicts([]);
+      return;
+    }
+    try {
+      const res = await api.jira.syncConflicts(projectId);
+      if (res.ok) setConflicts((await res.json()) as PendingConflict[]);
+    } catch {
+      // ignore
+    }
+  }, [projectId, syncState]);
+
   useEffect(() => { refresh(); }, [refresh]);
 
-  // Re-check after returning from OAuth in a browser tab
+  useEffect(() => { fetchConflicts(); }, [fetchConflicts]);
+
+  // Re-check after returning from the Atlassian OAuth tab
   useEffect(() => {
     window.addEventListener("focus", refresh);
     return () => window.removeEventListener("focus", refresh);
   }, [refresh]);
+
+  // Detect redirect back from OAuth (?jira=connected in URL)
+  useEffect(() => {
+    if (window.location.search.includes("jira=connected")) {
+      window.history.replaceState({}, "", window.location.pathname);
+      setJustConnected(true);
+      refresh();
+      setTimeout(() => setJustConnected(false), 4000);
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleConnect() {
     if (!projectId) return;
@@ -52,33 +81,36 @@ export function JiraMenu() {
     refresh();
   }
 
-  const isConnected = syncState?.is_connected ?? false;
-  const conflicts = syncState?.pending_conflicts ?? [];
-  const conflictCount = conflicts.length;
-  const lastSynced = syncState?.last_synced_at
-    ? new Date(syncState.last_synced_at).toLocaleDateString("en-GB", { day: "numeric", month: "short" })
+  const isConnected = syncState?.isConnected ?? false;
+  const conflictCount = syncState?.pendingConflicts ?? 0;
+  const lastSynced = syncState?.lastSyncedAt && syncState.lastSyncedAt !== "0001-01-01T00:00:00Z"
+    ? new Date(syncState.lastSyncedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short" })
     : null;
 
   if (!projectId) return null;
 
   return (
     <>
+      {justConnected && (
+        <div className="fixed bottom-6 right-6 z-[3000] bg-[#14112a] border border-green-500/40 text-green-300 text-sm px-4 py-2.5 rounded-xl shadow-xl flex items-center gap-2">
+          <span className="w-1.5 h-1.5 rounded-full bg-green-400 flex-shrink-0" />
+          Jira connected successfully
+        </div>
+      )}
+
       <div className="relative self-start">
         <button
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#252041] border border-[#3d366a] text-sm text-[#a78bfa] hover:bg-[#2e2848] hover:border-[#5b4b8a] transition-colors"
           onClick={() => setOpen((o) => !o)}
           title="Jira integration"
         >
-          {/* Jira-esque chevron icon */}
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
             <path d="M13 3L4 12l9 9" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" opacity="0.5"/>
             <path d="M20 3l-9 9 9 9" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
           <span>{connecting ? "Connecting…" : "Jira"}</span>
           {!loading && isConnected && (
-            <span
-              className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${conflictCount > 0 ? "bg-amber-400" : "bg-green-400"}`}
-            />
+            <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${conflictCount > 0 ? "bg-amber-400" : "bg-green-400"}`} />
           )}
           {conflictCount > 0 && (
             <span className="bg-amber-500/20 text-amber-300 text-xs font-bold px-1.5 py-0.5 rounded-full leading-none">
@@ -100,18 +132,17 @@ export function JiraMenu() {
                 </div>
               ) : isConnected ? (
                 <>
-                  {/* Status header */}
                   <div className="px-4 py-3 border-b border-[#1e1a2e]">
                     <div className="flex items-center gap-1.5 mb-1">
                       <span className="w-1.5 h-1.5 rounded-full bg-green-400 flex-shrink-0" />
                       <span className="text-xs font-semibold text-[#86efac]">Connected</span>
                     </div>
-                    {config?.jira_instance_url && (
-                      <p className="text-xs text-[#5c5575] truncate">{config.jira_instance_url}</p>
+                    {config?.jiraInstanceUrl && (
+                      <p className="text-xs text-[#5c5575] truncate">{config.jiraInstanceUrl}</p>
                     )}
-                    {config?.jira_project_key && (
+                    {config?.jiraProjectKey && (
                       <p className="text-xs text-[#9b93ba] font-mono mt-0.5">
-                        Project: <span className="text-[#a78bfa]">{config.jira_project_key}</span>
+                        Project: <span className="text-[#a78bfa]">{config.jiraProjectKey}</span>
                       </p>
                     )}
                     {lastSynced && (
@@ -175,7 +206,7 @@ export function JiraMenu() {
       {modal === "import" && projectId && (
         <JiraImportModal
           projectId={projectId}
-          defaultProjectKey={config?.jira_project_key}
+          defaultProjectKey={config?.jiraProjectKey}
           onClose={() => setModal(null)}
           onImported={refresh}
         />
@@ -187,12 +218,12 @@ export function JiraMenu() {
           onExported={refresh}
         />
       )}
-      {modal === "conflicts" && projectId && conflictCount > 0 && (
+      {modal === "conflicts" && projectId && conflicts.length > 0 && (
         <JiraConflictModal
           projectId={projectId}
           conflicts={conflicts}
           onClose={() => setModal(null)}
-          onResolved={refresh}
+          onResolved={() => { refresh(); setConflicts([]); }}
         />
       )}
     </>

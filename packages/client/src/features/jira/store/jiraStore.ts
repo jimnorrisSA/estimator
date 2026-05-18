@@ -1,47 +1,55 @@
 import { create } from "zustand";
 import { api } from "../../../lib/api.js";
 
+// Matches safeIntegration JSON from Go (camelCase)
 export interface JiraConfig {
   id: string;
-  jira_instance_url: string;
-  jira_cloud_id: string;
-  jira_project_key: string;
-  is_active: boolean;
-  created_at: string;
-  updated_at: string;
+  projectId: string;
+  jiraInstanceUrl: string;
+  jiraCloudId: string;
+  jiraProjectKey: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
 }
 
-export interface PendingConflict {
-  mapping_id: string;
-  jira_issue_key: string;
-  estimator_label: string;
-  jira_summary: string;
-  field: string;
-  estimator_value: string;
-  jira_value: string;
-}
-
+// Matches SyncState JSON from Go (camelCase); pendingConflicts is a count, not an array
 export interface SyncState {
-  is_connected: boolean;
-  last_synced_at?: string;
-  last_synced_by?: string;
-  pending_conflicts: PendingConflict[];
+  projectId: string;
+  isConnected: boolean;
+  lastSyncedAt: string;
+  lastSyncedBy: string;
+  pendingConflicts: number;
 }
 
+// Matches JiraMapping JSON from Go (camelCase)
+export interface PendingConflict {
+  id: string;
+  projectId: string;
+  estimatorType: string; // "feature" | "task"
+  estimatorId: string;
+  jiraIssueKey: string;
+  jiraIssueType: string;
+  direction: string;
+  origin: string;
+}
+
+// Matches ProjectImportResult JSON from Go
 export interface ImportResult {
-  features_created: number;
-  features_updated: number;
-  tasks_created: number;
-  tasks_updated: number;
-  skipped: number;
+  epicsImported: number;
+  storiesCreated: number;
+  mappingsAdded: number;
   errors: string[];
+  durationMs: number;
 }
 
+// Matches ExportResult JSON from Go
 export interface ExportResult {
-  feature_id: string;
-  jira_issue_key: string;
-  action: string;
-  error?: string;
+  estimatorId: string;
+  jiraKey: string;
+  status: string;
+  reason: string;
+  errorMessage?: string;
 }
 
 interface JiraStore {

@@ -22,6 +22,8 @@ export const api = {
       apiFetch(`/api/projects/${projectId}/jira/disconnect`, { method: "DELETE" }),
     syncStatus: (projectId: string) =>
       apiFetch(`/api/projects/${projectId}/jira/sync/status`),
+    syncConflicts: (projectId: string) =>
+      apiFetch(`/api/projects/${projectId}/jira/sync/conflicts`),
     validateConnection: (projectId: string) =>
       apiFetch(`/api/projects/${projectId}/jira/sync/validate`, { method: "POST" }),
     resolveConflict: (projectId: string, mappingId: string, winner: "estimator" | "jira") =>
