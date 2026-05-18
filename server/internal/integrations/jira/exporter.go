@@ -426,9 +426,9 @@ func (svc *Service) exportSnapshotTaskWithClient(ctx context.Context, client *Cl
 
 	if err == nil {
 		// Update existing Story.
+		summary := "[" + discipline + "] " + t.Label
 		if updateErr := client.UpdateIssue(ctx, mapping.JiraIssueKey, map[string]interface{}{
-			"summary": t.Label,
-			"labels":  labels,
+			"summary": summary,
 		}); updateErr != nil {
 			return ExportResult{EstimatorID: t.ID, JiraKey: mapping.JiraIssueKey, Status: "error", ErrorMessage: updateErr.Error()}
 		}
@@ -444,17 +444,24 @@ func (svc *Service) exportSnapshotTaskWithClient(ctx context.Context, client *Cl
 		return ExportResult{EstimatorID: t.ID, Status: "error", ErrorMessage: fmt.Sprintf("task mapping lookup: %v", err)}
 	}
 
-	// Create new Story.
-	body := BuildJiraIssueBody(intg.JiraProjectKey, "Story", t.Label, 0)
-	if epicKey != "" {
-		if fields, ok := body["fields"].(map[string]interface{}); ok {
-			fields["parent"] = map[string]string{"key": epicKey}
-			fields["labels"] = labels
-		}
-	}
+	// Create new Story — use discipline prefix in summary for context.
+	// Avoid optional fields (parent, labels) on create: they fail on some Jira
+	// project configurations. Link to the Epic via a separate update afterwards.
+	summary := "[" + discipline + "] " + t.Label
+	body := BuildJiraIssueBody(intg.JiraProjectKey, "Story", summary, 0)
 	created, createErr := client.CreateIssue(ctx, body)
 	if createErr != nil {
 		return ExportResult{EstimatorID: t.ID, Status: "error", ErrorMessage: createErr.Error()}
+	}
+
+	// Try to link to parent Epic. Attempt next-gen style (parent field) first,
+	// then classic style (customfield_10014 Epic Link). Failures are non-fatal.
+	if epicKey != "" {
+		updateFields := map[string]interface{}{
+			"parent":            map[string]string{"key": epicKey},
+			"customfield_10014": epicKey,
+		}
+		client.UpdateIssue(ctx, created.Key, updateFields) //nolint:errcheck
 	}
 	svc.mappings.InsertOne(ctx, JiraMapping{ //nolint:errcheck
 		ID:            primitive.NewObjectID(),
