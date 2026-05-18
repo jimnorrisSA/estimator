@@ -1,9 +1,6 @@
 package jira
 
-import (
-	"fmt"
-	"strings"
-)
+import "strings"
 
 // ---------------------------------------------------------------------------
 // Story points ↔ T-shirt size
@@ -102,48 +99,22 @@ func JiraIssueToDiscipline(issue JiraIssue) string {
 // BuildJiraIssueBody creates the JSON payload map for creating or updating a Jira issue.
 // issueType should be "Epic" or "Story". projectKey is the Jira project key (e.g. "DANCE").
 // storyPoints is stored in customfield_10016.
-func BuildJiraIssueBody(projectKey, issueType, summary string, storyPoints float64) map[string]interface{} {
+func BuildJiraIssueBody(projectKey, issueType, summary string, _ float64) map[string]interface{} {
 	fields := map[string]interface{}{
-		"project": map[string]string{
-			"key": projectKey,
-		},
-		"summary": summary,
-		"issuetype": map[string]string{
-			"name": issueType,
-		},
-		"customfield_10016": storyPoints,
+		"project":   map[string]string{"key": projectKey},
+		"summary":   summary,
+		"issuetype": map[string]string{"name": issueType},
 	}
-
-	// Epics need a name field in addition to summary on some Jira configurations.
-	if strings.EqualFold(issueType, "epic") {
-		fields["customfield_10011"] = summary // Epic Name (classic projects)
-	}
-
 	return map[string]interface{}{"fields": fields}
 }
 
 // BuildEstimateUpdateBody creates the fields map for updating custom estimate fields on a Jira issue.
 // This is passed directly to UpdateIssue as the fields parameter.
 // tshirtSize is stored as a label. cost and discipline totals are stored in custom text fields.
-func BuildEstimateUpdateBody(tshirtSize string, cost float64, disciplines map[string]float64) map[string]interface{} {
-	fields := map[string]interface{}{
-		"customfield_10016": TShirtSizeToStoryPoints(tshirtSize), // story points
-		"labels":            []string{"estimate:" + tshirtSize},
+func BuildEstimateUpdateBody(tshirtSize string, _ float64, _ map[string]float64) map[string]interface{} {
+	return map[string]interface{}{
+		"labels": []string{"estimate:" + tshirtSize},
 	}
-
-	// Encode cost as a custom text field (customfield_10100 is a common placeholder).
-	fields["customfield_10100"] = fmt.Sprintf("%.2f", cost)
-
-	// Encode per-discipline totals as a formatted string in another custom field.
-	if len(disciplines) > 0 {
-		var parts []string
-		for d, v := range disciplines {
-			parts = append(parts, fmt.Sprintf("%s:%.1f", d, v))
-		}
-		fields["customfield_10101"] = strings.Join(parts, ", ")
-	}
-
-	return fields
 }
 
 // ---------------------------------------------------------------------------
