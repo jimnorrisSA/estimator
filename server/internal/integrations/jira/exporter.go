@@ -442,26 +442,27 @@ func (svc *Service) exportSnapshotTaskWithClient(ctx context.Context, client *Cl
 		return ExportResult{EstimatorID: t.ID, Status: "error", ErrorMessage: fmt.Sprintf("task mapping lookup: %v", err)}
 	}
 
-	// Create new Story — use discipline prefix in summary for context.
-	// Avoid optional fields (parent, labels) on create: they fail on some Jira
-	// project configurations. Link to the Epic via a separate update afterwards.
+	// Create new Task — discipline prefix in summary gives context in Jira.
+	// Include both Epic Link approaches in the create body:
+	//   customfield_10014 = classic company-managed projects
+	//   parent            = next-gen team-managed projects
+	// Jira ignores fields it doesn't recognise for the project type.
 	summary := "[" + discipline + "] " + t.Label
-	body := BuildJiraIssueBody(intg.JiraProjectKey, "Story", summary, 0)
+	body := BuildJiraIssueBody(intg.JiraProjectKey, "Task", summary, 0)
+	if epicKey != "" {
+		if fields, ok := body["fields"].(map[string]interface{}); ok {
+			fields["customfield_10014"] = epicKey
+			fields["parent"] = map[string]string{"key": epicKey}
+		}
+	}
 	created, createErr := client.CreateIssue(ctx, body)
 	if createErr != nil {
-		return ExportResult{EstimatorID: t.ID, Status: "error", ErrorMessage: createErr.Error()}
-	}
-
-	// Link to parent Epic. Classic projects use customfield_10014 (Epic Link);
-	// next-gen projects use the parent field. Try each separately so a failure
-	// on one doesn't prevent the other from being applied.
-	if epicKey != "" {
-		client.UpdateIssue(ctx, created.Key, map[string]interface{}{ //nolint:errcheck
-			"customfield_10014": epicKey,
-		})
-		client.UpdateIssue(ctx, created.Key, map[string]interface{}{ //nolint:errcheck
-			"parent": map[string]string{"key": epicKey},
-		})
+		// If create with parent fields failed, retry with just the essentials.
+		body = BuildJiraIssueBody(intg.JiraProjectKey, "Task", summary, 0)
+		created, createErr = client.CreateIssue(ctx, body)
+		if createErr != nil {
+			return ExportResult{EstimatorID: t.ID, Status: "error", ErrorMessage: createErr.Error()}
+		}
 	}
 	svc.mappings.InsertOne(ctx, JiraMapping{ //nolint:errcheck
 		ID:            primitive.NewObjectID(),
