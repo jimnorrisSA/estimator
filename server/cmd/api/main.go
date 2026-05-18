@@ -101,6 +101,9 @@ func main() {
 
 	auth.RegisterRoutes(r, database)
 
+	// Fixed-path Jira OAuth callback — must be outside auth middleware so Atlassian can reach it.
+	handlers.RegisterJiraTopLevelRoutes(r, database)
+
 	api := r.Group("/api", middleware.RequireAuth())
 	handlers.RegisterProjectRoutes(api, database)
 	handlers.RegisterJiraRoutes(api, database)
