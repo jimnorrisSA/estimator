@@ -6,10 +6,11 @@ import type { PendingConflict } from "../store/jiraStore.js";
 import { JiraImportModal } from "./JiraImportModal.js";
 import { JiraExportModal } from "./JiraExportModal.js";
 import { JiraConflictModal } from "./JiraConflictModal.js";
+import { JiraProjectPickerModal } from "./JiraProjectPickerModal.js";
 
 export function JiraMenu() {
   const [open, setOpen] = useState(false);
-  const [modal, setModal] = useState<"import" | "export" | "conflicts" | null>(null);
+  const [modal, setModal] = useState<"import" | "export" | "conflicts" | "pick-project" | null>(null);
   const [connecting, setConnecting] = useState(false);
   const [conflicts, setConflicts] = useState<PendingConflict[]>([]);
   const [justConnected, setJustConnected] = useState(false);
@@ -50,12 +51,13 @@ export function JiraMenu() {
     return () => window.removeEventListener("focus", refresh);
   }, [refresh]);
 
-  // Detect redirect back from OAuth (?jira=connected in URL)
+  // Detect redirect back from OAuth (?jira=connected in URL) — open the project picker
   useEffect(() => {
     if (window.location.search.includes("jira=connected")) {
       window.history.replaceState({}, "", window.location.pathname);
       setJustConnected(true);
       refresh();
+      setModal("pick-project");
       setTimeout(() => setJustConnected(false), 4000);
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -140,10 +142,23 @@ export function JiraMenu() {
                     {config?.jiraInstanceUrl && (
                       <p className="text-xs text-[#5c5575] truncate">{config.jiraInstanceUrl}</p>
                     )}
-                    {config?.jiraProjectKey && (
-                      <p className="text-xs text-[#9b93ba] font-mono mt-0.5">
+                    {config?.jiraProjectKey ? (
+                      <p className="text-xs text-[#9b93ba] font-mono mt-0.5 flex items-center gap-1.5">
                         Project: <span className="text-[#a78bfa]">{config.jiraProjectKey}</span>
+                        <button
+                          className="text-[#5c5575] hover:text-[#9b93ba] text-xs underline underline-offset-2 transition-colors"
+                          onClick={() => { setOpen(false); setModal("pick-project"); }}
+                        >
+                          Change
+                        </button>
                       </p>
+                    ) : (
+                      <button
+                        className="mt-1.5 w-full text-left px-2.5 py-1.5 rounded-lg bg-[#7c3aed]/20 border border-[#7c3aed]/40 text-xs font-semibold text-[#a78bfa] hover:bg-[#7c3aed]/30 transition-colors"
+                        onClick={() => { setOpen(false); setModal("pick-project"); }}
+                      >
+                        Set Jira project →
+                      </button>
                     )}
                     {lastSynced && (
                       <p className="text-xs text-[#3a3456] mt-0.5">Last synced {lastSynced}</p>
@@ -224,6 +239,13 @@ export function JiraMenu() {
           conflicts={conflicts}
           onClose={() => setModal(null)}
           onResolved={() => { refresh(); setConflicts([]); }}
+        />
+      )}
+      {modal === "pick-project" && projectId && (
+        <JiraProjectPickerModal
+          projectId={projectId}
+          onClose={() => setModal(null)}
+          onSelected={() => { refresh(); setModal(null); }}
         />
       )}
     </>

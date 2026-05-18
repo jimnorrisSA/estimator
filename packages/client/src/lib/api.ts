@@ -45,6 +45,8 @@ export const api = {
         method: "POST",
         ...json(featureIds ? { feature_ids: featureIds } : {}),
       }),
+    listProjects: (projectId: string) =>
+      apiFetch(`/api/projects/${projectId}/jira/projects`),
   },
   auth: {
     me: () => apiFetch("/api/auth/me"),

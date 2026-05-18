@@ -15,6 +15,7 @@ export const api = {
         oauthStart: (projectId) => apiFetch(`/api/projects/${projectId}/jira/oauth/start`),
         disconnect: (projectId) => apiFetch(`/api/projects/${projectId}/jira/disconnect`, { method: "DELETE" }),
         syncStatus: (projectId) => apiFetch(`/api/projects/${projectId}/jira/sync/status`),
+        syncConflicts: (projectId) => apiFetch(`/api/projects/${projectId}/jira/sync/conflicts`),
         validateConnection: (projectId) => apiFetch(`/api/projects/${projectId}/jira/sync/validate`, { method: "POST" }),
         resolveConflict: (projectId, mappingId, winner) => apiFetch(`/api/projects/${projectId}/jira/sync/resolve`, {
             method: "POST",
@@ -30,6 +31,7 @@ export const api = {
             method: "POST",
             ...json(featureIds ? { feature_ids: featureIds } : {}),
         }),
+        listProjects: (projectId) => apiFetch(`/api/projects/${projectId}/jira/projects`),
     },
     auth: {
         me: () => apiFetch("/api/auth/me"),

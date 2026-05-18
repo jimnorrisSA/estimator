@@ -80,6 +80,8 @@ func RegisterJiraRoutes(rg *gin.RouterGroup, db *mongo.Database) {
 
 		project.GET("/config", h.getConfig)
 		project.PATCH("/config", h.updateConfig)
+
+		project.GET("/projects", h.listJiraProjects)
 	}
 }
 
@@ -500,6 +502,22 @@ func (h *jiraHandler) getConfig(c *gin.Context) {
 		LastUsedAt:      intg.LastUsedAt,
 		Scope:           intg.Scope,
 	})
+}
+
+func (h *jiraHandler) listJiraProjects(c *gin.Context) {
+	projectID, ok := projectIDFromParam(c)
+	if !ok {
+		return
+	}
+	projects, err := h.svc.ListJiraProjects(c.Request.Context(), projectID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if projects == nil {
+		projects = []jira.JiraProjectSummary{}
+	}
+	c.JSON(http.StatusOK, projects)
 }
 
 func (h *jiraHandler) updateConfig(c *gin.Context) {

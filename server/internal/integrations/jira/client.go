@@ -141,6 +141,27 @@ func (c *Client) UpdateIssue(ctx context.Context, key string, fields map[string]
 	return nil
 }
 
+// GetProjects fetches up to 50 Jira projects ordered by name.
+func (c *Client) GetProjects(ctx context.Context) ([]JiraProjectSummary, error) {
+	url := fmt.Sprintf("%s/project/search?maxResults=50&orderBy=name", c.baseURL())
+
+	var result struct {
+		Values []struct {
+			Key  string `json:"key"`
+			Name string `json:"name"`
+		} `json:"values"`
+	}
+	if err := c.do(ctx, http.MethodGet, url, nil, &result); err != nil {
+		return nil, fmt.Errorf("get projects: %w", err)
+	}
+
+	projects := make([]JiraProjectSummary, 0, len(result.Values))
+	for _, v := range result.Values {
+		projects = append(projects, JiraProjectSummary{Key: v.Key, Name: v.Name})
+	}
+	return projects, nil
+}
+
 // GetAccessibleResources fetches the list of Jira Cloud instances the token has access to.
 // This is a package-level function (not a method) because it is called before cloudID is known.
 func GetAccessibleResources(ctx context.Context, accessToken string) ([]JiraResource, error) {

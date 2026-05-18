@@ -193,3 +193,9 @@ type JiraResource struct {
 	URL  string `json:"url"`
 	Name string `json:"name"`
 }
+
+// JiraProjectSummary is a lightweight view of a Jira project for the project picker.
+type JiraProjectSummary struct {
+	Key  string `json:"key"`
+	Name string `json:"name"`
+}

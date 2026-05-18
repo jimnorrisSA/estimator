@@ -29,6 +29,7 @@ type Adapter interface {
 	GetSyncState(ctx context.Context, projectID primitive.ObjectID) (SyncState, error)
 	ResolveSyncConflict(ctx context.Context, projectID primitive.ObjectID, mappingID primitive.ObjectID, winner, userEmail string) error
 	ValidateConnection(ctx context.Context, projectID primitive.ObjectID) (bool, error)
+	ListJiraProjects(ctx context.Context, projectID primitive.ObjectID) ([]JiraProjectSummary, error)
 }
 
 // ---------------------------------------------------------------------------
@@ -198,4 +199,17 @@ func (svc *Service) getClientForProject(ctx context.Context, projectID primitive
 	}
 
 	return NewClient(intg.JiraCloudID, accessToken), nil
+}
+
+// ---------------------------------------------------------------------------
+// Project listing
+// ---------------------------------------------------------------------------
+
+// ListJiraProjects returns the Jira projects accessible to the connected account.
+func (svc *Service) ListJiraProjects(ctx context.Context, projectID primitive.ObjectID) ([]JiraProjectSummary, error) {
+	client, err := svc.getClientForProject(ctx, projectID)
+	if err != nil {
+		return nil, err
+	}
+	return client.GetProjects(ctx)
 }
