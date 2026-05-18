@@ -4,6 +4,7 @@ import { SchedulingPage } from "./features/phase2-scheduling/SchedulingPage.js";
 import { MilestonesPage } from "./features/phase3-milestones/MilestonesPage.js";
 import { CostSheetPage } from "./features/phase4-costs/CostSheetPage.js";
 import { ExportMenu } from "./features/phase2-scheduling/components/ExportMenu.js";
+import { JiraMenu } from "./features/jira/components/JiraMenu.js";
 import { LandingPage } from "./features/landing/LandingPage.js";
 import { ProjectsListPage } from "./features/landing/ProjectsListPage.js";
 import { AuthGate } from "./features/auth/AuthGate.js";
@@ -191,6 +192,7 @@ function AppContent() {
             </span>
           )}
           {activePhase === 2 && <ExportMenu />}
+          <JiraMenu />
           <button
             onClick={handleSave}
             disabled={saveState === "saving"}

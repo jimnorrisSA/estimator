@@ -15,6 +15,35 @@ function json(body: unknown): RequestInit {
 }
 
 export const api = {
+  jira: {
+    oauthStart: (projectId: string) =>
+      apiFetch(`/api/projects/${projectId}/jira/oauth/start`),
+    disconnect: (projectId: string) =>
+      apiFetch(`/api/projects/${projectId}/jira/disconnect`, { method: "DELETE" }),
+    syncStatus: (projectId: string) =>
+      apiFetch(`/api/projects/${projectId}/jira/sync/status`),
+    validateConnection: (projectId: string) =>
+      apiFetch(`/api/projects/${projectId}/jira/sync/validate`, { method: "POST" }),
+    resolveConflict: (projectId: string, mappingId: string, winner: "estimator" | "jira") =>
+      apiFetch(`/api/projects/${projectId}/jira/sync/resolve`, {
+        method: "POST",
+        ...json({ mapping_id: mappingId, winner }),
+      }),
+    config: (projectId: string) =>
+      apiFetch(`/api/projects/${projectId}/jira/config`),
+    updateConfig: (projectId: string, body: { jira_project_key?: string }) =>
+      apiFetch(`/api/projects/${projectId}/jira/config`, { method: "PATCH", ...json(body) }),
+    importProject: (projectId: string, jiraProjectKey: string) =>
+      apiFetch(`/api/projects/${projectId}/jira/import/project`, {
+        method: "POST",
+        ...json({ jira_project_key: jiraProjectKey }),
+      }),
+    exportEstimates: (projectId: string, featureIds?: string[]) =>
+      apiFetch(`/api/projects/${projectId}/jira/export/estimates`, {
+        method: "POST",
+        ...json(featureIds ? { feature_ids: featureIds } : {}),
+      }),
+  },
   auth: {
     me: () => apiFetch("/api/auth/me"),
     config: () => apiFetch("/api/auth/config"),
