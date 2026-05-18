@@ -421,8 +421,6 @@ func (svc *Service) exportSnapshotTaskWithClient(ctx context.Context, client *Cl
 	}).Decode(&mapping)
 
 	now := time.Now().UTC()
-	tshirtSize := StoryPointsToTShirtSize(t.Estimate.Value * snapshotWorkingDays[t.Estimate.Unit])
-	labels := []string{"estimate:" + tshirtSize, "discipline:" + discipline}
 
 	if err == nil {
 		// Update existing Story.
