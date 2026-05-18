@@ -25,7 +25,7 @@ type Adapter interface {
 	ImportProject(ctx context.Context, projectID primitive.ObjectID, jiraProjectKey, userEmail string) (ProjectImportResult, error)
 	ExportFeature(ctx context.Context, projectID, featureID primitive.ObjectID, userEmail string) (ExportResult, error)
 	ExportTask(ctx context.Context, projectID, taskID primitive.ObjectID, userEmail string) (ExportResult, error)
-	ExportEstimates(ctx context.Context, projectID primitive.ObjectID, featureIDs []primitive.ObjectID, notes, userEmail string) ([]ExportResult, error)
+	ExportEstimates(ctx context.Context, projectID primitive.ObjectID, featureIDs []string, notes, userEmail string) ([]ExportResult, error)
 	GetSyncState(ctx context.Context, projectID primitive.ObjectID) (SyncState, error)
 	ResolveSyncConflict(ctx context.Context, projectID primitive.ObjectID, mappingID primitive.ObjectID, winner, userEmail string) error
 	ValidateConnection(ctx context.Context, projectID primitive.ObjectID) (bool, error)

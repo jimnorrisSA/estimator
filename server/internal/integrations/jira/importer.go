@@ -149,9 +149,19 @@ func (svc *Service) upsertFeatureFromEpic(ctx context.Context, projectID primiti
 		}
 		// Update the feature name in the project.
 		now := time.Now().UTC()
+		// EstimatorID is stored as a hex string; convert back to ObjectID for the MongoDB filter.
+		existingOID, oidErr := primitive.ObjectIDFromHex(existing.EstimatorID)
+		if oidErr != nil {
+			return ImportResult{
+				EstimatorID:  existing.EstimatorID,
+				JiraKey:      epic.Key,
+				Status:       "error",
+				ErrorMessage: fmt.Sprintf("invalid estimator_id in mapping: %v", oidErr),
+			}
+		}
 		_, updateErr := svc.projects.UpdateOne(
 			ctx,
-			bson.M{"_id": projectID, "features._id": existing.EstimatorID},
+			bson.M{"_id": projectID, "features._id": existingOID},
 			bson.M{"$set": bson.M{
 				"features.$.name":       JiraIssueToFeatureName(epic),
 				"features.$.updated_at": now,
@@ -216,7 +226,7 @@ func (svc *Service) upsertFeatureFromEpic(ctx context.Context, projectID primiti
 		ID:            primitive.NewObjectID(),
 		ProjectID:     projectID,
 		EstimatorType: "feature",
-		EstimatorID:   featureID,
+		EstimatorID:   featureID.Hex(),
 		JiraIssueKey:  epic.Key,
 		JiraIssueID:   epic.ID,
 		JiraIssueType: "epic",
@@ -231,7 +241,7 @@ func (svc *Service) upsertFeatureFromEpic(ctx context.Context, projectID primiti
 	svc.mappings.InsertOne(ctx, mapping) //nolint:errcheck
 
 	return ImportResult{
-		EstimatorID: featureID,
+		EstimatorID: featureID.Hex(),
 		JiraKey:     epic.Key,
 		Status:      "created",
 	}
@@ -269,9 +279,15 @@ func (svc *Service) importStoriesWithClient(ctx context.Context, client *Client,
 		return nil, fmt.Errorf("search stories under %s: %w", epicKey, err)
 	}
 
+	// EstimatorID is stored as a hex string; convert back to ObjectID for the feature reference.
+	featureOID, err := primitive.ObjectIDFromHex(epicMapping.EstimatorID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid feature estimator_id in mapping for epic %s: %w", epicKey, err)
+	}
+
 	results := make([]ImportResult, 0, len(stories))
 	for _, story := range stories {
-		r := svc.upsertPostItFromStory(ctx, projectID, epicMapping.EstimatorID, story, userEmail)
+		r := svc.upsertPostItFromStory(ctx, projectID, featureOID, story, userEmail)
 		results = append(results, r)
 	}
 	return results, nil
@@ -303,9 +319,19 @@ func (svc *Service) upsertPostItFromStory(ctx context.Context, projectID, featur
 			size = StoryPointsToTShirtSize(*story.Fields.StoryPoints)
 		}
 		now := time.Now().UTC()
+		// EstimatorID is stored as a hex string; convert back to ObjectID for the MongoDB filter.
+		existingOID, oidErr := primitive.ObjectIDFromHex(existing.EstimatorID)
+		if oidErr != nil {
+			return ImportResult{
+				EstimatorID:  existing.EstimatorID,
+				JiraKey:      story.Key,
+				Status:       "error",
+				ErrorMessage: fmt.Sprintf("invalid estimator_id in mapping: %v", oidErr),
+			}
+		}
 		_, updateErr := svc.projects.UpdateOne(
 			ctx,
-			bson.M{"_id": projectID, "features.postits._id": existing.EstimatorID},
+			bson.M{"_id": projectID, "features.postits._id": existingOID},
 			bson.M{"$set": bson.M{
 				"features.$.postits.$[postit].task_label":       story.Fields.Summary,
 				"features.$.postits.$[postit].estimate.value":   TShirtSizeToStoryPoints(size),
@@ -383,7 +409,7 @@ func (svc *Service) upsertPostItFromStory(ctx context.Context, projectID, featur
 		ID:            primitive.NewObjectID(),
 		ProjectID:     projectID,
 		EstimatorType: "task",
-		EstimatorID:   postitID,
+		EstimatorID:   postitID.Hex(),
 		JiraIssueKey:  story.Key,
 		JiraIssueID:   story.ID,
 		JiraIssueType: "story",
@@ -398,7 +424,7 @@ func (svc *Service) upsertPostItFromStory(ctx context.Context, projectID, featur
 	svc.mappings.InsertOne(ctx, mapping) //nolint:errcheck
 
 	return ImportResult{
-		EstimatorID: postitID,
+		EstimatorID: postitID.Hex(),
 		JiraKey:     story.Key,
 		Status:      "created",
 	}

@@ -287,17 +287,7 @@ func (h *jiraHandler) exportEstimates(c *gin.Context) {
 		return
 	}
 
-	var featureIDs []primitive.ObjectID
-	for _, s := range body.FeatureIDs {
-		oid, err := primitive.ObjectIDFromHex(s)
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid feature_id: " + s})
-			return
-		}
-		featureIDs = append(featureIDs, oid)
-	}
-
-	results, err := h.svc.ExportEstimates(c.Request.Context(), projectID, featureIDs, body.Notes, c.GetString("userEmail"))
+	results, err := h.svc.ExportEstimates(c.Request.Context(), projectID, body.FeatureIDs, body.Notes, c.GetString("userEmail"))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

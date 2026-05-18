@@ -2,6 +2,7 @@ package jira
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -12,12 +13,87 @@ import (
 )
 
 // ---------------------------------------------------------------------------
+// Snapshot types — mirror the client-side feature structure stored in project.Snapshot
+// ---------------------------------------------------------------------------
+
+// snapshotFeature mirrors the client-side Feature stored in project.snapshot.features.
+type snapshotFeature struct {
+	ID     string          `json:"id"`
+	Name   string          `json:"name"`
+	Groups []snapshotGroup `json:"groups"`
+}
+
+type snapshotGroup struct {
+	Discipline string         `json:"discipline"`
+	Tasks      []snapshotTask `json:"tasks"`
+}
+
+type snapshotTask struct {
+	ID       string           `json:"id"`
+	Label    string           `json:"label"`
+	Estimate snapshotEstimate `json:"estimate"`
+}
+
+type snapshotEstimate struct {
+	Value float64 `json:"value"`
+	Unit  string  `json:"unit"`
+}
+
+var snapshotWorkingDays = map[string]float64{
+	"half_day": 0.5,
+	"day":      1,
+	"week":     5,
+	"month":    20,
+}
+
+// featuresFromSnapshot extracts features from the client's snapshot blob.
+func featuresFromSnapshot(snapshot interface{}) []snapshotFeature {
+	if snapshot == nil {
+		return nil
+	}
+	b, err := json.Marshal(snapshot)
+	if err != nil {
+		return nil
+	}
+	var s struct {
+		Features []snapshotFeature `json:"features"`
+	}
+	if err := json.Unmarshal(b, &s); err != nil {
+		return nil
+	}
+	return s.Features
+}
+
+// aggregateSnapshotFeature computes T-shirt size and cost from a snapshot feature's tasks.
+func aggregateSnapshotFeature(f snapshotFeature) (tshirtSize string, cost float64, disciplines map[string]float64) {
+	disciplines = make(map[string]float64)
+	total := 0.0
+	count := 0
+	for _, g := range f.Groups {
+		for _, t := range g.Tasks {
+			days := t.Estimate.Value * snapshotWorkingDays[t.Estimate.Unit]
+			disciplines[g.Discipline] += days
+			total += days
+			count++
+		}
+	}
+	if count == 0 {
+		tshirtSize = "M"
+	} else {
+		avg := total / float64(count)
+		tshirtSize = StoryPointsToTShirtSize(avg)
+	}
+	cost = total * 800
+	return
+}
+
+// ---------------------------------------------------------------------------
 // ExportEstimates
 // ---------------------------------------------------------------------------
 
 // ExportEstimates pushes T-shirt-size estimates for the given features to Jira.
 // If featureIDs is empty, all features in the project are exported.
-func (svc *Service) ExportEstimates(ctx context.Context, projectID primitive.ObjectID, featureIDs []primitive.ObjectID, notes, userEmail string) ([]ExportResult, error) {
+func (svc *Service) ExportEstimates(ctx context.Context, projectID primitive.ObjectID, featureIDs []string, notes, userEmail string) ([]ExportResult, error) {
 	start := time.Now()
 
 	client, err := svc.getClientForProject(ctx, projectID)
@@ -31,9 +107,9 @@ func (svc *Service) ExportEstimates(ctx context.Context, projectID primitive.Obj
 		return nil, err
 	}
 
-	// Build a set of requested IDs (empty = all).
+	// Build filter set (empty = all).
 	wantAll := len(featureIDs) == 0
-	wantSet := make(map[primitive.ObjectID]bool, len(featureIDs))
+	wantSet := make(map[string]bool, len(featureIDs))
 	for _, id := range featureIDs {
 		wantSet[id] = true
 	}
@@ -41,20 +117,44 @@ func (svc *Service) ExportEstimates(ctx context.Context, projectID primitive.Obj
 	var results []ExportResult
 	var changes []SyncChange
 
-	for _, feature := range project.Features {
-		if !wantAll && !wantSet[feature.ID] {
-			continue
+	if len(project.Features) > 0 {
+		// Structured features path.
+		for _, feature := range project.Features {
+			fid := feature.ID.Hex()
+			if !wantAll && !wantSet[fid] {
+				continue
+			}
+			r := svc.exportFeatureWithClient(ctx, client, project, feature, userEmail)
+			results = append(results, r)
+			changes = append(changes, SyncChange{
+				EstimatorID:  r.EstimatorID,
+				JiraKey:      r.JiraKey,
+				Action:       r.Status,
+				Reason:       r.Reason,
+				ErrorMessage: r.ErrorMessage,
+			})
 		}
-
-		r := svc.exportFeatureWithClient(ctx, client, project, feature, userEmail)
-		results = append(results, r)
-		changes = append(changes, SyncChange{
-			EstimatorID: feature.ID,
-			JiraKey:     r.JiraKey,
-			Action:      r.Status,
-			Reason:      r.Reason,
-			ErrorMessage: r.ErrorMessage,
-		})
+	} else {
+		// Snapshot features path — used by the current client.
+		snapshotFeats := featuresFromSnapshot(project.Snapshot)
+		var intg JiraIntegration
+		if err := svc.integrations.FindOne(ctx, bson.M{"project_id": projectID, "is_active": true}).Decode(&intg); err != nil {
+			return nil, fmt.Errorf("load integration: %w", err)
+		}
+		for _, f := range snapshotFeats {
+			if !wantAll && !wantSet[f.ID] {
+				continue
+			}
+			r := svc.exportSnapshotFeatureWithClient(ctx, client, projectID, intg, f, userEmail)
+			results = append(results, r)
+			changes = append(changes, SyncChange{
+				EstimatorID:  r.EstimatorID,
+				JiraKey:      r.JiraKey,
+				Action:       r.Status,
+				Reason:       r.Reason,
+				ErrorMessage: r.ErrorMessage,
+			})
+		}
 	}
 
 	// Count stats.
@@ -125,7 +225,7 @@ func (svc *Service) ExportFeature(ctx context.Context, projectID, featureID prim
 			Errors:  boolToInt(result.Status == "error"),
 		},
 		Changes: []SyncChange{{
-			EstimatorID:  feature.ID,
+			EstimatorID:  feature.ID.Hex(),
 			JiraKey:      result.JiraKey,
 			Action:       result.Status,
 			Reason:       result.Reason,
@@ -142,7 +242,7 @@ func (svc *Service) exportFeatureWithClient(ctx context.Context, client *Client,
 	var intg JiraIntegration
 	if err := svc.integrations.FindOne(ctx, bson.M{"project_id": project.ID, "is_active": true}).Decode(&intg); err != nil {
 		return ExportResult{
-			EstimatorID:  feature.ID,
+			EstimatorID:  feature.ID.Hex(),
 			Status:       "error",
 			ErrorMessage: fmt.Sprintf("load integration: %v", err),
 		}
@@ -152,7 +252,7 @@ func (svc *Service) exportFeatureWithClient(ctx context.Context, client *Client,
 	var mapping JiraMapping
 	err := svc.mappings.FindOne(ctx, bson.M{
 		"project_id":    project.ID,
-		"estimator_id":  feature.ID,
+		"estimator_id":  feature.ID.Hex(),
 		"estimator_type": "feature",
 	}).Decode(&mapping)
 
@@ -167,7 +267,7 @@ func (svc *Service) exportFeatureWithClient(ctx context.Context, client *Client,
 		fields["summary"] = feature.Name
 		if updateErr := client.UpdateIssue(ctx, mapping.JiraIssueKey, fields); updateErr != nil {
 			return ExportResult{
-				EstimatorID:  feature.ID,
+				EstimatorID:  feature.ID.Hex(),
 				JiraKey:      mapping.JiraIssueKey,
 				Status:       "error",
 				ErrorMessage: updateErr.Error(),
@@ -179,7 +279,7 @@ func (svc *Service) exportFeatureWithClient(ctx context.Context, client *Client,
 			"updated_at":     now,
 		}})
 		return ExportResult{
-			EstimatorID: feature.ID,
+			EstimatorID: feature.ID.Hex(),
 			JiraKey:     mapping.JiraIssueKey,
 			Status:      "updated",
 		}
@@ -187,7 +287,7 @@ func (svc *Service) exportFeatureWithClient(ctx context.Context, client *Client,
 
 	if err != mongo.ErrNoDocuments {
 		return ExportResult{
-			EstimatorID:  feature.ID,
+			EstimatorID:  feature.ID.Hex(),
 			Status:       "error",
 			ErrorMessage: fmt.Sprintf("mapping lookup: %v", err),
 		}
@@ -196,7 +296,7 @@ func (svc *Service) exportFeatureWithClient(ctx context.Context, client *Client,
 	// No mapping — create a new Epic in Jira.
 	if intg.JiraProjectKey == "" {
 		return ExportResult{
-			EstimatorID:  feature.ID,
+			EstimatorID:  feature.ID.Hex(),
 			Status:       "skipped",
 			Reason:       "no jira_project_key configured on integration — cannot create new issues",
 		}
@@ -207,7 +307,7 @@ func (svc *Service) exportFeatureWithClient(ctx context.Context, client *Client,
 	created, createErr := client.CreateIssue(ctx, body)
 	if createErr != nil {
 		return ExportResult{
-			EstimatorID:  feature.ID,
+			EstimatorID:  feature.ID.Hex(),
 			Status:       "error",
 			ErrorMessage: createErr.Error(),
 		}
@@ -217,7 +317,7 @@ func (svc *Service) exportFeatureWithClient(ctx context.Context, client *Client,
 		ID:            primitive.NewObjectID(),
 		ProjectID:     project.ID,
 		EstimatorType: "feature",
-		EstimatorID:   feature.ID,
+		EstimatorID:   feature.ID.Hex(),
 		JiraIssueKey:  created.Key,
 		JiraIssueID:   created.ID,
 		JiraIssueType: "epic",
@@ -231,10 +331,72 @@ func (svc *Service) exportFeatureWithClient(ctx context.Context, client *Client,
 	svc.mappings.InsertOne(ctx, newMapping) //nolint:errcheck
 
 	return ExportResult{
-		EstimatorID: feature.ID,
+		EstimatorID: feature.ID.Hex(),
 		JiraKey:     created.Key,
 		Status:      "created",
 	}
+}
+
+// exportSnapshotFeatureWithClient exports a client-side snapshot feature to Jira.
+func (svc *Service) exportSnapshotFeatureWithClient(ctx context.Context, client *Client, projectID primitive.ObjectID, intg JiraIntegration, f snapshotFeature, userEmail string) ExportResult {
+	tshirtSize, cost, disciplines := aggregateSnapshotFeature(f)
+
+	var mapping JiraMapping
+	err := svc.mappings.FindOne(ctx, bson.M{
+		"project_id":     projectID,
+		"estimator_id":   f.ID,
+		"estimator_type": "feature",
+	}).Decode(&mapping)
+
+	now := time.Now().UTC()
+
+	if err == nil {
+		fields := BuildEstimateUpdateBody(tshirtSize, cost, disciplines)
+		fields["summary"] = f.Name
+		if updateErr := client.UpdateIssue(ctx, mapping.JiraIssueKey, fields); updateErr != nil {
+			return ExportResult{EstimatorID: f.ID, JiraKey: mapping.JiraIssueKey, Status: "error", ErrorMessage: updateErr.Error()}
+		}
+		svc.mappings.UpdateOne(ctx, bson.M{"_id": mapping.ID}, bson.M{"$set": bson.M{ //nolint:errcheck
+			"last_synced_at": now,
+			"last_synced_by": userEmail,
+			"updated_at":     now,
+		}})
+		return ExportResult{EstimatorID: f.ID, JiraKey: mapping.JiraIssueKey, Status: "updated"}
+	}
+
+	if err != mongo.ErrNoDocuments {
+		return ExportResult{EstimatorID: f.ID, Status: "error", ErrorMessage: fmt.Sprintf("mapping lookup: %v", err)}
+	}
+
+	if intg.JiraProjectKey == "" {
+		return ExportResult{EstimatorID: f.ID, Status: "skipped", Reason: "no jira_project_key configured — cannot create new issues"}
+	}
+
+	storyPoints := TShirtSizeToStoryPoints(tshirtSize)
+	body := BuildJiraIssueBody(intg.JiraProjectKey, "Epic", f.Name, storyPoints)
+	created, createErr := client.CreateIssue(ctx, body)
+	if createErr != nil {
+		return ExportResult{EstimatorID: f.ID, Status: "error", ErrorMessage: createErr.Error()}
+	}
+
+	newMapping := JiraMapping{
+		ID:            primitive.NewObjectID(),
+		ProjectID:     projectID,
+		EstimatorType: "feature",
+		EstimatorID:   f.ID,
+		JiraIssueKey:  created.Key,
+		JiraIssueID:   created.ID,
+		JiraIssueType: "epic",
+		Direction:     "export",
+		Origin:        "estimator",
+		LastSyncedAt:  now,
+		LastSyncedBy:  userEmail,
+		CreatedAt:     now,
+		UpdatedAt:     now,
+	}
+	svc.mappings.InsertOne(ctx, newMapping) //nolint:errcheck
+
+	return ExportResult{EstimatorID: f.ID, JiraKey: created.Key, Status: "created"}
 }
 
 // ---------------------------------------------------------------------------
@@ -294,7 +456,7 @@ func (svc *Service) ExportTask(ctx context.Context, projectID, taskID primitive.
 		}
 		if updateErr := client.UpdateIssue(ctx, mapping.JiraIssueKey, fields); updateErr != nil {
 			return ExportResult{
-				EstimatorID:  taskID,
+				EstimatorID:  taskID.Hex(),
 				JiraKey:      mapping.JiraIssueKey,
 				Status:       "error",
 				ErrorMessage: updateErr.Error(),
@@ -306,7 +468,7 @@ func (svc *Service) ExportTask(ctx context.Context, projectID, taskID primitive.
 			"updated_at":     now,
 		}})
 		return ExportResult{
-			EstimatorID: taskID,
+			EstimatorID: taskID.Hex(),
 			JiraKey:     mapping.JiraIssueKey,
 			Status:      "updated",
 		}, nil
@@ -314,7 +476,7 @@ func (svc *Service) ExportTask(ctx context.Context, projectID, taskID primitive.
 
 	if err != mongo.ErrNoDocuments {
 		return ExportResult{
-			EstimatorID:  taskID,
+			EstimatorID:  taskID.Hex(),
 			Status:       "error",
 			ErrorMessage: fmt.Sprintf("mapping lookup: %v", err),
 		}, nil
@@ -322,7 +484,7 @@ func (svc *Service) ExportTask(ctx context.Context, projectID, taskID primitive.
 
 	if intg.JiraProjectKey == "" {
 		return ExportResult{
-			EstimatorID: taskID,
+			EstimatorID: taskID.Hex(),
 			Status:      "skipped",
 			Reason:      "no jira_project_key configured — cannot create new story",
 		}, nil
@@ -341,7 +503,7 @@ func (svc *Service) ExportTask(ctx context.Context, projectID, taskID primitive.
 	created, createErr := client.CreateIssue(ctx, body)
 	if createErr != nil {
 		return ExportResult{
-			EstimatorID:  taskID,
+			EstimatorID:  taskID.Hex(),
 			Status:       "error",
 			ErrorMessage: createErr.Error(),
 		}, nil
@@ -351,7 +513,7 @@ func (svc *Service) ExportTask(ctx context.Context, projectID, taskID primitive.
 		ID:            primitive.NewObjectID(),
 		ProjectID:     projectID,
 		EstimatorType: "task",
-		EstimatorID:   taskID,
+		EstimatorID:   taskID.Hex(),
 		JiraIssueKey:  created.Key,
 		JiraIssueID:   created.ID,
 		JiraIssueType: "story",
@@ -365,7 +527,7 @@ func (svc *Service) ExportTask(ctx context.Context, projectID, taskID primitive.
 	svc.mappings.InsertOne(ctx, newMapping) //nolint:errcheck
 
 	return ExportResult{
-		EstimatorID: taskID,
+		EstimatorID: taskID.Hex(),
 		JiraKey:     created.Key,
 		Status:      "created",
 	}, nil

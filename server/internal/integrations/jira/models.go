@@ -36,7 +36,7 @@ type JiraMapping struct {
 	ID             primitive.ObjectID `bson:"_id"              json:"id"`
 	ProjectID      primitive.ObjectID `bson:"project_id"       json:"projectId"`
 	EstimatorType  string             `bson:"estimator_type"   json:"estimatorType"` // "feature" | "task"
-	EstimatorID    primitive.ObjectID `bson:"estimator_id"     json:"estimatorId"`
+	EstimatorID    string             `bson:"estimator_id"     json:"estimatorId"`
 	JiraIssueKey   string             `bson:"jira_issue_key"   json:"jiraIssueKey"`   // e.g. "DANCE-42"
 	JiraIssueID    string             `bson:"jira_issue_id"    json:"jiraIssueId"`
 	JiraIssueType  string             `bson:"jira_issue_type"  json:"jiraIssueType"` // "epic" | "story" | "task"
@@ -60,7 +60,7 @@ type SyncStats struct {
 
 // SyncChange records one item changed during a sync.
 type SyncChange struct {
-	EstimatorID  primitive.ObjectID `bson:"estimator_id"   json:"estimatorId"`
+	EstimatorID  string `bson:"estimator_id"   json:"estimatorId"`
 	JiraKey      string             `bson:"jira_key"       json:"jiraKey"`
 	Action       string             `bson:"action"         json:"action"` // "created" | "updated" | "skipped" | "error"
 	Reason       string             `bson:"reason"         json:"reason"`
@@ -89,7 +89,7 @@ type JiraSyncHistory struct {
 
 // ImportResult describes the outcome of importing a single Jira issue.
 type ImportResult struct {
-	EstimatorID  primitive.ObjectID `json:"estimatorId"`
+	EstimatorID  string `json:"estimatorId"`
 	JiraKey      string             `json:"jiraKey"`
 	Status       string             `json:"status"`       // "created" | "updated" | "skipped" | "error"
 	Reason       string             `json:"reason"`
@@ -98,7 +98,7 @@ type ImportResult struct {
 
 // ExportResult describes the outcome of exporting a single estimator item.
 type ExportResult struct {
-	EstimatorID  primitive.ObjectID `json:"estimatorId"`
+	EstimatorID  string `json:"estimatorId"`
 	JiraKey      string             `json:"jiraKey"`
 	Status       string             `json:"status"`       // "created" | "updated" | "skipped" | "error"
 	Reason       string             `json:"reason"`
@@ -125,7 +125,7 @@ type SyncState struct {
 
 // EstimateExport carries estimate data for a feature ready to push to Jira.
 type EstimateExport struct {
-	EstimatorID primitive.ObjectID `json:"estimatorId"`
+	EstimatorID string `json:"estimatorId"`
 	TShirtSize  string             `json:"tShirtSize"`
 	Cost        float64            `json:"cost"`
 	Disciplines map[string]float64 `json:"disciplines"`
