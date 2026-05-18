@@ -368,16 +368,23 @@ func (svc *Service) exportSnapshotFeatureWithClient(ctx context.Context, client 
 		fields := BuildEstimateUpdateBody(tshirtSize, cost, disciplines)
 		fields["summary"] = f.Name
 		if updateErr := client.UpdateIssue(ctx, mapping.JiraIssueKey, fields); updateErr != nil {
-			return []ExportResult{{EstimatorID: f.ID, JiraKey: mapping.JiraIssueKey, Status: "error", ErrorMessage: updateErr.Error()}}
+			if strings.Contains(updateErr.Error(), "404") {
+				svc.mappings.DeleteOne(ctx, bson.M{"_id": mapping.ID}) //nolint:errcheck
+				err = mongo.ErrNoDocuments // fall through to create
+			} else {
+				return []ExportResult{{EstimatorID: f.ID, JiraKey: mapping.JiraIssueKey, Status: "error", ErrorMessage: updateErr.Error()}}
+			}
+		} else {
+			svc.mappings.UpdateOne(ctx, bson.M{"_id": mapping.ID}, bson.M{"$set": bson.M{ //nolint:errcheck
+				"last_synced_at": now,
+				"last_synced_by": userEmail,
+				"updated_at":     now,
+			}})
+			epicKey = mapping.JiraIssueKey
+			epicResult = ExportResult{EstimatorID: f.ID, JiraKey: epicKey, Status: "updated"}
 		}
-		svc.mappings.UpdateOne(ctx, bson.M{"_id": mapping.ID}, bson.M{"$set": bson.M{ //nolint:errcheck
-			"last_synced_at": now,
-			"last_synced_by": userEmail,
-			"updated_at":     now,
-		}})
-		epicKey = mapping.JiraIssueKey
-		epicResult = ExportResult{EstimatorID: f.ID, JiraKey: epicKey, Status: "updated"}
-	} else if err != mongo.ErrNoDocuments {
+	}
+	if err != nil && err != mongo.ErrNoDocuments {
 		return []ExportResult{{EstimatorID: f.ID, Status: "error", ErrorMessage: fmt.Sprintf("mapping lookup: %v", err)}}
 	} else {
 		// Create new Epic.
@@ -437,14 +444,20 @@ func (svc *Service) exportSnapshotTaskWithClient(ctx context.Context, client *Cl
 		if updateErr := client.UpdateIssue(ctx, mapping.JiraIssueKey, map[string]interface{}{
 			"summary": summary,
 		}); updateErr != nil {
-			return ExportResult{EstimatorID: t.ID, JiraKey: mapping.JiraIssueKey, Status: "error", ErrorMessage: updateErr.Error()}
+			if strings.Contains(updateErr.Error(), "404") {
+				svc.mappings.DeleteOne(ctx, bson.M{"_id": mapping.ID}) //nolint:errcheck
+				err = mongo.ErrNoDocuments // fall through to create
+			} else {
+				return ExportResult{EstimatorID: t.ID, JiraKey: mapping.JiraIssueKey, Status: "error", ErrorMessage: updateErr.Error()}
+			}
+		} else {
+			svc.mappings.UpdateOne(ctx, bson.M{"_id": mapping.ID}, bson.M{"$set": bson.M{ //nolint:errcheck
+				"last_synced_at": now,
+				"last_synced_by": userEmail,
+				"updated_at":     now,
+			}})
+			return ExportResult{EstimatorID: t.ID, JiraKey: mapping.JiraIssueKey, Status: "updated"}
 		}
-		svc.mappings.UpdateOne(ctx, bson.M{"_id": mapping.ID}, bson.M{"$set": bson.M{ //nolint:errcheck
-			"last_synced_at": now,
-			"last_synced_by": userEmail,
-			"updated_at":     now,
-		}})
-		return ExportResult{EstimatorID: t.ID, JiraKey: mapping.JiraIssueKey, Status: "updated"}
 	}
 
 	if err != mongo.ErrNoDocuments {
