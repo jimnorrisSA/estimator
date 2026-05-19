@@ -12,15 +12,13 @@ const CURRENCIES: { value: Currency; label: string }[] = [
 interface Props {
   settings: ScheduleSettings;
   onChange: (patch: Partial<ScheduleSettings>) => void;
-  totalCostGBP?: number;
 }
 
-export function SettingsPanel({ settings, onChange, totalCostGBP = 0 }: Props) {
+export function SettingsPanel({ settings, onChange }: Props) {
   const symbol = CURRENCY_SYMBOLS[settings.currency];
   const conversionRate = settings.currency === "GBP" ? 1 : (settings.exchangeRates?.[settings.currency] ?? 1);
 
   const toDisplay = (gbp: number) => Math.round(gbp * conversionRate);
-  const fmt = (gbp: number) => `${symbol}${toDisplay(gbp).toLocaleString()}`;
 
   const [monthDraft, setMonthDraft] = useState(
     settings.defaultMonthlyRate > 0 ? String(toDisplay(settings.defaultMonthlyRate)) : ""
@@ -32,55 +30,29 @@ export function SettingsPanel({ settings, onChange, totalCostGBP = 0 }: Props) {
   const [wdpmDraft, setWdpmDraft] = useState(String(settings.workingDaysPerMonth ?? 22));
   useEffect(() => { setWdpmDraft(String(settings.workingDaysPerMonth ?? 22)); }, [settings.workingDaysPerMonth]);
 
-  const [revDraft, setRevDraft] = useState(
+  const [budgetDraft, setBudgetDraft] = useState(
     settings.revenueGBP > 0 ? String(toDisplay(settings.revenueGBP)) : ""
   );
   useEffect(() => {
-    setRevDraft(settings.revenueGBP > 0 ? String(Math.round(settings.revenueGBP * conversionRate)) : "");
+    setBudgetDraft(settings.revenueGBP > 0 ? String(Math.round(settings.revenueGBP * conversionRate)) : "");
   }, [settings.currency, settings.exchangeRates, settings.revenueGBP, conversionRate]);
 
   function commitMonthRate(raw: string) {
     const v = parseFloat(raw);
     const monthly = isNaN(v) || v < 0 ? 0 : v;
-    const gbp = monthly / conversionRate;
-    onChange({ defaultMonthlyRate: gbp });
+    onChange({ defaultMonthlyRate: monthly / conversionRate });
     setMonthDraft(monthly > 0 ? String(Math.round(monthly)) : "");
   }
 
-  function commitRevenue(raw: string) {
+  function commitBudget(raw: string) {
     const v = parseFloat(raw);
     const display = isNaN(v) || v < 0 ? 0 : v;
-    const gbp = display / conversionRate;
-    onChange({ revenueGBP: gbp });
-    setRevDraft(display > 0 ? String(Math.round(display)) : "");
+    onChange({ revenueGBP: display / conversionRate });
+    setBudgetDraft(display > 0 ? String(Math.round(display)) : "");
   }
 
-  const agencyFeeGBP = totalCostGBP * ((settings.agencyFeePct ?? 0) / 100);
-  const marginGBP = settings.revenueGBP - totalCostGBP - agencyFeeGBP;
-  const hasFinancials = totalCostGBP > 0 || settings.revenueGBP > 0;
-
   return (
-    <div className="flex flex-col bg-[#14112a] border-b border-[#2e2848] flex-shrink-0">
-    {/* Financial summary strip */}
-    {hasFinancials && (
-      <div className="flex items-center gap-0 border-b border-[#2e2848] divide-x divide-[#2e2848]">
-        <FinStat label="Project cost" value={fmt(totalCostGBP)} />
-        {(settings.agencyFeePct ?? 0) > 0 && (
-          <FinStat label={`${settings.agencyFeeLabel || "Agency"} fee (${settings.agencyFeePct}%)`} value={fmt(agencyFeeGBP)} />
-        )}
-        {settings.revenueGBP > 0 && (
-          <FinStat label="Revenue" value={fmt(settings.revenueGBP)} />
-        )}
-        {settings.revenueGBP > 0 && totalCostGBP > 0 && (
-          <FinStat
-            label="Margin"
-            value={fmt(marginGBP)}
-            valueClass={marginGBP >= 0 ? "text-green-400" : "text-red-400"}
-          />
-        )}
-      </div>
-    )}
-    <div className="flex items-end gap-6 px-6 py-3 flex-wrap relative">
+    <div className="flex items-end gap-6 px-6 py-3 bg-[#14112a] border-b border-[#2e2848] flex-shrink-0 flex-wrap">
       <Field label="Project name">
         <input
           className="border border-[#2e2848] bg-[#1a1628] text-[#ece7ff] rounded-lg px-3 py-1.5 text-sm w-52 focus:outline-none focus:ring-2 focus:ring-[#7c3aed] placeholder:text-[#3a3456]"
@@ -139,15 +111,10 @@ export function SettingsPanel({ settings, onChange, totalCostGBP = 0 }: Props) {
       <Field label="Contingency">
         <div className="flex items-center gap-1.5">
           <input
-            type="number"
-            min={0}
-            max={100}
-            step={5}
+            type="number" min={0} max={100} step={5}
             className="border border-[#2e2848] bg-[#1a1628] text-[#ece7ff] rounded-lg px-3 py-1.5 text-sm w-20 focus:outline-none focus:ring-2 focus:ring-[#7c3aed]"
             value={settings.contingencyPct}
-            onChange={(e) =>
-              onChange({ contingencyPct: Math.max(0, Math.min(100, Number(e.target.value))) })
-            }
+            onChange={(e) => onChange({ contingencyPct: Math.max(0, Math.min(100, Number(e.target.value))) })}
           />
           <span className="text-sm text-[#5c5575]">%</span>
         </div>
@@ -159,9 +126,7 @@ export function SettingsPanel({ settings, onChange, totalCostGBP = 0 }: Props) {
           value={settings.currency}
           onChange={(e) => onChange({ currency: e.target.value as Currency })}
         >
-          {CURRENCIES.map((c) => (
-            <option key={c.value} value={c.value}>{c.label}</option>
-          ))}
+          {CURRENCIES.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
         </select>
       </Field>
 
@@ -169,10 +134,7 @@ export function SettingsPanel({ settings, onChange, totalCostGBP = 0 }: Props) {
         <div className="flex items-center gap-1">
           <span className="text-sm text-[#5c5575]">{symbol}</span>
           <input
-            type="number"
-            min={0}
-            step={500}
-            placeholder="e.g. 6700"
+            type="number" min={0} step={500} placeholder="e.g. 6700"
             className="border border-[#2e2848] bg-[#1a1628] text-[#ece7ff] rounded-lg px-2 py-1.5 text-sm w-28 focus:outline-none focus:ring-2 focus:ring-[#7c3aed] placeholder:text-[#3a3456]"
             value={monthDraft}
             onChange={(e) => setMonthDraft(e.target.value)}
@@ -184,10 +146,7 @@ export function SettingsPanel({ settings, onChange, totalCostGBP = 0 }: Props) {
 
       <Field label="Working days / month">
         <input
-          type="number"
-          min={1}
-          max={31}
-          step={1}
+          type="number" min={1} max={31} step={1}
           className="border border-[#2e2848] bg-[#1a1628] text-[#ece7ff] rounded-lg px-3 py-1.5 text-sm w-20 focus:outline-none focus:ring-2 focus:ring-[#7c3aed]"
           value={wdpmDraft}
           onChange={(e) => setWdpmDraft(e.target.value)}
@@ -201,53 +160,20 @@ export function SettingsPanel({ settings, onChange, totalCostGBP = 0 }: Props) {
         />
       </Field>
 
-      <Field label={`Revenue (${symbol})`}>
+      <Field label={`Budget / project value (${symbol})`}>
         <div className="flex items-center gap-1">
           <span className="text-sm text-[#5c5575]">{symbol}</span>
           <input
-            type="number"
-            min={0}
-            step={1000}
-            placeholder="e.g. 150000"
-            className="border border-[#2e2848] bg-[#1a1628] text-[#ece7ff] rounded-lg px-2 py-1.5 text-sm w-28 focus:outline-none focus:ring-2 focus:ring-[#7c3aed] placeholder:text-[#3a3456]"
-            value={revDraft}
-            onChange={(e) => setRevDraft(e.target.value)}
-            onBlur={() => commitRevenue(revDraft)}
+            type="number" min={0} step={1000} placeholder="e.g. 150000"
+            className="border border-[#2e2848] bg-[#1a1628] text-[#ece7ff] rounded-lg px-2 py-1.5 text-sm w-32 focus:outline-none focus:ring-2 focus:ring-[#7c3aed] placeholder:text-[#3a3456]"
+            value={budgetDraft}
+            onChange={(e) => setBudgetDraft(e.target.value)}
+            onBlur={() => commitBudget(budgetDraft)}
             onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
           />
         </div>
       </Field>
 
-      <Field label="Agency fee %">
-        <div className="flex items-center gap-1.5">
-          <input
-            type="number"
-            min={0}
-            max={100}
-            step={1}
-            className="border border-[#2e2848] bg-[#1a1628] text-[#ece7ff] rounded-lg px-3 py-1.5 text-sm w-20 focus:outline-none focus:ring-2 focus:ring-[#7c3aed]"
-            value={settings.agencyFeePct ?? 0}
-            onChange={(e) => onChange({ agencyFeePct: Math.max(0, Math.min(100, Number(e.target.value))) })}
-          />
-          <input
-            className="border border-[#2e2848] bg-[#1a1628] text-[#ece7ff] rounded-lg px-2 py-1.5 text-sm w-20 focus:outline-none focus:ring-2 focus:ring-[#7c3aed] placeholder:text-[#3a3456]"
-            placeholder="Label"
-            value={settings.agencyFeeLabel ?? ""}
-            onChange={(e) => onChange({ agencyFeeLabel: e.target.value })}
-          />
-        </div>
-      </Field>
-
-    </div>
-    </div>
-  );
-}
-
-function FinStat({ label, value, valueClass = "text-[#ece7ff]" }: { label: string; value: string; valueClass?: string }) {
-  return (
-    <div className="flex flex-col gap-0.5 px-5 py-2">
-      <span className="text-xs text-[#5c5575] font-medium uppercase tracking-wide whitespace-nowrap">{label}</span>
-      <span className={`text-base font-bold tabular-nums ${valueClass}`}>{value}</span>
     </div>
   );
 }
