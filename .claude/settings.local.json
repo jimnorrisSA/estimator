@@ -46,7 +46,9 @@
       "Bash(git -C \"C:\\\\Users\\\\jnorris\\\\git\\\\estimator\" diff --stat)",
       "Bash(git *)",
       "Bash(go vet *)",
-      "Bash(Select-Object Name, Mode)"
+      "Bash(Select-Object Name, Mode)",
+      "Bash(xargs grep -l \"snapshot\\\\|Snapshot\")",
+      "Bash(xargs grep -l \"PUT\\\\|update\\\\|Update\")"
     ]
   }
 }

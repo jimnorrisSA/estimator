@@ -5,6 +5,7 @@ import type { Feature } from "@estimator/shared";
 import { WORKING_DAYS } from "@estimator/shared";
 import { useEstimationsStore } from "../store/estimationsStore.js";
 import { useCanvasContext } from "../context/CanvasContext.js";
+import { useJiraStore } from "../../jira/store/jiraStore.js";
 import type { KonvaEventObject } from "konva/lib/Node.js";
 import { DisciplineGroupCard } from "./DisciplineGroupCard.js";
 import {
@@ -41,6 +42,7 @@ export function FeatureBox({ feature, selectedId, onSelect, stageScale }: Props)
   const [deleteHover, setDeleteHover] = useState(false);
   const dragStartRef = useRef<Map<string, { x: number; y: number }>>(new Map());
 
+  const jiraKey = useJiraStore((s) => s.syncedFeatures[feature.id]);
   const isSelected = selectedIds.includes(feature.id) || selectedId === feature.id;
   const boxH = featureHeight(feature.groups);
   const groupLayouts = computeGroupLayouts(feature);
@@ -261,6 +263,23 @@ export function FeatureBox({ feature, selectedId, onSelect, stageScale }: Props)
             text="×"
             fontSize={14}
             fill={deleteHover ? "#ffffff" : "#ef4444"}
+            align="center"
+            verticalAlign="middle"
+          />
+        </Group>
+      )}
+
+      {/* Jira synced badge — small pill in top-right corner, visible when not selected */}
+      {jiraKey && !isSelected && (
+        <Group x={feature.width - 6} y={-7}>
+          <Rect width={22} height={14} cornerRadius={3} fill="#0052CC" />
+          <Text
+            width={22}
+            height={14}
+            text="J"
+            fontSize={9}
+            fontStyle="bold"
+            fill="#ffffff"
             align="center"
             verticalAlign="middle"
           />

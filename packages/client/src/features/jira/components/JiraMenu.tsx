@@ -19,13 +19,14 @@ export function JiraMenu() {
   const activeProject = getActiveProject();
   const projectId = activeProject?.apiId ?? null;
 
-  const { syncState, config, loading, fetchSyncState, fetchConfig } = useJiraStore();
+  const { syncState, config, loading, fetchSyncState, fetchConfig, fetchSyncedFeatures } = useJiraStore();
 
   const refresh = useCallback(async () => {
     if (!projectId) return;
     await fetchSyncState(projectId);
     fetchConfig(projectId);
-  }, [projectId, fetchSyncState, fetchConfig]);
+    fetchSyncedFeatures(projectId);
+  }, [projectId, fetchSyncState, fetchConfig, fetchSyncedFeatures]);
 
   // Fetch actual conflict records when count > 0
   const fetchConflicts = useCallback(async () => {

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/soulassembly/estimator/internal/models"
@@ -142,20 +143,42 @@ func (svc *Service) ExportEstimates(ctx context.Context, projectID primitive.Obj
 		if err := svc.integrations.FindOne(ctx, bson.M{"project_id": projectID, "is_active": true}).Decode(&intg); err != nil {
 			return nil, fmt.Errorf("load integration: %w", err)
 		}
+		type featBatch struct {
+			results []ExportResult
+			changes []SyncChange
+		}
+		var (
+			wg      sync.WaitGroup
+			mu      sync.Mutex
+			batches []featBatch
+		)
 		for _, f := range snapshotFeats {
 			if !wantAll && !wantSet[f.ID] {
 				continue
 			}
-			for _, r := range svc.exportSnapshotFeatureWithClient(ctx, client, projectID, intg, f, userEmail) {
-				results = append(results, r)
-				changes = append(changes, SyncChange{
-					EstimatorID:  r.EstimatorID,
-					JiraKey:      r.JiraKey,
-					Action:       r.Status,
-					Reason:       r.Reason,
-					ErrorMessage: r.ErrorMessage,
-				})
-			}
+			wg.Add(1)
+			go func(feat snapshotFeature) {
+				defer wg.Done()
+				var b featBatch
+				for _, r := range svc.exportSnapshotFeatureWithClient(ctx, client, projectID, project.Name, intg, feat, userEmail) {
+					b.results = append(b.results, r)
+					b.changes = append(b.changes, SyncChange{
+						EstimatorID:  r.EstimatorID,
+						JiraKey:      r.JiraKey,
+						Action:       r.Status,
+						Reason:       r.Reason,
+						ErrorMessage: r.ErrorMessage,
+					})
+				}
+				mu.Lock()
+				batches = append(batches, b)
+				mu.Unlock()
+			}(f)
+		}
+		wg.Wait()
+		for _, b := range batches {
+			results = append(results, b.results...)
+			changes = append(changes, b.changes...)
 		}
 	}
 
@@ -349,8 +372,10 @@ func (svc *Service) exportFeatureWithClient(ctx context.Context, client *Client,
 
 // exportSnapshotFeatureWithClient exports a snapshot feature as a Jira Epic and its tasks as Stories.
 // Returns one result per item (first entry is the Epic, remaining are Stories).
-func (svc *Service) exportSnapshotFeatureWithClient(ctx context.Context, client *Client, projectID primitive.ObjectID, intg JiraIntegration, f snapshotFeature, userEmail string) []ExportResult {
+func (svc *Service) exportSnapshotFeatureWithClient(ctx context.Context, client *Client, projectID primitive.ObjectID, projectName string, intg JiraIntegration, f snapshotFeature, userEmail string) []ExportResult {
 	tshirtSize, cost, disciplines := aggregateSnapshotFeature(f)
+	projectSlug := SlugifyLabel(projectName)
+	featureSlug := SlugifyLabel(f.Name)
 
 	var mapping JiraMapping
 	err := svc.mappings.FindOne(ctx, bson.M{
@@ -367,6 +392,7 @@ func (svc *Service) exportSnapshotFeatureWithClient(ctx context.Context, client 
 		// Update existing Epic.
 		fields := BuildEstimateUpdateBody(tshirtSize, cost, disciplines)
 		fields["summary"] = f.Name
+		fields["labels"] = []string{"vigo", "vigo-project:" + projectSlug, "estimate:" + tshirtSize}
 		if updateErr := client.UpdateIssue(ctx, mapping.JiraIssueKey, fields); updateErr != nil {
 			if strings.Contains(updateErr.Error(), "404") {
 				svc.mappings.DeleteOne(ctx, bson.M{"_id": mapping.ID}) //nolint:errcheck
@@ -386,12 +412,15 @@ func (svc *Service) exportSnapshotFeatureWithClient(ctx context.Context, client 
 	}
 	if err != nil && err != mongo.ErrNoDocuments {
 		return []ExportResult{{EstimatorID: f.ID, Status: "error", ErrorMessage: fmt.Sprintf("mapping lookup: %v", err)}}
-	} else {
-		// Create new Epic.
+	} else if epicKey == "" {
+		// Create new Epic — only when we don't already have one from a successful update above.
 		if intg.JiraProjectKey == "" {
 			return []ExportResult{{EstimatorID: f.ID, Status: "skipped", Reason: "no jira_project_key configured — cannot create new issues"}}
 		}
 		body := BuildJiraIssueBody(intg.JiraProjectKey, "Epic", f.Name, 0)
+		if fields, ok := body["fields"].(map[string]interface{}); ok {
+			fields["labels"] = []string{"vigo", "vigo-project:" + projectSlug}
+		}
 		created, createErr := client.CreateIssue(ctx, body)
 		if createErr != nil {
 			return []ExportResult{{EstimatorID: f.ID, Status: "error", ErrorMessage: createErr.Error()}}
@@ -417,18 +446,33 @@ func (svc *Service) exportSnapshotFeatureWithClient(ctx context.Context, client 
 
 	results := []ExportResult{epicResult}
 
-	// Export each task as a Story linked to the Epic.
+	// Collect all tasks first so we can allocate result slots and launch goroutines.
+	type taskWork struct {
+		task       snapshotTask
+		discipline string
+	}
+	var work []taskWork
 	for _, g := range f.Groups {
 		for _, t := range g.Tasks {
-			r := svc.exportSnapshotTaskWithClient(ctx, client, projectID, intg, t, g.Discipline, epicKey, userEmail)
-			results = append(results, r)
+			work = append(work, taskWork{t, g.Discipline})
 		}
 	}
-	return results
+
+	taskResults := make([]ExportResult, len(work))
+	var wg sync.WaitGroup
+	for i, w := range work {
+		wg.Add(1)
+		go func(idx int, tw taskWork) {
+			defer wg.Done()
+			taskResults[idx] = svc.exportSnapshotTaskWithClient(ctx, client, projectID, intg, tw.task, tw.discipline, epicKey, featureSlug, userEmail)
+		}(i, w)
+	}
+	wg.Wait()
+	return append(results, taskResults...)
 }
 
 // exportSnapshotTaskWithClient exports a single snapshot task as a Jira Story linked to the given Epic.
-func (svc *Service) exportSnapshotTaskWithClient(ctx context.Context, client *Client, projectID primitive.ObjectID, intg JiraIntegration, t snapshotTask, discipline, epicKey, userEmail string) ExportResult {
+func (svc *Service) exportSnapshotTaskWithClient(ctx context.Context, client *Client, projectID primitive.ObjectID, intg JiraIntegration, t snapshotTask, discipline, epicKey, featureSlug, userEmail string) ExportResult {
 	var mapping JiraMapping
 	err := svc.mappings.FindOne(ctx, bson.M{
 		"project_id":     projectID,
@@ -465,26 +509,41 @@ func (svc *Service) exportSnapshotTaskWithClient(ctx context.Context, client *Cl
 	}
 
 	// Create new Task — discipline prefix in summary gives context in Jira.
-	// Include both Epic Link approaches in the create body:
-	//   customfield_10014 = classic company-managed projects
-	//   parent            = next-gen team-managed projects
-	// Jira ignores fields it doesn't recognise for the project type.
+	// Try epic-link strategies in order: next-gen (parent), classic (customfield_10014), no link.
+	// Each attempt is a clean request; 4xx means the issue was not created so retrying is safe.
 	summary := "[" + discipline + "] " + t.Label
-	body := BuildJiraIssueBody(intg.JiraProjectKey, "Task", summary, 0)
+
+	var epicLinkAttempts []func(map[string]interface{})
 	if epicKey != "" {
-		if fields, ok := body["fields"].(map[string]interface{}); ok {
-			fields["customfield_10014"] = epicKey
-			fields["parent"] = map[string]string{"key": epicKey}
+		epicLinkAttempts = []func(map[string]interface{}){
+			func(f map[string]interface{}) { f["parent"] = map[string]string{"key": epicKey} },
+			func(f map[string]interface{}) { f["customfield_10014"] = epicKey },
+			func(_ map[string]interface{}) {}, // no link as last resort
 		}
+	} else {
+		epicLinkAttempts = []func(map[string]interface{}){func(_ map[string]interface{}) {}}
 	}
-	created, createErr := client.CreateIssue(ctx, body)
-	if createErr != nil {
-		// If create with parent fields failed, retry with just the essentials.
-		body = BuildJiraIssueBody(intg.JiraProjectKey, "Task", summary, 0)
+
+	var created *JiraIssue
+	var createErr error
+	for _, applyLink := range epicLinkAttempts {
+		body := BuildJiraIssueBody(intg.JiraProjectKey, "Task", summary, 0)
+		if fields, ok := body["fields"].(map[string]interface{}); ok {
+			fields["labels"] = []string{"vigo", "vigo-feature:" + featureSlug}
+			applyLink(fields)
+		}
 		created, createErr = client.CreateIssue(ctx, body)
-		if createErr != nil {
+		if createErr == nil {
+			break
+		}
+		// Only retry on 4xx (validation error — issue was not created by Jira).
+		// Network or 5xx errors may have created the issue; stop to avoid duplicates.
+		if !strings.Contains(createErr.Error(), "jira API error 4") {
 			return ExportResult{EstimatorID: t.ID, Status: "error", ErrorMessage: createErr.Error()}
 		}
+	}
+	if createErr != nil {
+		return ExportResult{EstimatorID: t.ID, Status: "error", ErrorMessage: createErr.Error()}
 	}
 	svc.mappings.InsertOne(ctx, JiraMapping{ //nolint:errcheck
 		ID:            primitive.NewObjectID(),

@@ -55,16 +55,20 @@ export interface ExportResult {
 interface JiraStore {
   syncState: SyncState | null;
   config: JiraConfig | null;
+  syncedFeatures: Record<string, string>; // featureId → jiraKey
   loading: boolean;
   error: string | null;
   fetchSyncState: (projectId: string) => Promise<void>;
   fetchConfig: (projectId: string) => Promise<void>;
+  fetchSyncedFeatures: (projectId: string) => Promise<void>;
+  markFeaturesSynced: (results: ExportResult[]) => void;
   clear: () => void;
 }
 
 export const useJiraStore = create<JiraStore>((set) => ({
   syncState: null,
   config: null,
+  syncedFeatures: {},
   loading: false,
   error: null,
 
@@ -91,5 +95,30 @@ export const useJiraStore = create<JiraStore>((set) => ({
     }
   },
 
-  clear: () => set({ syncState: null, config: null, error: null }),
+  fetchSyncedFeatures: async (projectId: string) => {
+    try {
+      const res = await api.jira.syncedFeatures(projectId);
+      if (!res.ok) return;
+      const data = (await res.json()) as { estimatorId: string; jiraKey: string }[];
+      const map: Record<string, string> = {};
+      for (const d of data) map[d.estimatorId] = d.jiraKey;
+      set({ syncedFeatures: map });
+    } catch {
+      // ignore
+    }
+  },
+
+  markFeaturesSynced: (results: ExportResult[]) => {
+    set((s) => {
+      const next = { ...s.syncedFeatures };
+      for (const r of results) {
+        if (r.jiraKey && (r.status === "created" || r.status === "updated")) {
+          next[r.estimatorId] = r.jiraKey;
+        }
+      }
+      return { syncedFeatures: next };
+    });
+  },
+
+  clear: () => set({ syncState: null, config: null, syncedFeatures: {}, error: null }),
 }));

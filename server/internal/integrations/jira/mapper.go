@@ -1,6 +1,9 @@
 package jira
 
-import "strings"
+import (
+	"strings"
+	"unicode"
+)
 
 // ---------------------------------------------------------------------------
 // Story points ↔ T-shirt size
@@ -106,6 +109,23 @@ func BuildJiraIssueBody(projectKey, issueType, summary string, _ float64) map[st
 		"issuetype": map[string]string{"name": issueType},
 	}
 	return map[string]interface{}{"fields": fields}
+}
+
+// SlugifyLabel converts a string to a safe Jira label (no spaces; non-alphanum → hyphen).
+func SlugifyLabel(s string) string {
+	s = strings.ToLower(s)
+	var b strings.Builder
+	prevHyphen := false
+	for _, r := range s {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) {
+			b.WriteRune(r)
+			prevHyphen = false
+		} else if !prevHyphen {
+			b.WriteRune('-')
+			prevHyphen = true
+		}
+	}
+	return strings.Trim(b.String(), "-")
 }
 
 // BuildEstimateUpdateBody creates the fields map for updating custom estimate fields on a Jira issue.

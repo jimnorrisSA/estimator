@@ -1,7 +1,11 @@
 import { useState } from "react";
 import { api } from "../../../lib/api.js";
+import { useJiraStore } from "../store/jiraStore.js";
 import type { ExportResult } from "../store/jiraStore.js";
 import { useEstimationsStore } from "../../phase1-estimations/store/estimationsStore.js";
+import { useSchedulingStore } from "../../phase2-scheduling/store/schedulingStore.js";
+import { useMilestonesStore } from "../../phase3-milestones/store/milestonesStore.js";
+import { useProjectsStore } from "../../../store/projectsStore.js";
 
 interface Props {
   projectId: string;
@@ -11,6 +15,7 @@ interface Props {
 
 export function JiraExportModal({ projectId, onClose, onExported }: Props) {
   const features = useEstimationsStore((s) => s.features);
+  const markFeaturesSynced = useJiraStore((s) => s.markFeaturesSynced);
   const [selected, setSelected] = useState<Set<string>>(() => new Set(features.map((f) => f.id)));
   const [state, setState] = useState<"idle" | "loading" | "done" | "error">("idle");
   const [results, setResults] = useState<ExportResult[]>([]);
@@ -31,6 +36,20 @@ export function JiraExportModal({ projectId, onClose, onExported }: Props) {
   async function handleExport() {
     setState("loading");
     try {
+      // Flush current canvas state to the server so the export reads fresh data.
+      const { saveActiveSnapshot, pushToServer, getActiveProject } = useProjectsStore.getState();
+      const active = getActiveProject();
+      if (active) {
+        saveActiveSnapshot({
+          features: useEstimationsStore.getState().features,
+          schedulingSettings: useSchedulingStore.getState().settings,
+          overrides: useSchedulingStore.getState().overrides,
+          resources: useSchedulingStore.getState().resources,
+          milestones: useMilestonesStore.getState().milestones,
+        });
+        await pushToServer(active.id);
+      }
+
       const featureIds = [...selected];
       const res = await api.jira.exportEstimates(
         projectId,
@@ -43,6 +62,7 @@ export function JiraExportModal({ projectId, onClose, onExported }: Props) {
       }
       const data = (await res.json()) as ExportResult[] | null;
       setResults(data ?? []);
+      if (data) markFeaturesSynced(data);
       setState("done");
       onExported();
     } catch (e) {

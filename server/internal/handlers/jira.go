@@ -75,6 +75,7 @@ func RegisterJiraRoutes(rg *gin.RouterGroup, db *mongo.Database) {
 		project.GET("/sync/status", h.syncStatus)
 		project.GET("/sync/conflicts", h.syncConflicts)
 		project.GET("/sync/history", h.syncHistory)
+		project.GET("/sync/features", h.syncedFeatures)
 		project.POST("/sync/resolve", h.syncResolve)
 		project.POST("/sync/validate", h.syncValidate)
 
@@ -562,4 +563,38 @@ func (h *jiraHandler) updateConfig(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"ok": true})
+}
+
+// syncedFeatures returns the estimator IDs and Jira keys for all features that
+// have been exported to Jira from this project.
+func (h *jiraHandler) syncedFeatures(c *gin.Context) {
+	projectID, ok := projectIDFromParam(c)
+	if !ok {
+		return
+	}
+
+	type featureSync struct {
+		EstimatorID  string `bson:"estimator_id"   json:"estimatorId"`
+		JiraIssueKey string `bson:"jira_issue_key" json:"jiraKey"`
+	}
+
+	col := h.db.Collection("jira_mappings")
+	cur, err := col.Find(c.Request.Context(), bson.M{
+		"project_id":     projectID,
+		"estimator_type": "feature",
+	}, options.Find().SetProjection(bson.M{"estimator_id": 1, "jira_issue_key": 1}))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	var results []featureSync
+	if err := cur.All(c.Request.Context(), &results); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if results == nil {
+		results = []featureSync{}
+	}
+	c.JSON(http.StatusOK, results)
 }
