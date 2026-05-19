@@ -84,6 +84,13 @@ export function JiraMenu() {
     refresh();
   }
 
+  async function handleResetMappings() {
+    if (!projectId) return;
+    setOpen(false);
+    await api.jira.resetMappings(projectId);
+    fetchSyncedFeatures(projectId);
+  }
+
   const isConnected = syncState?.isConnected ?? false;
   const conflictCount = syncState?.pendingConflicts ?? 0;
   const lastSynced = syncState?.lastSyncedAt && syncState.lastSyncedAt !== "0001-01-01T00:00:00Z"
@@ -197,6 +204,13 @@ export function JiraMenu() {
                     </button>
                   )}
 
+                  <button
+                    className="w-full text-left px-4 py-2.5 hover:bg-[#1e1548] transition-colors border-b border-[#1e1a2e]"
+                    onClick={handleResetMappings}
+                  >
+                    <span className="text-sm font-medium text-amber-400">Reset sync mappings</span>
+                    <p className="text-xs text-[#5c5575] mt-0.5">Clears issue links — next export creates everything fresh</p>
+                  </button>
                   <button
                     className="w-full text-left px-4 py-2.5 hover:bg-[#1e1548] transition-colors"
                     onClick={handleDisconnect}

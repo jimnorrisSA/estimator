@@ -78,6 +78,7 @@ func RegisterJiraRoutes(rg *gin.RouterGroup, db *mongo.Database) {
 		project.GET("/sync/features", h.syncedFeatures)
 		project.POST("/sync/resolve", h.syncResolve)
 		project.POST("/sync/validate", h.syncValidate)
+		project.DELETE("/sync/mappings", h.resetMappings)
 
 		project.GET("/config", h.getConfig)
 		project.PATCH("/config", h.updateConfig)
@@ -597,4 +598,19 @@ func (h *jiraHandler) syncedFeatures(c *gin.Context) {
 		results = []featureSync{}
 	}
 	c.JSON(http.StatusOK, results)
+}
+
+// resetMappings deletes all jira_mappings for a project so the next export creates everything fresh.
+func (h *jiraHandler) resetMappings(c *gin.Context) {
+	projectID, ok := projectIDFromParam(c)
+	if !ok {
+		return
+	}
+	col := h.db.Collection("jira_mappings")
+	res, err := col.DeleteMany(c.Request.Context(), bson.M{"project_id": projectID})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"deleted": res.DeletedCount})
 }
