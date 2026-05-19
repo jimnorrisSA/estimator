@@ -527,41 +527,46 @@ func (svc *Service) exportSnapshotTaskWithClient(ctx context.Context, client *Cl
 	}
 
 	// Create new Task — discipline prefix in summary gives context in Jira.
-	// Try epic-link strategies in order: next-gen (parent), classic (customfield_10014), no link.
-	// Each attempt is a clean request; 4xx means the issue was not created so retrying is safe.
+	// Step 1: try to create with the epic link inline (works for next-gen / team-managed projects).
+	// Step 2: if that fails, create without the link and apply it via an update (works for classic /
+	//         company-managed projects where the Epic Link field isn't on the Create screen).
 	summary := "[" + discipline + "] " + t.Label
 
-	var epicLinkAttempts []func(map[string]interface{})
-	if epicKey != "" {
-		epicLinkAttempts = []func(map[string]interface{}){
-			func(f map[string]interface{}) { f["parent"] = map[string]string{"key": epicKey} },
-			func(f map[string]interface{}) { f["customfield_10014"] = epicKey },
-			func(_ map[string]interface{}) {}, // no link as last resort
+	body := BuildJiraIssueBody(intg.JiraProjectKey, "Task", summary, 0)
+	if fields, ok := body["fields"].(map[string]interface{}); ok {
+		fields["labels"] = []string{"vigo", "vigo-feature:" + featureSlug}
+		if epicKey != "" {
+			fields["parent"] = map[string]string{"key": epicKey}
 		}
-	} else {
-		epicLinkAttempts = []func(map[string]interface{}){func(_ map[string]interface{}) {}}
 	}
-
-	var created *JiraIssue
-	var createErr error
-	for _, applyLink := range epicLinkAttempts {
-		body := BuildJiraIssueBody(intg.JiraProjectKey, "Task", summary, 0)
-		if fields, ok := body["fields"].(map[string]interface{}); ok {
-			fields["labels"] = []string{"vigo", "vigo-feature:" + featureSlug}
-			applyLink(fields)
-		}
-		created, createErr = client.CreateIssue(ctx, body)
-		if createErr == nil {
-			break
-		}
-		// Only retry on 4xx (validation error — issue was not created by Jira).
-		// Network or 5xx errors may have created the issue; stop to avoid duplicates.
+	created, createErr := client.CreateIssue(ctx, body)
+	if createErr != nil {
 		if !strings.Contains(createErr.Error(), "jira API error 4") {
+			// Network or 5xx — issue may have been created; bail to avoid duplicate.
+			return ExportResult{EstimatorID: t.ID, Status: "error", ErrorMessage: createErr.Error()}
+		}
+		// 4xx — Jira rejected the parent field; create without it, link via update.
+		body2 := BuildJiraIssueBody(intg.JiraProjectKey, "Task", summary, 0)
+		if fields, ok := body2["fields"].(map[string]interface{}); ok {
+			fields["labels"] = []string{"vigo", "vigo-feature:" + featureSlug}
+		}
+		created, createErr = client.CreateIssue(ctx, body2)
+		if createErr != nil {
 			return ExportResult{EstimatorID: t.ID, Status: "error", ErrorMessage: createErr.Error()}
 		}
 	}
-	if createErr != nil {
-		return ExportResult{EstimatorID: t.ID, Status: "error", ErrorMessage: createErr.Error()}
+
+	// Step 2: ensure the epic link is set (handles classic Jira where the field must be updated, not set on create).
+	if epicKey != "" {
+		for _, linkFields := range []map[string]interface{}{
+			{"parent": map[string]string{"key": epicKey}},
+			{"customfield_10014": epicKey},
+		} {
+			if updateErr := client.UpdateIssue(ctx, created.Key, linkFields); updateErr == nil {
+				break
+			}
+		}
+		// If both link strategies fail the issue is created but unlinked — not fatal.
 	}
 	svc.mappings.InsertOne(ctx, JiraMapping{ //nolint:errcheck
 		ID:            primitive.NewObjectID(),
