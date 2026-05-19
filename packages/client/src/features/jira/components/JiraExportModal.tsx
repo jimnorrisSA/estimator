@@ -39,15 +39,21 @@ export function JiraExportModal({ projectId, onClose, onExported }: Props) {
       // Flush current canvas state to the server so the export reads fresh data.
       const { saveActiveSnapshot, pushToServer, getActiveProject } = useProjectsStore.getState();
       const active = getActiveProject();
+      const currentFeatures = useEstimationsStore.getState().features;
+      console.log("[jira-export] active project:", active?.id, "apiId:", active?.apiId, "projectId prop:", projectId);
+      console.log("[jira-export] features to save:", currentFeatures.length, currentFeatures.map(f => ({ id: f.id, name: f.name, groups: f.groups.length, tasks: f.groups.flatMap(g => g.tasks).length })));
       if (active) {
         saveActiveSnapshot({
-          features: useEstimationsStore.getState().features,
+          features: currentFeatures,
           schedulingSettings: useSchedulingStore.getState().settings,
           overrides: useSchedulingStore.getState().overrides,
           resources: useSchedulingStore.getState().resources,
           milestones: useMilestonesStore.getState().milestones,
         });
         await pushToServer(active.id);
+        console.log("[jira-export] snapshot pushed to server");
+      } else {
+        console.warn("[jira-export] no active project — snapshot NOT saved");
       }
 
       const featureIds = [...selected];
@@ -55,12 +61,16 @@ export function JiraExportModal({ projectId, onClose, onExported }: Props) {
         projectId,
         featureIds.length < features.length ? featureIds : undefined
       );
+      console.log("[jira-export] response status:", res.status);
       if (!res.ok) {
-        setError(await res.text());
+        const errText = await res.text();
+        console.error("[jira-export] error response:", errText);
+        setError(errText);
         setState("error");
         return;
       }
       const data = (await res.json()) as ExportResult[] | null;
+      console.log("[jira-export] results:", JSON.stringify(data, null, 2));
       setResults(data ?? []);
       if (data) markFeaturesSynced(data);
       setState("done");
