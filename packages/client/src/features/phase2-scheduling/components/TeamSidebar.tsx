@@ -3,7 +3,7 @@ import type { Discipline, Resource, ResourceType } from "@estimator/shared";
 import type { Currency } from "../store/schedulingStore.js";
 import { CURRENCY_SYMBOLS } from "../store/schedulingStore.js";
 
-const DISCIPLINES: Discipline[] = ["Art", "Design", "Code", "Production"];
+const DISCIPLINES: Discipline[] = ["Art", "Design", "Code", "Production", "Custom"];
 
 const DISCIPLINE_STYLES: Record<Discipline, { dot: string; badge: string }> = {
   Art:        { dot: "bg-amber-500",  badge: "bg-amber-900/30 text-amber-400" },

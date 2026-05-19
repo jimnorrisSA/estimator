@@ -74,6 +74,7 @@ export function SchedulingPage() {
         <SettingsPanel
           settings={settings}
           onChange={updateSettings}
+          totalCostGBP={baseCost}
         />
 
         <div className="flex-1 flex flex-col gap-6 p-6">
