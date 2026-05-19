@@ -483,11 +483,29 @@ func (svc *Service) exportSnapshotTaskWithClient(ctx context.Context, client *Cl
 	now := time.Now().UTC()
 
 	if err == nil {
-		// Update existing Story.
+		// Update existing Story — re-assert epic link in case the parent epic was deleted and recreated.
 		summary := "[" + discipline + "] " + t.Label
-		if updateErr := client.UpdateIssue(ctx, mapping.JiraIssueKey, map[string]interface{}{
-			"summary": summary,
-		}); updateErr != nil {
+		var updateErr error
+		if epicKey != "" {
+			// Try next-gen parent link first; fall back to classic field; fall back to summary-only.
+			for _, fields := range []map[string]interface{}{
+				{"summary": summary, "parent": map[string]string{"key": epicKey}},
+				{"summary": summary, "customfield_10014": epicKey},
+				{"summary": summary},
+			} {
+				updateErr = client.UpdateIssue(ctx, mapping.JiraIssueKey, fields)
+				if updateErr == nil || strings.Contains(updateErr.Error(), "404") {
+					break
+				}
+				// 4xx other than 404 means the field is not supported — retry without it.
+				if !strings.Contains(updateErr.Error(), "jira API error 4") {
+					break
+				}
+			}
+		} else {
+			updateErr = client.UpdateIssue(ctx, mapping.JiraIssueKey, map[string]interface{}{"summary": summary})
+		}
+		if updateErr != nil {
 			if strings.Contains(updateErr.Error(), "404") {
 				svc.mappings.DeleteOne(ctx, bson.M{"_id": mapping.ID}) //nolint:errcheck
 				err = mongo.ErrNoDocuments // fall through to create
