@@ -48,7 +48,10 @@
       "Bash(go vet *)",
       "Bash(Select-Object Name, Mode)",
       "Bash(xargs grep -l \"snapshot\\\\|Snapshot\")",
-      "Bash(xargs grep -l \"PUT\\\\|update\\\\|Update\")"
+      "Bash(xargs grep -l \"PUT\\\\|update\\\\|Update\")",
+      "Read(//c/Users/jnorris/Downloads/**)",
+      "Bash(python3 -c ' *)",
+      "PowerShell(pip install *)"
     ]
   }
 }

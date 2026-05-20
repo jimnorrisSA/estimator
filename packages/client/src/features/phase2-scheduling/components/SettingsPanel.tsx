@@ -174,6 +174,24 @@ export function SettingsPanel({ settings, onChange }: Props) {
         </div>
       </Field>
 
+      <Field label="Agency fee">
+        <div className="flex items-center gap-1.5">
+          <input
+            type="number" min={0} max={100} step={1}
+            className="border border-[#2e2848] bg-[#1a1628] text-[#ece7ff] rounded-lg px-3 py-1.5 text-sm w-16 focus:outline-none focus:ring-2 focus:ring-[#7c3aed]"
+            value={settings.agencyFeePct ?? 0}
+            onChange={(e) => onChange({ agencyFeePct: Math.max(0, Math.min(100, Number(e.target.value))) })}
+          />
+          <span className="text-sm text-[#5c5575]">%</span>
+          <input
+            className="border border-[#2e2848] bg-[#1a1628] text-[#ece7ff] rounded-lg px-2 py-1.5 text-sm w-20 focus:outline-none focus:ring-2 focus:ring-[#7c3aed] placeholder:text-[#3a3456]"
+            placeholder="Label"
+            value={settings.agencyFeeLabel ?? ""}
+            onChange={(e) => onChange({ agencyFeeLabel: e.target.value })}
+          />
+        </div>
+      </Field>
+
     </div>
   );
 }

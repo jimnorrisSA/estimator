@@ -13,7 +13,7 @@ const DISCIPLINE_STYLES: Record<Discipline, { dot: string; badge: string }> = {
   Custom:     { dot: "bg-gray-500",   badge: "bg-gray-800 text-gray-400" },
 };
 
-type ResourcePatch = Partial<Pick<Resource, "name" | "resourceType" | "monthlyRate" | "allocationPct" | "rollOnDate" | "rollOffDate">>;
+type ResourcePatch = Partial<Pick<Resource, "name" | "email" | "resourceType" | "monthlyRate" | "allocationPct" | "rollOnDate" | "rollOffDate">>;
 
 interface Props {
   resources: Resource[];
@@ -173,6 +173,7 @@ function MemberRow({
   const [editing, setEditing] = useState(false);
   const effectiveType: ResourceType = (member.resourceType || "Contractor") as ResourceType;
   const [draftName, setDraftName] = useState(member.name);
+  const [draftEmail, setDraftEmail] = useState(member.email || "");
   const [draftType, setDraftType] = useState<ResourceType>(effectiveType);
   const [draftRate, setDraftRate] = useState(String(member.monthlyRate || ""));
   const [useDefault, setUseDefault] = useState(effectiveType === "FTE" && !member.monthlyRate);
@@ -183,6 +184,7 @@ function MemberRow({
   function openEdit() {
     const t: ResourceType = (member.resourceType || "Contractor") as ResourceType;
     setDraftName(member.name);
+    setDraftEmail(member.email || "");
     setDraftType(t);
     setDraftRate(String(member.monthlyRate || ""));
     setUseDefault(t === "FTE" && !member.monthlyRate);
@@ -203,6 +205,7 @@ function MemberRow({
     const alloc = Math.min(100, Math.max(1, parseInt(draftAlloc) || 100));
     onUpdate(member.id, {
       name,
+      email: draftEmail.trim() || undefined,
       resourceType: draftType,
       monthlyRate: rate,
       allocationPct: alloc,
@@ -226,6 +229,16 @@ function MemberRow({
           value={draftName}
           onChange={(e) => setDraftName(e.target.value)}
           placeholder="Name"
+          onKeyDown={(e) => { if (e.key === "Enter") commitEdit(); if (e.key === "Escape") setEditing(false); }}
+        />
+
+        {/* Email */}
+        <input
+          type="email"
+          className="text-sm border border-[#2e2848] bg-[#1a1628] text-[#ece7ff] rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-[#7c3aed] w-full placeholder:text-[#3a3456]"
+          value={draftEmail}
+          onChange={(e) => setDraftEmail(e.target.value)}
+          placeholder="Email (optional)"
           onKeyDown={(e) => { if (e.key === "Enter") commitEdit(); if (e.key === "Escape") setEditing(false); }}
         />
 
@@ -364,6 +377,9 @@ function MemberRow({
           {allocLabel && <span className="text-xs text-[#5c5575]">{allocLabel}</span>}
           {dateHint && <span className="text-xs text-[#5c5575] truncate">{dateHint}</span>}
         </div>
+        {member.email && (
+          <span className="text-xs text-[#5c5575] truncate mt-0.5">{member.email}</span>
+        )}
       </div>
       <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity mt-0.5 flex-shrink-0">
         <button

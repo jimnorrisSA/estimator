@@ -518,6 +518,12 @@ func (svc *Service) exportSnapshotTaskWithClient(ctx context.Context, client *Cl
 				"last_synced_by": userEmail,
 				"updated_at":     now,
 			}})
+			// Best-effort: push original estimate to Jira timetracking.
+			if jiraTime := estimateToJiraTime(t.Estimate.Value, t.Estimate.Unit); jiraTime != "" {
+				client.UpdateIssue(ctx, mapping.JiraIssueKey, map[string]interface{}{ //nolint:errcheck
+					"timetracking": map[string]string{"originalEstimate": jiraTime},
+				})
+			}
 			return ExportResult{EstimatorID: t.ID, JiraKey: mapping.JiraIssueKey, Status: "updated"}
 		}
 	}
@@ -568,6 +574,14 @@ func (svc *Service) exportSnapshotTaskWithClient(ctx context.Context, client *Cl
 		}
 		// If both link strategies fail the issue is created but unlinked — not fatal.
 	}
+
+	// Best-effort: push original estimate to Jira timetracking.
+	if jiraTime := estimateToJiraTime(t.Estimate.Value, t.Estimate.Unit); jiraTime != "" {
+		client.UpdateIssue(ctx, created.Key, map[string]interface{}{ //nolint:errcheck
+			"timetracking": map[string]string{"originalEstimate": jiraTime},
+		})
+	}
+
 	svc.mappings.InsertOne(ctx, JiraMapping{ //nolint:errcheck
 		ID:            primitive.NewObjectID(),
 		ProjectID:     projectID,
@@ -777,6 +791,28 @@ func aggregateFeatureEstimates(feature models.Feature) (tshirtSize string, cost 
 	// Cost is a stub — real calculation requires roster rates.
 	cost = totalPoints * 800
 	return
+}
+
+// estimateToJiraTime converts a Vigo estimate to a Jira time-tracking string.
+// half_day → "4h", whole days → "Nd", multiples of 5 days → "Nw".
+func estimateToJiraTime(value float64, unit string) string {
+	days := value * snapshotWorkingDays[unit]
+	if days <= 0 {
+		return ""
+	}
+	if days < 1 {
+		// half_day = 0.5 → "4h" (assumes 8h working day)
+		hours := int(days * 8)
+		if hours < 1 {
+			hours = 1
+		}
+		return fmt.Sprintf("%dh", hours)
+	}
+	wholeDays := int(days)
+	if wholeDays%5 == 0 {
+		return fmt.Sprintf("%dw", wholeDays/5)
+	}
+	return fmt.Sprintf("%dd", wholeDays)
 }
 
 // boolToInt converts a bool to 0 or 1.

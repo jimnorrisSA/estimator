@@ -51,6 +51,7 @@ export interface Resource {
   id: string;
   projectId: string;
   name: string;
+  email?: string;
   role: Discipline;
   resourceType: ResourceType;
   rollOnDate: string;
