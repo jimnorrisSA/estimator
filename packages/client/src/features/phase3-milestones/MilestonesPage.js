@@ -1,4 +1,4 @@
-import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
+import { jsx as _jsx, Fragment as _Fragment, jsxs as _jsxs } from "react/jsx-runtime";
 import { useMemo, useState } from "react";
 import { useMilestonesStore } from "./store/milestonesStore.js";
 import { useEstimationsStore } from "../phase1-estimations/store/estimationsStore.js";
@@ -45,6 +45,10 @@ export function MilestonesPage() {
     const hasCosts = result.tasks.some((t) => t.cost > 0);
     const baseCost = result.tasks.reduce((s, t) => s + t.cost, 0);
     const projectCost = baseCost * (1 + settings.contingencyPct / 100);
+    const agencyFee = projectCost * ((settings.agencyFeePct ?? 0) / 100);
+    const revenueGBP = settings.revenueGBP ?? 0;
+    const marginGBP = revenueGBP - projectCost - agencyFee;
+    const hasFinancials = hasCosts && (revenueGBP > 0 || (settings.agencyFeePct ?? 0) > 0);
     const milestoneCosts = useMemo(() => milestones.map((m) => {
         const mStart = dateToWorkingDay(m.startDate, settings.calendarMode, settings.startDate, cal);
         const mEnd = dateToWorkingDay(m.endDate, settings.calendarMode, settings.startDate, cal);
@@ -74,7 +78,7 @@ export function MilestonesPage() {
                                             name: discipline,
                                             days,
                                             cost: cost * conversionRate,
-                                        })), symbol: symbol }), _jsxs("div", { className: "w-full flex flex-wrap gap-3 pt-2 border-t border-[#2e2848]", children: [_jsx(StatCard, { label: "Base cost", value: `${symbol}${Math.round(baseCost * conversionRate).toLocaleString()}` }), _jsx(StatCard, { label: `Contingency (${settings.contingencyPct}%)`, value: `+${symbol}${Math.round((projectCost - baseCost) * conversionRate).toLocaleString()}` }), _jsx(StatCard, { label: "Total", value: `${symbol}${Math.round(projectCost * conversionRate).toLocaleString()}`, highlight: true })] })] }))] })] })] }));
+                                        })), symbol: symbol }), _jsxs("div", { className: "w-full flex flex-wrap gap-3 pt-2 border-t border-[#2e2848]", children: [_jsx(StatCard, { label: "Base cost", value: `${symbol}${Math.round(baseCost * conversionRate).toLocaleString()}` }), _jsx(StatCard, { label: `Contingency (${settings.contingencyPct}%)`, value: `+${symbol}${Math.round((projectCost - baseCost) * conversionRate).toLocaleString()}` }), _jsx(StatCard, { label: "Total", value: `${symbol}${Math.round(projectCost * conversionRate).toLocaleString()}`, highlight: true }), hasFinancials && (_jsxs(_Fragment, { children: [_jsx("div", { className: "w-full border-t border-[#2e2848] mt-1" }), (settings.agencyFeePct ?? 0) > 0 && (_jsx(StatCard, { label: `${settings.agencyFeeLabel || "Agency"} fee (${settings.agencyFeePct}%)`, value: `${symbol}${Math.round(agencyFee * conversionRate).toLocaleString()}` })), revenueGBP > 0 && (_jsx(StatCard, { label: "Revenue", value: `${symbol}${Math.round(revenueGBP * conversionRate).toLocaleString()}` })), revenueGBP > 0 && (_jsx(StatCard, { label: "Margin", value: `${marginGBP >= 0 ? "" : "-"}${symbol}${Math.round(Math.abs(marginGBP) * conversionRate).toLocaleString()}`, highlight: true, positive: marginGBP >= 0 }))] }))] })] }))] })] })] }));
 }
 function MilestoneStrip({ milestones, settings, onAdd, onUpdate, onDelete }) {
     const [adding, setAdding] = useState(false);
@@ -116,8 +120,9 @@ function MilestoneChip({ milestone, onUpdate, onDelete }) {
 function CostTable({ label, rows, symbol }) {
     return (_jsxs("div", { className: "flex-1 min-w-[240px]", children: [_jsx("h3", { className: "text-xs font-semibold text-[#5c5575] uppercase tracking-wide mb-3", children: label }), _jsxs("table", { className: "w-full text-sm border-collapse", children: [_jsx("thead", { children: _jsxs("tr", { className: "text-left text-xs text-[#5c5575] uppercase tracking-wide", children: [_jsx("th", { className: "pb-2 font-medium pr-4", children: "Name" }), _jsx("th", { className: "pb-2 font-medium pr-4 text-right", children: "Days" }), _jsx("th", { className: "pb-2 font-medium text-right", children: "Cost" })] }) }), _jsx("tbody", { children: rows.map(({ key, name, color, days, cost }) => (_jsxs("tr", { className: "border-t border-[#2e2848]", children: [_jsx("td", { className: "py-2.5 pr-4", children: _jsxs("div", { className: "flex items-center gap-2", children: [color && _jsx("span", { className: "w-2.5 h-2.5 rounded-sm flex-shrink-0", style: { background: color } }), _jsx("span", { className: "text-[#ece7ff]", children: name })] }) }), _jsxs("td", { className: "py-2.5 pr-4 text-right text-[#9b93ba]", children: [Math.round(days), "d"] }), _jsx("td", { className: "py-2.5 text-right font-medium text-[#ece7ff]", children: cost > 0 ? `${symbol}${Math.round(cost).toLocaleString()}` : "—" })] }, key))) })] })] }));
 }
-function StatCard({ label, value, highlight }) {
-    return (_jsxs("div", { className: "bg-[#1d1930] rounded-xl border border-[#2e2848] px-4 py-3 flex flex-col gap-0.5", children: [_jsx("span", { className: "text-xs text-[#5c5575] font-medium uppercase tracking-wide", children: label }), _jsx("span", { className: `text-xl font-bold tabular-nums ${highlight ? "text-[#a78bfa]" : "text-[#ece7ff]"}`, children: value })] }));
+function StatCard({ label, value, highlight, positive }) {
+    const valueColor = positive === false ? "text-red-400" : positive === true ? "text-green-400" : highlight ? "text-[#a78bfa]" : "text-[#ece7ff]";
+    return (_jsxs("div", { className: "bg-[#1d1930] rounded-xl border border-[#2e2848] px-4 py-3 flex flex-col gap-0.5", children: [_jsx("span", { className: "text-xs text-[#5c5575] font-medium uppercase tracking-wide", children: label }), _jsx("span", { className: `text-xl font-bold tabular-nums ${valueColor}`, children: value })] }));
 }
 function Field({ label, children }) {
     return (_jsxs("div", { className: "flex flex-col gap-1", children: [_jsx("label", { className: "text-xs font-semibold text-[#5c5575] uppercase tracking-wide", children: label }), children] }));

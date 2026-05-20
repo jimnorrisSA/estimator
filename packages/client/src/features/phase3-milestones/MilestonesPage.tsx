@@ -59,6 +59,10 @@ export function MilestonesPage() {
   const hasCosts = result.tasks.some((t) => t.cost > 0);
   const baseCost = result.tasks.reduce((s, t) => s + t.cost, 0);
   const projectCost = baseCost * (1 + settings.contingencyPct / 100);
+  const agencyFee = projectCost * ((settings.agencyFeePct ?? 0) / 100);
+  const revenueGBP = settings.revenueGBP ?? 0;
+  const marginGBP = revenueGBP - projectCost - agencyFee;
+  const hasFinancials = hasCosts && (revenueGBP > 0 || (settings.agencyFeePct ?? 0) > 0);
 
   const milestoneCosts = useMemo(() =>
     milestones.map((m) => {
@@ -146,6 +150,32 @@ export function MilestonesPage() {
                 <StatCard label="Base cost" value={`${symbol}${Math.round(baseCost * conversionRate).toLocaleString()}`} />
                 <StatCard label={`Contingency (${settings.contingencyPct}%)`} value={`+${symbol}${Math.round((projectCost - baseCost) * conversionRate).toLocaleString()}`} />
                 <StatCard label="Total" value={`${symbol}${Math.round(projectCost * conversionRate).toLocaleString()}`} highlight />
+
+                {hasFinancials && (
+                  <>
+                    <div className="w-full border-t border-[#2e2848] mt-1" />
+                    {(settings.agencyFeePct ?? 0) > 0 && (
+                      <StatCard
+                        label={`${settings.agencyFeeLabel || "Agency"} fee (${settings.agencyFeePct}%)`}
+                        value={`${symbol}${Math.round(agencyFee * conversionRate).toLocaleString()}`}
+                      />
+                    )}
+                    {revenueGBP > 0 && (
+                      <StatCard
+                        label="Revenue"
+                        value={`${symbol}${Math.round(revenueGBP * conversionRate).toLocaleString()}`}
+                      />
+                    )}
+                    {revenueGBP > 0 && (
+                      <StatCard
+                        label="Margin"
+                        value={`${marginGBP >= 0 ? "" : "-"}${symbol}${Math.round(Math.abs(marginGBP) * conversionRate).toLocaleString()}`}
+                        highlight
+                        positive={marginGBP >= 0}
+                      />
+                    )}
+                  </>
+                )}
               </div>
             </div>
           )}
@@ -492,11 +522,12 @@ function CostTable({ label, rows, symbol }: {
   );
 }
 
-function StatCard({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
+function StatCard({ label, value, highlight, positive }: { label: string; value: string; highlight?: boolean; positive?: boolean }) {
+  const valueColor = positive === false ? "text-red-400" : positive === true ? "text-green-400" : highlight ? "text-[#a78bfa]" : "text-[#ece7ff]";
   return (
     <div className="bg-[#1d1930] rounded-xl border border-[#2e2848] px-4 py-3 flex flex-col gap-0.5">
       <span className="text-xs text-[#5c5575] font-medium uppercase tracking-wide">{label}</span>
-      <span className={`text-xl font-bold tabular-nums ${highlight ? "text-[#a78bfa]" : "text-[#ece7ff]"}`}>{value}</span>
+      <span className={`text-xl font-bold tabular-nums ${valueColor}`}>{value}</span>
     </div>
   );
 }
