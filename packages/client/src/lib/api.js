@@ -16,6 +16,8 @@ export const api = {
         disconnect: (projectId) => apiFetch(`/api/projects/${projectId}/jira/disconnect`, { method: "DELETE" }),
         syncStatus: (projectId) => apiFetch(`/api/projects/${projectId}/jira/sync/status`),
         syncConflicts: (projectId) => apiFetch(`/api/projects/${projectId}/jira/sync/conflicts`),
+        syncedFeatures: (projectId) => apiFetch(`/api/projects/${projectId}/jira/sync/features`),
+        resetMappings: (projectId) => apiFetch(`/api/projects/${projectId}/jira/sync/mappings`, { method: "DELETE" }),
         validateConnection: (projectId) => apiFetch(`/api/projects/${projectId}/jira/sync/validate`, { method: "POST" }),
         resolveConflict: (projectId, mappingId, winner) => apiFetch(`/api/projects/${projectId}/jira/sync/resolve`, {
             method: "POST",

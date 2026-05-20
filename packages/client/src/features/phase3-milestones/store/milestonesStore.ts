@@ -1,15 +1,8 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import type { Milestone } from "@estimator/shared";
 
-export interface Milestone {
-  id: string;
-  title: string;
-  startDate: string;
-  endDate: string;
-  color: string;
-  hardeningDays: number;
-  sprintLengthWeeks?: 2 | 3;
-}
+export type { Milestone };
 
 export const MILESTONE_COLORS = [
   "#f59e0b", "#10b981", "#3b82f6", "#ef4444",
@@ -31,7 +24,16 @@ export const useMilestonesStore = create<MilestonesStore>()(
       addMilestone(title, startDate, endDate) {
         const color = MILESTONE_COLORS[get().milestones.length % MILESTONE_COLORS.length];
         set((s) => ({
-          milestones: [...s.milestones, { id: crypto.randomUUID(), title, startDate, endDate, color, hardeningDays: 0 }],
+          milestones: [...s.milestones, {
+            id: crypto.randomUUID(),
+            projectId: "",
+            title,
+            startDate,
+            endDate,
+            color,
+            hardeningDays: 0,
+            updatedAt: new Date().toISOString(),
+          }],
         }));
       },
 

@@ -67,11 +67,12 @@ export interface Resource {
 export interface Milestone {
   id: string;
   projectId: string;
-  label: string;
-  type: "feature-derived" | "manual";
-  featureId?: string;
-  date?: string;
-  anchorFeatureId?: string;
+  title: string;
+  startDate: string;
+  endDate: string;
+  color: string;
+  hardeningDays: number;
+  sprintLengthWeeks?: 2 | 3;
   updatedAt: string;
 }
 

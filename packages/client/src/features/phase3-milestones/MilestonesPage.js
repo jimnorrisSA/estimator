@@ -14,6 +14,7 @@ export function MilestonesPage() {
     const symbol = CURRENCY_SYMBOLS[settings.currency];
     const conversionRate = getConversionRate(settings);
     const [viewMode, setViewMode] = useState("detailed");
+    const [focusedMilestoneId, setFocusedMilestoneId] = useState(null);
     const cal = useMemo(() => {
         if (settings.calendarMode !== "actual")
             return [];
@@ -62,7 +63,7 @@ export function MilestonesPage() {
         }
         return Array.from(map.entries()).map(([discipline, data]) => ({ discipline, ...data }));
     }, [result.tasks]);
-    return (_jsxs("div", { className: "flex flex-col h-full overflow-y-auto bg-[#0d0b16]", children: [_jsx(MilestoneStrip, { milestones: milestones, settings: settings, onAdd: addMilestone, onUpdate: updateMilestone, onDelete: deleteMilestone }), _jsxs("div", { className: "flex-1 px-6 pb-6 flex flex-col gap-6", children: [_jsx(Timeline, { result: result, features: features, settings: settings, viewMode: viewMode, onToggleView: () => setViewMode((v) => (v === "detailed" ? "summary" : "detailed")), resourceWindows: resourceWindows }), _jsxs("section", { className: "flex flex-col gap-4", children: [_jsx("h2", { className: "text-sm font-semibold text-[#9b93ba] uppercase tracking-wide", children: "Cost Breakdown" }), !hasCosts && (_jsx("p", { className: "text-sm text-[#5c5575]", children: "Add daily rates to team members in Phase 2 to see cost breakdowns." })), hasCosts && (_jsxs("div", { className: "flex flex-wrap gap-6 items-start", children: [milestones.length > 0 && (_jsx(CostTable, { label: "By Milestone", rows: milestoneCosts.map((m) => ({
+    return (_jsxs("div", { className: "flex flex-col h-full overflow-y-auto bg-[#0d0b16]", children: [_jsx(MilestoneStrip, { milestones: milestones, settings: settings, onAdd: addMilestone, onUpdate: updateMilestone, onDelete: deleteMilestone }), _jsxs("div", { className: "flex-1 px-6 pb-6 flex flex-col gap-6", children: [_jsx(Timeline, { result: result, features: features, settings: settings, viewMode: viewMode, onToggleView: () => setViewMode((v) => (v === "detailed" ? "summary" : "detailed")), resourceWindows: resourceWindows, focusedMilestoneId: focusedMilestoneId, onFocusMilestone: setFocusedMilestoneId }), _jsxs("section", { className: "flex flex-col gap-4", children: [_jsx("h2", { className: "text-sm font-semibold text-[#9b93ba] uppercase tracking-wide", children: "Cost Breakdown" }), !hasCosts && (_jsx("p", { className: "text-sm text-[#5c5575]", children: "Add daily rates to team members in Phase 2 to see cost breakdowns." })), hasCosts && (_jsxs("div", { className: "flex flex-wrap gap-6 items-start", children: [milestones.length > 0 && (_jsx(CostTable, { label: "By Milestone", rows: milestoneCosts.map((m) => ({
                                             key: m.id,
                                             name: m.title,
                                             color: m.color,

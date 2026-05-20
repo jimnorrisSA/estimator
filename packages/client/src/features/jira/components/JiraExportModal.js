@@ -1,9 +1,14 @@
 import { jsx as _jsx, jsxs as _jsxs, Fragment as _Fragment } from "react/jsx-runtime";
 import { useState } from "react";
 import { api } from "../../../lib/api.js";
+import { useJiraStore } from "../store/jiraStore.js";
 import { useEstimationsStore } from "../../phase1-estimations/store/estimationsStore.js";
+import { useSchedulingStore } from "../../phase2-scheduling/store/schedulingStore.js";
+import { useMilestonesStore } from "../../phase3-milestones/store/milestonesStore.js";
+import { useProjectsStore } from "../../../store/projectsStore.js";
 export function JiraExportModal({ projectId, onClose, onExported }) {
     const features = useEstimationsStore((s) => s.features);
+    const markFeaturesSynced = useJiraStore((s) => s.markFeaturesSynced);
     const [selected, setSelected] = useState(() => new Set(features.map((f) => f.id)));
     const [state, setState] = useState("idle");
     const [results, setResults] = useState([]);
@@ -21,15 +26,41 @@ export function JiraExportModal({ projectId, onClose, onExported }) {
     async function handleExport() {
         setState("loading");
         try {
+            // Flush current canvas state to the server so the export reads fresh data.
+            const { saveActiveSnapshot, pushToServer, getActiveProject } = useProjectsStore.getState();
+            const active = getActiveProject();
+            const currentFeatures = useEstimationsStore.getState().features;
+            console.log("[jira-export] active project:", active?.id, "apiId:", active?.apiId, "projectId prop:", projectId);
+            console.log("[jira-export] features to save:", currentFeatures.length, currentFeatures.map(f => ({ id: f.id, name: f.name, groups: f.groups.length, tasks: f.groups.flatMap(g => g.tasks).length })));
+            if (active) {
+                saveActiveSnapshot({
+                    features: currentFeatures,
+                    schedulingSettings: useSchedulingStore.getState().settings,
+                    overrides: useSchedulingStore.getState().overrides,
+                    resources: useSchedulingStore.getState().resources,
+                    milestones: useMilestonesStore.getState().milestones,
+                });
+                await pushToServer(active.id);
+                console.log("[jira-export] snapshot pushed to server");
+            }
+            else {
+                console.warn("[jira-export] no active project — snapshot NOT saved");
+            }
             const featureIds = [...selected];
             const res = await api.jira.exportEstimates(projectId, featureIds.length < features.length ? featureIds : undefined);
+            console.log("[jira-export] response status:", res.status);
             if (!res.ok) {
-                setError(await res.text());
+                const errText = await res.text();
+                console.error("[jira-export] error response:", errText);
+                setError(errText);
                 setState("error");
                 return;
             }
             const data = (await res.json());
+            console.log("[jira-export] results:", JSON.stringify(data, null, 2));
             setResults(data ?? []);
+            if (data)
+                markFeaturesSynced(data);
             setState("done");
             onExported();
         }

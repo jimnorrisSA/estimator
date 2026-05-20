@@ -19,6 +19,7 @@ export function MilestonesPage() {
   const conversionRate = getConversionRate(settings);
 
   const [viewMode, setViewMode] = useState<"detailed" | "summary">("detailed");
+  const [focusedMilestoneId, setFocusedMilestoneId] = useState<string | null>(null);
 
   const cal = useMemo(() => {
     if (settings.calendarMode !== "actual") return [];
@@ -102,6 +103,8 @@ export function MilestonesPage() {
           viewMode={viewMode}
           onToggleView={() => setViewMode((v) => (v === "detailed" ? "summary" : "detailed"))}
           resourceWindows={resourceWindows}
+          focusedMilestoneId={focusedMilestoneId}
+          onFocusMilestone={setFocusedMilestoneId}
         />
 
         {/* Cost breakdown */}

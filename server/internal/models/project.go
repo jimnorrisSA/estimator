@@ -77,22 +77,16 @@ const (
 	CalendarFourWeek CalendarMode = "four-week"
 )
 
-type MilestoneType string
-
-const (
-	MilestoneFeatureDerived MilestoneType = "feature-derived"
-	MilestoneManual         MilestoneType = "manual"
-)
-
 type Milestone struct {
-	ID              primitive.ObjectID  `bson:"_id"                            json:"id"`
-	ProjectID       primitive.ObjectID  `bson:"project_id"                     json:"projectId"`
-	Label           string              `bson:"label"                          json:"label"`
-	Type            MilestoneType       `bson:"type"                           json:"type"`
-	FeatureID       *primitive.ObjectID `bson:"feature_id,omitempty"           json:"featureId,omitempty"`
-	Date            *time.Time          `bson:"date,omitempty"                 json:"date,omitempty"`
-	AnchorFeatureID *primitive.ObjectID `bson:"anchor_feature_id,omitempty"    json:"anchorFeatureId,omitempty"`
-	UpdatedAt       time.Time           `bson:"updated_at"                     json:"updatedAt"`
+	ID                primitive.ObjectID `bson:"_id"                           json:"id"`
+	ProjectID         primitive.ObjectID `bson:"project_id"                    json:"projectId"`
+	Title             string             `bson:"title"                         json:"title"`
+	StartDate         string             `bson:"start_date"                    json:"startDate"`
+	EndDate           string             `bson:"end_date"                      json:"endDate"`
+	Color             string             `bson:"color"                         json:"color"`
+	HardeningDays     int                `bson:"hardening_days"                json:"hardeningDays"`
+	SprintLengthWeeks *int               `bson:"sprint_length_weeks,omitempty" json:"sprintLengthWeeks,omitempty"`
+	UpdatedAt         time.Time          `bson:"updated_at"                    json:"updatedAt"`
 }
 
 type ResourceType string

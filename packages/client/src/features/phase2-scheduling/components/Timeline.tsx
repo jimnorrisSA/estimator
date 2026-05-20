@@ -271,9 +271,11 @@ interface Props {
   viewMode: "detailed" | "summary";
   onToggleView: () => void;
   resourceWindows: Record<string, ResourceWindow>;
+  focusedMilestoneId?: string | null;
+  onFocusMilestone?: (id: string | null) => void;
 }
 
-export function Timeline({ result, features, settings, viewMode, onToggleView, resourceWindows }: Props) {
+export function Timeline({ result, features, settings, viewMode, onToggleView, resourceWindows, focusedMilestoneId, onFocusMilestone }: Props) {
   const { tasks, disciplines, capacities, projectEndDay, slotContingency, blockedPeriods } = result;
 
   const { setOverride, clearOverride, resources } = useSchedulingStore();
@@ -283,6 +285,22 @@ export function Timeline({ result, features, settings, viewMode, onToggleView, r
 
   const [editingTask, setEditingTask] = useState<ScheduledTask | null>(null);
   const milestoneH = milestones.length > 0 ? MILESTONE_LANE_H : 0;
+
+  const focusedMilestone = focusedMilestoneId
+    ? milestones.find((m) => m.id === focusedMilestoneId) ?? null
+    : null;
+
+  // ─── Calendar (needed early for focus range + coordinate system) ─────────
+  const cal = useMemo(() => {
+    if (settings.calendarMode !== "actual" || projectEndDay === 0) return [];
+    return buildWorkingDayCalendar(parseISODate(settings.startDate), projectEndDay + 1);
+  }, [settings.calendarMode, settings.startDate, projectEndDay]);
+
+  // Working-day range for the focused milestone (null = show all)
+  const focusRange = useMemo<{ startDay: number; endDay: number } | null>(() => {
+    if (!focusedMilestone) return null;
+    return milestoneWorkingDays(focusedMilestone, settings.calendarMode, settings.startDate, cal);
+  }, [focusedMilestone, settings.calendarMode, settings.startDate, cal]);
 
   // ─── Coordinate system: working-day → pixel ───────────────────────────────
   const showWeekends = settings.calendarMode === "actual";
@@ -295,11 +313,14 @@ export function Timeline({ result, features, settings, viewMode, onToggleView, r
   // Pixels per working-day for drag snap (average accounts for weekend gaps)
   const effectiveDayW = showWeekends ? DAY_W + WKND_W / 5 : DAY_W;
 
+  const focusOffset = focusRange?.startDay ?? 0;
+
   const wdToX = useCallback((n: number): number => {
-    if (!showWeekends) return n * DAY_W;
-    const weekends = Math.floor((startWeekday + n) / 5);
-    return n * DAY_W + weekends * WKND_W;
-  }, [showWeekends, startWeekday]);
+    const adjusted = n - focusOffset;
+    if (!showWeekends) return adjusted * DAY_W;
+    const weekends = Math.floor((startWeekday + n) / 5) - Math.floor((startWeekday + focusOffset) / 5);
+    return adjusted * DAY_W + weekends * WKND_W;
+  }, [showWeekends, startWeekday, focusOffset]);
 
   // X positions where weekend gaps start (for overlay rendering)
   const weekendStrips = useMemo(() => {
@@ -440,11 +461,6 @@ export function Timeline({ result, features, settings, viewMode, onToggleView, r
       .filter(Boolean) as { featureId: string; featureName: string; startDay: number; endDay: number; color: string; rowY: number }[];
   }, [features, tasks, featureColors]);
 
-  const cal = useMemo(() => {
-    if (settings.calendarMode !== "actual" || projectEndDay === 0) return [];
-    return buildWorkingDayCalendar(parseISODate(settings.startDate), projectEndDay + 1);
-  }, [settings.calendarMode, settings.startDate, projectEndDay]);
-
   const rowLayouts = useMemo<RowLayout[]>(() => {
     let y = 0;
     return disciplines.map((d) => {
@@ -476,11 +492,31 @@ export function Timeline({ result, features, settings, viewMode, onToggleView, r
     );
   }
 
+  const visibleEndDay = focusRange ? focusRange.endDay : projectEndDay;
+  const visibleTasks = focusRange
+    ? tasks.filter((t) => t.startDay < focusRange.endDay && t.endDay > focusRange.startDay)
+    : tasks;
+
   const svgH = HEADER_H + milestoneH + (viewMode === "detailed" ? detailedH : summaryH) + BOTTOM_PAD;
-  const chartW = Math.max(wdToX(projectEndDay + 20), 480);
+  const chartW = Math.max(wdToX(visibleEndDay + 20), 480);
 
   return (
     <div className="flex flex-col gap-3">
+      {/* Focus banner */}
+      {focusedMilestone && onFocusMilestone && (
+        <div className="flex items-center gap-3 px-4 py-2 rounded-lg border border-[#3d366a] bg-[#1d1930] text-sm">
+          <span className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ background: focusedMilestone.color }} />
+          <span className="text-[#ece7ff] font-medium">{focusedMilestone.title}</span>
+          <span className="text-[#5c5575]">{focusedMilestone.startDate} – {focusedMilestone.endDate}</span>
+          <button
+            className="ml-auto px-3 py-1 rounded-md bg-[#252041] border border-[#2e2848] text-xs text-[#a78bfa] hover:bg-[#2e2848] transition-colors"
+            onClick={() => onFocusMilestone(null)}
+          >
+            ← All milestones
+          </button>
+        </div>
+      )}
+
       {/* View toggle */}
       <div className="flex justify-end">
         <div className="flex rounded-lg border border-[#2e2848] overflow-hidden text-xs shadow-sm">
@@ -591,9 +627,15 @@ export function Timeline({ result, features, settings, viewMode, onToggleView, r
                     const barH = milestoneH - 8;
                     const sprintDays = (m.sprintLengthWeeks ?? 0) * 5;
                     const sprintCount = sprintDays > 0 ? Math.ceil((endDay - startDay) / sprintDays) : 0;
+                    const isFocused = focusedMilestoneId === m.id;
                     return (
-                      <g key={m.id}>
-                        <rect x={x} y={HEADER_H + 4} width={w} height={barH} rx={3} fill={m.color} opacity={0.85} />
+                      <g key={m.id}
+                        onClick={() => onFocusMilestone?.(isFocused ? null : m.id)}
+                        style={{ cursor: onFocusMilestone ? "pointer" : undefined }}
+                      >
+                        <rect x={x} y={HEADER_H + 4} width={w} height={barH} rx={3} fill={m.color}
+                          opacity={isFocused ? 1 : 0.85}
+                          stroke={isFocused ? "white" : "none"} strokeWidth={1.5} strokeOpacity={0.6} />
                         {sprintCount > 0
                           ? Array.from({ length: sprintCount }, (_, i) => {
                               const sx = wdToX(startDay + i * sprintDays);
@@ -744,14 +786,15 @@ export function Timeline({ result, features, settings, viewMode, onToggleView, r
 
               {/* Date headers */}
               {settings.calendarMode === "four-week" ? (
-                <FourWeekHeader projectEndDay={projectEndDay} chartW={chartW} wdToX={wdToX} />
+                <FourWeekHeader projectEndDay={visibleEndDay} startDay={focusOffset} chartW={chartW} wdToX={wdToX} />
               ) : (
-                <ActualDateHeader projectEndDay={projectEndDay} cal={cal} chartW={chartW} wdToX={wdToX} />
+                <ActualDateHeader projectEndDay={visibleEndDay} startDay={focusOffset} cal={cal} chartW={chartW} wdToX={wdToX} />
               )}
 
               {/* Grid lines */}
               <GridLines
-                projectEndDay={projectEndDay}
+                projectEndDay={visibleEndDay}
+                startDay={focusOffset}
                 calendarMode={settings.calendarMode}
                 cal={cal}
                 svgH={svgH}
@@ -761,7 +804,7 @@ export function Timeline({ result, features, settings, viewMode, onToggleView, r
 
               {/* Task bars */}
               {viewMode === "detailed"
-                ? tasks.map((task) => {
+                ? visibleTasks.map((task) => {
                     const layout = rowLayouts.find((r) => r.discipline === task.discipline);
                     if (!layout) return null;
                     const barH = SLOT_H - 4;
@@ -886,15 +929,17 @@ export function Timeline({ result, features, settings, viewMode, onToggleView, r
 
 // ─── Date headers ─────────────────────────────────────────────────────────────
 
-function FourWeekHeader({ projectEndDay, chartW, wdToX }: { projectEndDay: number; chartW: number; wdToX: (n: number) => number }) {
-  const numMonths = Math.ceil(projectEndDay / 20);
+function FourWeekHeader({ projectEndDay, startDay = 0, chartW, wdToX }: { projectEndDay: number; startDay?: number; chartW: number; wdToX: (n: number) => number }) {
   const els: React.ReactNode[] = [];
+  const firstMonth = Math.floor(startDay / 20);
+  const lastMonth = Math.ceil(projectEndDay / 20);
 
-  for (let m = 0; m < numMonths; m++) {
+  for (let m = firstMonth; m < lastMonth; m++) {
     const mStart = m * 20;
     const mEnd = Math.min((m + 1) * 20, projectEndDay);
     const x = wdToX(mStart);
     const w = wdToX(mEnd) - wdToX(mStart);
+    if (w <= 0) continue;
     els.push(
       <g key={`m-${m}`}>
         <rect x={x} y={0} width={w} height={MONTH_H} fill={m % 2 === 0 ? "#1a1628" : "#211d38"} />
@@ -906,9 +951,10 @@ function FourWeekHeader({ projectEndDay, chartW, wdToX }: { projectEndDay: numbe
     for (let w4 = 0; w4 < 4; w4++) {
       const wStart = mStart + w4 * 5;
       const wEnd = Math.min(wStart + 5, projectEndDay);
-      if (wStart >= projectEndDay) break;
+      if (wStart >= projectEndDay || wEnd <= startDay) continue;
       const wx = wdToX(wStart);
       const ww = wdToX(wEnd) - wdToX(wStart);
+      if (ww <= 0) continue;
       els.push(
         <g key={`w-${m}-${w4}`}>
           <rect x={wx} y={MONTH_H} width={ww} height={WEEK_H} fill={(m + w4) % 2 === 0 ? "#1d1930" : "#201c32"} />
@@ -924,11 +970,11 @@ function FourWeekHeader({ projectEndDay, chartW, wdToX }: { projectEndDay: numbe
   return <>{els}</>;
 }
 
-function ActualDateHeader({ projectEndDay, cal, chartW, wdToX }: { projectEndDay: number; cal: Date[]; chartW: number; wdToX: (n: number) => number }) {
+function ActualDateHeader({ projectEndDay, startDay = 0, cal, chartW, wdToX }: { projectEndDay: number; startDay?: number; cal: Date[]; chartW: number; wdToX: (n: number) => number }) {
   if (cal.length === 0) return null;
   const els: React.ReactNode[] = [];
   let monthKey = -1;
-  let monthStart = 0;
+  let monthStart = startDay;
   let monthIdx = 0;
 
   const flushMonth = (endDay: number) => {
@@ -938,16 +984,16 @@ function ActualDateHeader({ projectEndDay, cal, chartW, wdToX }: { projectEndDay
     if (w <= 0) return;
     els.push(
       <g key={`month-${monthKey}`}>
-        <rect x={x} y={0} width={w} height={MONTH_H} fill={monthIdx % 2 === 0 ? "#1a1628" : "#211d38"} />
-        <text x={x + w / 2} y={MONTH_H / 2} textAnchor="middle" dominantBaseline="middle" fontSize={12} fill="#c5bedf" fontWeight="600">
-          {formatMonthYear(cal[monthStart])}
+        <rect x={Math.max(0, x)} y={0} width={w} height={MONTH_H} fill={monthIdx % 2 === 0 ? "#1a1628" : "#211d38"} />
+        <text x={Math.max(0, x) + w / 2} y={MONTH_H / 2} textAnchor="middle" dominantBaseline="middle" fontSize={12} fill="#c5bedf" fontWeight="600">
+          {formatMonthYear(cal[monthStart] ?? cal[startDay])}
         </text>
       </g>
     );
     monthIdx++;
   };
 
-  for (let d = 0; d < projectEndDay; d++) {
+  for (let d = startDay; d < projectEndDay; d++) {
     const date = cal[d];
     if (!date) continue;
     const mk = date.getFullYear() * 12 + date.getMonth();
@@ -992,15 +1038,16 @@ function milestoneWorkingDays(
   };
 }
 
-function GridLines({ projectEndDay, calendarMode, cal, svgH, milestoneH, wdToX }: {
-  projectEndDay: number; calendarMode: string; cal: Date[]; svgH: number; milestoneH: number;
+function GridLines({ projectEndDay, startDay = 0, calendarMode, cal, svgH, milestoneH, wdToX }: {
+  projectEndDay: number; startDay?: number; calendarMode: string; cal: Date[]; svgH: number; milestoneH: number;
   wdToX: (n: number) => number;
 }) {
   const bottom = svgH - BOTTOM_PAD;
   const top = HEADER_H + milestoneH;
   const lines: React.ReactNode[] = [];
   if (calendarMode === "four-week") {
-    for (let d = 5; d <= projectEndDay; d += 5) {
+    const first = Math.ceil(startDay / 5) * 5;
+    for (let d = first; d <= projectEndDay; d += 5) {
       const isMonth = d % 20 === 0;
       const x = wdToX(d);
       lines.push(
@@ -1009,7 +1056,7 @@ function GridLines({ projectEndDay, calendarMode, cal, svgH, milestoneH, wdToX }
       );
     }
   } else {
-    for (let d = 0; d < projectEndDay; d++) {
+    for (let d = startDay; d < projectEndDay; d++) {
       const date = cal[d];
       if (!date || date.getDay() !== 1) continue;
       const isMonthStart = date.getDate() <= 7;

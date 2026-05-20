@@ -9,7 +9,16 @@ export const useMilestonesStore = create()(persist((set, get) => ({
     addMilestone(title, startDate, endDate) {
         const color = MILESTONE_COLORS[get().milestones.length % MILESTONE_COLORS.length];
         set((s) => ({
-            milestones: [...s.milestones, { id: crypto.randomUUID(), title, startDate, endDate, color, hardeningDays: 0 }],
+            milestones: [...s.milestones, {
+                    id: crypto.randomUUID(),
+                    projectId: "",
+                    title,
+                    startDate,
+                    endDate,
+                    color,
+                    hardeningDays: 0,
+                    updatedAt: new Date().toISOString(),
+                }],
         }));
     },
     updateMilestone(id, patch) {

@@ -165,7 +165,7 @@ function DraggableTaskBar({ task, y, barH, color, slotCount, disciplineBoundarie
                 return (_jsxs("text", { x: sx + sw / 2, y: dispY - 5, textAnchor: "middle", fontSize: 11, fill: "#a78bfa", fontWeight: "600", style: { pointerEvents: "none", userSelect: "none" }, children: [String(Math.round(previewDays * 2) / 2), "d", dispSlot !== task.slotIndex ? ` · slot ${dispSlot + 1}` : ""] }));
             })()] }));
 }
-export function Timeline({ result, features, settings, viewMode, onToggleView, resourceWindows }) {
+export function Timeline({ result, features, settings, viewMode, onToggleView, resourceWindows, focusedMilestoneId, onFocusMilestone }) {
     const { tasks, disciplines, capacities, projectEndDay, slotContingency, blockedPeriods } = result;
     const { setOverride, clearOverride, resources } = useSchedulingStore();
     const updateTaskEstimate = useEstimationsStore((s) => s.updateTaskEstimate);
@@ -173,6 +173,21 @@ export function Timeline({ result, features, settings, viewMode, onToggleView, r
     const milestones = useMilestonesStore((s) => s.milestones);
     const [editingTask, setEditingTask] = useState(null);
     const milestoneH = milestones.length > 0 ? MILESTONE_LANE_H : 0;
+    const focusedMilestone = focusedMilestoneId
+        ? milestones.find((m) => m.id === focusedMilestoneId) ?? null
+        : null;
+    // ─── Calendar (needed early for focus range + coordinate system) ─────────
+    const cal = useMemo(() => {
+        if (settings.calendarMode !== "actual" || projectEndDay === 0)
+            return [];
+        return buildWorkingDayCalendar(parseISODate(settings.startDate), projectEndDay + 1);
+    }, [settings.calendarMode, settings.startDate, projectEndDay]);
+    // Working-day range for the focused milestone (null = show all)
+    const focusRange = useMemo(() => {
+        if (!focusedMilestone)
+            return null;
+        return milestoneWorkingDays(focusedMilestone, settings.calendarMode, settings.startDate, cal);
+    }, [focusedMilestone, settings.calendarMode, settings.startDate, cal]);
     // ─── Coordinate system: working-day → pixel ───────────────────────────────
     const showWeekends = settings.calendarMode === "actual";
     const startWeekday = useMemo(() => {
@@ -182,12 +197,14 @@ export function Timeline({ result, features, settings, viewMode, onToggleView, r
     }, [showWeekends, settings.startDate]);
     // Pixels per working-day for drag snap (average accounts for weekend gaps)
     const effectiveDayW = showWeekends ? DAY_W + WKND_W / 5 : DAY_W;
+    const focusOffset = focusRange?.startDay ?? 0;
     const wdToX = useCallback((n) => {
+        const adjusted = n - focusOffset;
         if (!showWeekends)
-            return n * DAY_W;
-        const weekends = Math.floor((startWeekday + n) / 5);
-        return n * DAY_W + weekends * WKND_W;
-    }, [showWeekends, startWeekday]);
+            return adjusted * DAY_W;
+        const weekends = Math.floor((startWeekday + n) / 5) - Math.floor((startWeekday + focusOffset) / 5);
+        return adjusted * DAY_W + weekends * WKND_W;
+    }, [showWeekends, startWeekday, focusOffset]);
     // X positions where weekend gaps start (for overlay rendering)
     const weekendStrips = useMemo(() => {
         if (!showWeekends)
@@ -311,11 +328,6 @@ export function Timeline({ result, features, settings, viewMode, onToggleView, r
         })
             .filter(Boolean);
     }, [features, tasks, featureColors]);
-    const cal = useMemo(() => {
-        if (settings.calendarMode !== "actual" || projectEndDay === 0)
-            return [];
-        return buildWorkingDayCalendar(parseISODate(settings.startDate), projectEndDay + 1);
-    }, [settings.calendarMode, settings.startDate, projectEndDay]);
     const rowLayouts = useMemo(() => {
         let y = 0;
         return disciplines.map((d) => {
@@ -339,9 +351,13 @@ export function Timeline({ result, features, settings, viewMode, onToggleView, r
     if (tasks.length === 0) {
         return (_jsx("div", { className: "flex items-center justify-center h-36 text-sm text-[#5c5575] border border-dashed border-[#2e2848] rounded-xl", children: "No tasks yet \u2014 add discipline cards and tasks in Phase 1 to see the schedule." }));
     }
+    const visibleEndDay = focusRange ? focusRange.endDay : projectEndDay;
+    const visibleTasks = focusRange
+        ? tasks.filter((t) => t.startDay < focusRange.endDay && t.endDay > focusRange.startDay)
+        : tasks;
     const svgH = HEADER_H + milestoneH + (viewMode === "detailed" ? detailedH : summaryH) + BOTTOM_PAD;
-    const chartW = Math.max(wdToX(projectEndDay + 20), 480);
-    return (_jsxs("div", { className: "flex flex-col gap-3", children: [_jsx("div", { className: "flex justify-end", children: _jsx("div", { className: "flex rounded-lg border border-[#2e2848] overflow-hidden text-xs shadow-sm", children: ["detailed", "summary"].map((mode) => (_jsx("button", { className: `px-3 py-1.5 transition-colors ${viewMode === mode
+    const chartW = Math.max(wdToX(visibleEndDay + 20), 480);
+    return (_jsxs("div", { className: "flex flex-col gap-3", children: [focusedMilestone && onFocusMilestone && (_jsxs("div", { className: "flex items-center gap-3 px-4 py-2 rounded-lg border border-[#3d366a] bg-[#1d1930] text-sm", children: [_jsx("span", { className: "w-2.5 h-2.5 rounded-sm flex-shrink-0", style: { background: focusedMilestone.color } }), _jsx("span", { className: "text-[#ece7ff] font-medium", children: focusedMilestone.title }), _jsxs("span", { className: "text-[#5c5575]", children: [focusedMilestone.startDate, " \u2013 ", focusedMilestone.endDate] }), _jsx("button", { className: "ml-auto px-3 py-1 rounded-md bg-[#252041] border border-[#2e2848] text-xs text-[#a78bfa] hover:bg-[#2e2848] transition-colors", onClick: () => onFocusMilestone(null), children: "\u2190 All milestones" })] })), _jsx("div", { className: "flex justify-end", children: _jsx("div", { className: "flex rounded-lg border border-[#2e2848] overflow-hidden text-xs shadow-sm", children: ["detailed", "summary"].map((mode) => (_jsx("button", { className: `px-3 py-1.5 transition-colors ${viewMode === mode
                             ? "bg-[#7c3aed] text-white font-medium"
                             : "bg-[#1d1930] text-[#5c5575] hover:bg-[#252041]"}`, onClick: onToggleView, children: mode === "detailed" ? "Detailed" : "Summary" }, mode))) }) }), _jsx("div", { className: "overflow-hidden rounded-xl border border-[#2e2848] shadow-sm shadow-black/40", children: _jsxs("div", { className: "flex items-stretch", children: [_jsxs("svg", { "data-label-svg": true, width: LABEL_W, height: svgH, className: "flex-shrink-0 border-r border-[#2e2848]", style: { background: "#14112a" }, children: [milestoneH > 0 && (_jsxs(_Fragment, { children: [_jsx("rect", { x: 0, y: HEADER_H, width: LABEL_W, height: milestoneH, fill: "#1a1628" }), _jsx("text", { x: LABEL_W - 12, y: HEADER_H + milestoneH / 2, textAnchor: "end", dominantBaseline: "middle", fontSize: 11, fill: "#5c5575", fontStyle: "italic", children: "Milestones" }), _jsx("line", { x1: 0, y1: HEADER_H + milestoneH, x2: LABEL_W, y2: HEADER_H + milestoneH, stroke: "#2e2848", strokeWidth: 1 })] })), viewMode === "detailed"
                                     ? rowLayouts.map((layout, layoutIdx) => {
@@ -362,7 +378,8 @@ export function Timeline({ result, features, settings, viewMode, onToggleView, r
                                                 const barH = milestoneH - 8;
                                                 const sprintDays = (m.sprintLengthWeeks ?? 0) * 5;
                                                 const sprintCount = sprintDays > 0 ? Math.ceil((endDay - startDay) / sprintDays) : 0;
-                                                return (_jsxs("g", { children: [_jsx("rect", { x: x, y: HEADER_H + 4, width: w, height: barH, rx: 3, fill: m.color, opacity: 0.85 }), sprintCount > 0
+                                                const isFocused = focusedMilestoneId === m.id;
+                                                return (_jsxs("g", { onClick: () => onFocusMilestone?.(isFocused ? null : m.id), style: { cursor: onFocusMilestone ? "pointer" : undefined }, children: [_jsx("rect", { x: x, y: HEADER_H + 4, width: w, height: barH, rx: 3, fill: m.color, opacity: isFocused ? 1 : 0.85, stroke: isFocused ? "white" : "none", strokeWidth: 1.5, strokeOpacity: 0.6 }), sprintCount > 0
                                                             ? Array.from({ length: sprintCount }, (_, i) => {
                                                                 const sx = wdToX(startDay + i * sprintDays);
                                                                 const ex = wdToX(Math.min(startDay + (i + 1) * sprintDays, endDay));
@@ -419,8 +436,8 @@ export function Timeline({ result, features, settings, viewMode, onToggleView, r
                                             }
                                         }
                                         return zones.length > 0 ? zones : null;
-                                    }).filter(Boolean)), settings.calendarMode === "four-week" ? (_jsx(FourWeekHeader, { projectEndDay: projectEndDay, chartW: chartW, wdToX: wdToX })) : (_jsx(ActualDateHeader, { projectEndDay: projectEndDay, cal: cal, chartW: chartW, wdToX: wdToX })), _jsx(GridLines, { projectEndDay: projectEndDay, calendarMode: settings.calendarMode, cal: cal, svgH: svgH, milestoneH: milestoneH, wdToX: wdToX }), viewMode === "detailed"
-                                        ? tasks.map((task) => {
+                                    }).filter(Boolean)), settings.calendarMode === "four-week" ? (_jsx(FourWeekHeader, { projectEndDay: visibleEndDay, startDay: focusOffset, chartW: chartW, wdToX: wdToX })) : (_jsx(ActualDateHeader, { projectEndDay: visibleEndDay, startDay: focusOffset, cal: cal, chartW: chartW, wdToX: wdToX })), _jsx(GridLines, { projectEndDay: visibleEndDay, startDay: focusOffset, calendarMode: settings.calendarMode, cal: cal, svgH: svgH, milestoneH: milestoneH, wdToX: wdToX }), viewMode === "detailed"
+                                        ? visibleTasks.map((task) => {
                                             const layout = rowLayouts.find((r) => r.discipline === task.discipline);
                                             if (!layout)
                                                 return null;
@@ -472,34 +489,39 @@ export function Timeline({ result, features, settings, viewMode, onToggleView, r
                                     })] }) })] }) }), _jsx(FeatureLegend, { features: features, featureColors: featureColors, tasks: tasks }), editingTask && (_jsx(TaskEditModal, { task: editingTask, resources: resources, onSave: handleSaveTask, onUnpin: () => handleClearPin(editingTask.taskId), onClose: () => setEditingTask(null) }))] }));
 }
 // ─── Date headers ─────────────────────────────────────────────────────────────
-function FourWeekHeader({ projectEndDay, chartW, wdToX }) {
-    const numMonths = Math.ceil(projectEndDay / 20);
+function FourWeekHeader({ projectEndDay, startDay = 0, chartW, wdToX }) {
     const els = [];
-    for (let m = 0; m < numMonths; m++) {
+    const firstMonth = Math.floor(startDay / 20);
+    const lastMonth = Math.ceil(projectEndDay / 20);
+    for (let m = firstMonth; m < lastMonth; m++) {
         const mStart = m * 20;
         const mEnd = Math.min((m + 1) * 20, projectEndDay);
         const x = wdToX(mStart);
         const w = wdToX(mEnd) - wdToX(mStart);
+        if (w <= 0)
+            continue;
         els.push(_jsxs("g", { children: [_jsx("rect", { x: x, y: 0, width: w, height: MONTH_H, fill: m % 2 === 0 ? "#1a1628" : "#211d38" }), _jsxs("text", { x: x + w / 2, y: MONTH_H / 2, textAnchor: "middle", dominantBaseline: "middle", fontSize: 12, fill: "#c5bedf", fontWeight: "600", children: ["Month ", m + 1] })] }, `m-${m}`));
         for (let w4 = 0; w4 < 4; w4++) {
             const wStart = mStart + w4 * 5;
             const wEnd = Math.min(wStart + 5, projectEndDay);
-            if (wStart >= projectEndDay)
-                break;
+            if (wStart >= projectEndDay || wEnd <= startDay)
+                continue;
             const wx = wdToX(wStart);
             const ww = wdToX(wEnd) - wdToX(wStart);
+            if (ww <= 0)
+                continue;
             els.push(_jsxs("g", { children: [_jsx("rect", { x: wx, y: MONTH_H, width: ww, height: WEEK_H, fill: (m + w4) % 2 === 0 ? "#1d1930" : "#201c32" }), _jsxs("text", { x: wx + ww / 2, y: MONTH_H + WEEK_H / 2, textAnchor: "middle", dominantBaseline: "middle", fontSize: 11, fill: "#5c5575", children: ["W", w4 + 1] })] }, `w-${m}-${w4}`));
         }
     }
     els.push(_jsx("line", { x1: 0, y1: HEADER_H, x2: chartW, y2: HEADER_H, stroke: "#2e2848", strokeWidth: 1 }, "hdr-border"));
     return _jsx(_Fragment, { children: els });
 }
-function ActualDateHeader({ projectEndDay, cal, chartW, wdToX }) {
+function ActualDateHeader({ projectEndDay, startDay = 0, cal, chartW, wdToX }) {
     if (cal.length === 0)
         return null;
     const els = [];
     let monthKey = -1;
-    let monthStart = 0;
+    let monthStart = startDay;
     let monthIdx = 0;
     const flushMonth = (endDay) => {
         if (monthKey === -1)
@@ -508,10 +530,10 @@ function ActualDateHeader({ projectEndDay, cal, chartW, wdToX }) {
         const w = wdToX(endDay) - wdToX(monthStart);
         if (w <= 0)
             return;
-        els.push(_jsxs("g", { children: [_jsx("rect", { x: x, y: 0, width: w, height: MONTH_H, fill: monthIdx % 2 === 0 ? "#1a1628" : "#211d38" }), _jsx("text", { x: x + w / 2, y: MONTH_H / 2, textAnchor: "middle", dominantBaseline: "middle", fontSize: 12, fill: "#c5bedf", fontWeight: "600", children: formatMonthYear(cal[monthStart]) })] }, `month-${monthKey}`));
+        els.push(_jsxs("g", { children: [_jsx("rect", { x: Math.max(0, x), y: 0, width: w, height: MONTH_H, fill: monthIdx % 2 === 0 ? "#1a1628" : "#211d38" }), _jsx("text", { x: Math.max(0, x) + w / 2, y: MONTH_H / 2, textAnchor: "middle", dominantBaseline: "middle", fontSize: 12, fill: "#c5bedf", fontWeight: "600", children: formatMonthYear(cal[monthStart] ?? cal[startDay]) })] }, `month-${monthKey}`));
         monthIdx++;
     };
-    for (let d = 0; d < projectEndDay; d++) {
+    for (let d = startDay; d < projectEndDay; d++) {
         const date = cal[d];
         if (!date)
             continue;
@@ -547,19 +569,20 @@ function milestoneWorkingDays(m, calendarMode, startDate, cal) {
         endDay: Math.max(1, Math.round(((mEnd.getTime() - projStart.getTime()) / 86400000) * 5 / 7)),
     };
 }
-function GridLines({ projectEndDay, calendarMode, cal, svgH, milestoneH, wdToX }) {
+function GridLines({ projectEndDay, startDay = 0, calendarMode, cal, svgH, milestoneH, wdToX }) {
     const bottom = svgH - BOTTOM_PAD;
     const top = HEADER_H + milestoneH;
     const lines = [];
     if (calendarMode === "four-week") {
-        for (let d = 5; d <= projectEndDay; d += 5) {
+        const first = Math.ceil(startDay / 5) * 5;
+        for (let d = first; d <= projectEndDay; d += 5) {
             const isMonth = d % 20 === 0;
             const x = wdToX(d);
             lines.push(_jsx("line", { x1: x, y1: top, x2: x, y2: bottom, stroke: isMonth ? "#2e2848" : "#1e1a2e", strokeWidth: isMonth ? 1.5 : 1 }, `gl-${d}`));
         }
     }
     else {
-        for (let d = 0; d < projectEndDay; d++) {
+        for (let d = startDay; d < projectEndDay; d++) {
             const date = cal[d];
             if (!date || date.getDay() !== 1)
                 continue;
