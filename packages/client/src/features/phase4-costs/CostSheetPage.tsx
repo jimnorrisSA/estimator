@@ -471,7 +471,7 @@ function ResourceTable({
         <span className="text-xs text-[#5c5575]">{resources.length} member{resources.length !== 1 ? "s" : ""}</span>
       </div>
       <div className="overflow-x-auto">
-        <table className="w-full text-sm">
+        <table className="min-w-full text-sm">
           <thead>
             <tr className="bg-[#14112a] border-b border-[#2e2848]">
               <Th>Name</Th>
