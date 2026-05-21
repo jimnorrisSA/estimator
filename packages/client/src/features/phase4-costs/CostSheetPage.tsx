@@ -129,8 +129,9 @@ export function CostSheetPage() {
   const contingencyAmount = contingencyEnabled ? grandTotal * (contingencyPct / 100) : 0;
   const atCost        = grandTotal + contingencyAmount;
   const agencyFeeAmount = agencyFeeEnabled && revenueGBP > 0 ? revenueGBP * (agencyFeePct / 100) : 0;
-  const totalDelivery = atCost + agencyFeeAmount;
-  const profit  = revenueGBP > 0 ? revenueGBP - totalDelivery : null;
+  const totalDelivery = atCost + agencyFeeAmount;  // used in Cost Summary total row
+  // Profit = Revenue − resource cost − agency fee (matches spreadsheet; contingency stays in Cost Summary)
+  const profit  = revenueGBP > 0 ? revenueGBP - grandTotal - agencyFeeAmount : null;
   const margin  = profit !== null && revenueGBP > 0 ? (profit / revenueGBP) * 100 : null;
 
   const missingRates = resources.filter((r) => !effectiveRate(r, defaultMonthlyRate));
@@ -169,7 +170,7 @@ export function CostSheetPage() {
       <FinancialOverview
         totalMM={totalMM}
         totalMMExcluded={totalMMExcluded}
-        atCost={atCost}
+        atCost={grandTotal}
         revenueGBP={revenueGBP}
         profit={profit}
         margin={margin}
@@ -415,7 +416,7 @@ function FinancialOverview({
 
         <div className="bg-[#0d0b16] px-6 py-5 flex flex-col gap-1">
           <span className="text-xs font-semibold uppercase tracking-wide text-[#5c5575]">Profit</span>
-          <span className="text-xs text-[#5c5575]">Revenue − At Cost</span>
+          <span className="text-xs text-[#5c5575]">Revenue − Cost − Agency Fee</span>
           {profit !== null ? (
             <>
               <span className="text-2xl font-bold tabular-nums mt-2" style={{ color: profitColor }}>{fmtGBP(profit)}</span>

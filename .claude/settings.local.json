@@ -51,7 +51,8 @@
       "Bash(xargs grep -l \"PUT\\\\|update\\\\|Update\")",
       "Read(//c/Users/jnorris/Downloads/**)",
       "Bash(python3 -c ' *)",
-      "PowerShell(pip install *)"
+      "PowerShell(pip install *)",
+      "Bash(node -e ' *)"
     ]
   }
 }
