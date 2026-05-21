@@ -8,7 +8,6 @@ import { useMilestonesStore } from "../phase3-milestones/store/milestonesStore.j
 import { buildWorkingDayCalendar, dateToWorkingDay, parseISODate } from "./utils/calendarUtils.js";
 import { SettingsPanel } from "./components/SettingsPanel.js";
 import { Timeline } from "./components/Timeline.js";
-import { SpecsTable } from "./components/SpecsTable.js";
 import { TeamSidebar } from "./components/TeamSidebar.js";
 import { TeamAllocationTable } from "./components/TeamAllocationTable.js";
 
@@ -115,14 +114,6 @@ export function SchedulingPage() {
           {hasCosts && (
             <CostSummary tasks={result.tasks} features={features} symbol={symbol} conversionRate={conversionRate} />
           )}
-
-          {/* Specs table */}
-          <SpecsTable
-            tasks={result.tasks}
-            features={features}
-            settings={settings}
-            currencySymbol={symbol}
-          />
 
           {/* Team allocation grid */}
           <TeamAllocationTable

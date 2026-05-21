@@ -5,15 +5,32 @@ import { CURRENCY_SYMBOLS } from "../store/schedulingStore.js";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function monthRange(startDate: string, endDate: string): string[] {
+const EXTRA_MONTHS = 6; // columns to show beyond the furthest date
+
+function monthRange(startDate: string, projectEnd: string, resources: Resource[]): string[] {
   if (!startDate) return [];
+
+  // Find the furthest month with any allocation set across all resources
+  let furthestAlloc = "";
+  for (const r of resources) {
+    for (const m of Object.keys(r.monthlyAllocations ?? {})) {
+      if (m > furthestAlloc) furthestAlloc = m;
+    }
+  }
+
+  // Effective end = max(projectEnd, furthestAlloc), then pad by EXTRA_MONTHS
+  const baseEnd = [projectEnd?.slice(0, 7), furthestAlloc].filter(Boolean).sort().at(-1) ?? "";
+  const endDate = (() => {
+    const d = baseEnd
+      ? new Date(baseEnd + "-01")
+      : (() => { const d2 = new Date(startDate.slice(0, 7) + "-01"); d2.setMonth(d2.getMonth() + 11); return d2; })();
+    d.setMonth(d.getMonth() + EXTRA_MONTHS);
+    return d;
+  })();
+
   const months: string[] = [];
-  const start = new Date(startDate.slice(0, 7) + "-01");
-  const end = endDate
-    ? new Date(endDate.slice(0, 7) + "-01")
-    : (() => { const d = new Date(start); d.setMonth(d.getMonth() + 11); return d; })();
-  const cur = new Date(start.getFullYear(), start.getMonth(), 1);
-  while (cur <= end) {
+  const cur = new Date(startDate.slice(0, 7) + "-01");
+  while (cur <= endDate) {
     months.push(`${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, "0")}`);
     cur.setMonth(cur.getMonth() + 1);
   }
@@ -58,7 +75,7 @@ interface Props {
 export function TeamAllocationTable({
   resources, projectStart, projectEnd, currency, defaultMonthlyRate, onSetAllocation,
 }: Props) {
-  const months = monthRange(projectStart, projectEnd);
+  const months = monthRange(projectStart, projectEnd, resources);
   const symbol = CURRENCY_SYMBOLS[currency];
 
   if (resources.length === 0 || months.length === 0) {
