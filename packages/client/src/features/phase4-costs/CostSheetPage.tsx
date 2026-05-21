@@ -128,7 +128,7 @@ export function CostSheetPage() {
   const grandTotal    = fteSub.sum + contractorSub.sum;
   const contingencyAmount = contingencyEnabled ? grandTotal * (contingencyPct / 100) : 0;
   const atCost        = grandTotal + contingencyAmount;
-  const agencyFeeAmount = agencyFeeEnabled ? atCost * (agencyFeePct / 100) : 0;
+  const agencyFeeAmount = agencyFeeEnabled && revenueGBP > 0 ? revenueGBP * (agencyFeePct / 100) : 0;
   const totalDelivery = atCost + agencyFeeAmount;
   const profit  = revenueGBP > 0 ? revenueGBP - totalDelivery : null;
   const margin  = profit !== null && revenueGBP > 0 ? (profit / revenueGBP) * 100 : null;
@@ -299,7 +299,7 @@ export function CostSheetPage() {
           {agencyFeeEnabled && (
             <>
               <div className="border-t border-[#2e2848] my-1" />
-              <SummaryRow label={`${agencyFeeLabel} fee (${agencyFeePct}% of at-cost)`} gbp={agencyFeeAmount} usdRate={usdRate} muted />
+              <SummaryRow label={`${agencyFeeLabel} fee (${agencyFeePct}% of budget)`} gbp={agencyFeeAmount} usdRate={usdRate} muted />
             </>
           )}
           <div className="border-t border-[#2e2848] my-1" />

@@ -110,18 +110,6 @@ export function SchedulingPage() {
             />
           </section>
 
-          {/* Financial overview */}
-          {(hasCosts || settings.revenueGBP > 0) && (
-            <FinancialOverview
-              budgetGBP={settings.revenueGBP}
-              costGBP={baseCost}
-              agencyFeePct={settings.agencyFeePct ?? 0}
-              agencyFeeLabel={settings.agencyFeeLabel || "Agency fee"}
-              symbol={symbol}
-              conversionRate={conversionRate}
-            />
-          )}
-
           {/* Cost summary */}
           {hasCosts && (
             <CostSummary tasks={result.tasks} features={features} symbol={symbol} conversionRate={conversionRate} />
@@ -157,56 +145,6 @@ function Stat({ label, value, sub }: { label: string; value: string; sub?: strin
       <span className="text-xl font-bold text-[#ece7ff] tabular-nums">{value}</span>
       {sub && <span className="text-xs text-[#5c5575]">{sub}</span>}
     </div>
-  );
-}
-
-// Spreadsheet math (NEX tab):
-//   At Cost   = total working days / working days per month × monthly rate
-//   Agency fee = budget × agencyFeePct%   (fee is on revenue, not cost)
-//   Profit    = budget − cost − agency fee
-//   Margin    = profit / budget
-function FinancialOverview({
-  budgetGBP, costGBP, agencyFeePct, agencyFeeLabel, symbol, conversionRate,
-}: {
-  budgetGBP: number; costGBP: number; agencyFeePct: number;
-  agencyFeeLabel: string; symbol: string; conversionRate: number;
-}) {
-  const fmt = (gbp: number) => `${symbol}${Math.round(gbp * conversionRate).toLocaleString()}`;
-  const agencyFeeGBP = budgetGBP * (agencyFeePct / 100);
-  const profitGBP = budgetGBP - costGBP - agencyFeeGBP;
-  const marginPct = budgetGBP > 0 ? (profitGBP / budgetGBP) * 100 : null;
-
-  const items: { label: string; value: string; sub?: string; valueClass?: string }[] = [
-    { label: "Budget", value: budgetGBP > 0 ? fmt(budgetGBP) : "—", sub: "Project value" },
-    { label: "At cost", value: costGBP > 0 ? fmt(costGBP) : "—", sub: "Delivery cost" },
-    {
-      label: agencyFeePct > 0 ? `${agencyFeeLabel} (${agencyFeePct}%)` : agencyFeeLabel,
-      value: agencyFeePct > 0 && budgetGBP > 0 ? fmt(agencyFeeGBP) : "—",
-      sub: "% of budget",
-    },
-    {
-      label: "Profit",
-      value: budgetGBP > 0 && costGBP > 0 ? fmt(profitGBP) : "—",
-      sub: marginPct !== null ? `${marginPct.toFixed(1)}% margin` : "Set budget & costs",
-      valueClass: budgetGBP > 0 && costGBP > 0 ? (profitGBP >= 0 ? "text-green-400" : "text-red-400") : undefined,
-    },
-  ];
-
-  return (
-    <section className="flex flex-col gap-3">
-      <h2 className="text-sm font-semibold text-[#9b93ba] uppercase tracking-wide">Financial overview</h2>
-      <div className="rounded-xl border border-[#2e2848] bg-[#14112a] grid grid-cols-2 md:grid-cols-4 divide-y divide-[#2e2848] md:divide-y-0 md:divide-x md:divide-[#2e2848]">
-        {items.map((item) => (
-          <div key={item.label} className="flex flex-col gap-1 px-6 py-5">
-            <span className="text-xs text-[#5c5575] font-medium uppercase tracking-wide">{item.label}</span>
-            <span className={`text-3xl font-bold tabular-nums leading-none ${item.valueClass ?? "text-[#ece7ff]"}`}>
-              {item.value}
-            </span>
-            {item.sub && <span className="text-xs text-[#3a3456] mt-0.5">{item.sub}</span>}
-          </div>
-        ))}
-      </div>
-    </section>
   );
 }
 
