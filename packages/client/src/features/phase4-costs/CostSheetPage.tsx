@@ -138,7 +138,7 @@ export function CostSheetPage() {
 
   if (resources.length === 0) {
     return (
-      <div className="h-full overflow-y-auto bg-[#0d0b16] flex items-center justify-center">
+      <div className="h-full bg-[#0d0b16] flex items-center justify-center">
         <div className="text-center flex flex-col gap-2">
           <p className="text-[#5c5575] text-sm">No resources added yet.</p>
           <p className="text-[#3a3456] text-xs">Add team members in the Schedule tab to see cost breakdown here.</p>
@@ -148,7 +148,8 @@ export function CostSheetPage() {
   }
 
   return (
-    <div className="h-full overflow-y-auto bg-[#0d0b16] p-8 flex flex-col gap-6">
+    <div className="h-full overflow-y-auto bg-[#0d0b16]">
+    <div className="p-8 flex flex-col gap-6">
 
       {/* Missing dates banner */}
       {missingDates && (
@@ -318,6 +319,7 @@ export function CostSheetPage() {
         </div>
       </div>
 
+    </div>
     </div>
   );
 }
