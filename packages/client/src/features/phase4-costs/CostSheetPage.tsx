@@ -169,7 +169,7 @@ export function CostSheetPage() {
       <FinancialOverview
         totalMM={totalMM}
         totalMMExcluded={totalMMExcluded}
-        atCost={totalDelivery}
+        atCost={atCost}
         revenueGBP={revenueGBP}
         profit={profit}
         margin={margin}
