@@ -52,6 +52,7 @@ export interface Resource {
   projectId: string;
   name: string;
   email?: string;
+  jiraId?: string;
   role: Discipline;
   resourceType: ResourceType;
   rollOnDate: string;

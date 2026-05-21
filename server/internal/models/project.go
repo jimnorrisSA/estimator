@@ -100,6 +100,8 @@ type Resource struct {
 	ID               primitive.ObjectID `bson:"_id"                             json:"id"`
 	ProjectID        primitive.ObjectID `bson:"project_id"                      json:"projectId"`
 	Name             string             `bson:"name"                            json:"name"`
+	Email            string             `bson:"email,omitempty"                 json:"email,omitempty"`
+	JiraID           string             `bson:"jira_id,omitempty"               json:"jiraId,omitempty"`
 	Role             Discipline         `bson:"role"                            json:"role"`
 	ResourceType     ResourceType       `bson:"resource_type"                   json:"resourceType"`
 	RollOnDate       time.Time          `bson:"roll_on_date"                    json:"rollOnDate"`
