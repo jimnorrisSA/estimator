@@ -373,51 +373,65 @@ function FinancialOverview({
         </div>
       )}
 
-      {/* Stats — wrap naturally on narrow screens */}
-      <div className="px-6 py-5 bg-[#0d0b16]">
-        <div className="flex flex-wrap gap-6">
+      {/* Stats */}
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-px bg-[#2e2848]">
 
-          <OverviewStat label="Total MM" sublabel="Man-months of work">
-            <span className="text-2xl font-bold text-[#9b93ba] tabular-nums leading-tight">
-              {totalMM.toFixed(1)}<span className="text-base font-normal text-[#5c5575] ml-1">MM</span>
-            </span>
-            {totalMMExcluded > 0 && <span className="text-xs text-amber-400">+{totalMMExcluded} excluded</span>}
-          </OverviewStat>
-
-          <OverviewStat label="At Cost" sublabel="Total delivery cost">
-            <Dual gbp={atCost} usdRate={usdRate} color="#a78bfa" size="lg" />
-          </OverviewStat>
-
-          <OverviewStat label="Revenue" sublabel="Client contract (USD)">
-            <div className="flex items-baseline gap-1 mt-1">
-              <span className="text-sm text-[#5c5575]">$</span>
-              <input
-                type="number" min={0} step={1000} placeholder="0"
-                className="flex-1 min-w-0 text-2xl font-bold bg-transparent border-b border-[#2e2848] focus:border-[#7c3aed] text-[#ece7ff] outline-none pb-0.5 tabular-nums placeholder:text-[#3a3456] w-full"
-                value={revDraft}
-                onChange={(e) => setRevDraft(e.target.value)}
-                onBlur={commitRevenue}
-                onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
-              />
-            </div>
-            {revenueGBP > 0 && (
-              <span className="text-xs text-[#5c5575] tabular-nums">≈ {fmtGBP(revenueGBP)}</span>
-            )}
-          </OverviewStat>
-
-          <OverviewStat label="Profit" sublabel="Revenue − At Cost">
-            {profit !== null
-              ? <Dual gbp={profit} usdRate={usdRate} color={profitColor} size="lg" />
-              : <span className="text-2xl font-bold text-[#3a3456] leading-tight">—</span>}
-          </OverviewStat>
-
-          <OverviewStat label="Margin" sublabel="Profit ÷ Revenue">
-            <span className="text-2xl font-bold tabular-nums leading-tight" style={{ color: marginColor }}>
-              {margin !== null ? `${Math.round(margin)}%` : "—"}
-            </span>
-          </OverviewStat>
-
+        <div className="bg-[#0d0b16] px-6 py-5 flex flex-col gap-1">
+          <span className="text-xs font-semibold uppercase tracking-wide text-[#5c5575]">Total MM</span>
+          <span className="text-xs text-[#5c5575]">Man-months of work</span>
+          <span className="text-2xl font-bold text-[#9b93ba] tabular-nums mt-2">
+            {totalMM.toFixed(1)}<span className="text-base font-normal text-[#5c5575] ml-1">MM</span>
+          </span>
+          {totalMMExcluded > 0 && <span className="text-xs text-amber-400">+{totalMMExcluded} excluded</span>}
         </div>
+
+        <div className="bg-[#0d0b16] px-6 py-5 flex flex-col gap-1">
+          <span className="text-xs font-semibold uppercase tracking-wide text-[#5c5575]">At Cost</span>
+          <span className="text-xs text-[#5c5575]">Total delivery cost</span>
+          <span className="text-2xl font-bold tabular-nums mt-2" style={{ color: "#a78bfa" }}>{fmtGBP(atCost)}</span>
+          <span className="text-xs text-[#5c5575] tabular-nums">{fmtUSD(atCost, usdRate)}</span>
+        </div>
+
+        <div className="bg-[#0d0b16] px-6 py-5 flex flex-col gap-1">
+          <span className="text-xs font-semibold uppercase tracking-wide text-[#5c5575]">Revenue</span>
+          <span className="text-xs text-[#5c5575]">Client contract (USD)</span>
+          <div className="flex items-baseline gap-1 mt-2">
+            <span className="text-sm text-[#5c5575]">$</span>
+            <input
+              type="number" min={0} step={1000} placeholder="0"
+              className="flex-1 min-w-0 text-2xl font-bold bg-transparent border-b border-[#2e2848] focus:border-[#7c3aed] text-[#ece7ff] outline-none pb-0.5 tabular-nums placeholder:text-[#3a3456] w-full"
+              value={revDraft}
+              onChange={(e) => setRevDraft(e.target.value)}
+              onBlur={commitRevenue}
+              onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
+            />
+          </div>
+          {revenueGBP > 0 && (
+            <span className="text-xs text-[#5c5575] tabular-nums">≈ {fmtGBP(revenueGBP)}</span>
+          )}
+        </div>
+
+        <div className="bg-[#0d0b16] px-6 py-5 flex flex-col gap-1">
+          <span className="text-xs font-semibold uppercase tracking-wide text-[#5c5575]">Profit</span>
+          <span className="text-xs text-[#5c5575]">Revenue − At Cost</span>
+          {profit !== null ? (
+            <>
+              <span className="text-2xl font-bold tabular-nums mt-2" style={{ color: profitColor }}>{fmtGBP(profit)}</span>
+              <span className="text-xs text-[#5c5575] tabular-nums">{fmtUSD(profit, usdRate)}</span>
+            </>
+          ) : (
+            <span className="text-2xl font-bold text-[#5c5575] mt-2">—</span>
+          )}
+        </div>
+
+        <div className="bg-[#0d0b16] px-6 py-5 flex flex-col gap-1">
+          <span className="text-xs font-semibold uppercase tracking-wide text-[#5c5575]">Margin</span>
+          <span className="text-xs text-[#5c5575]">Profit ÷ Revenue</span>
+          <span className="text-2xl font-bold tabular-nums mt-2" style={{ color: marginColor }}>
+            {margin !== null ? `${Math.round(margin)}%` : "—"}
+          </span>
+        </div>
+
       </div>
 
       {/* Exchange rate */}
@@ -435,16 +449,6 @@ function FinancialOverview({
         <span className="text-xs text-[#5c5575]">USD</span>
         <span className="text-xs text-[#3a3456]">— costs stored in GBP; USD shown for reference</span>
       </div>
-    </div>
-  );
-}
-
-function OverviewStat({ label, sublabel, children }: { label: string; sublabel: string; children: React.ReactNode }) {
-  return (
-    <div className="flex flex-col gap-1 flex-1 min-w-[140px]">
-      <span className="text-xs font-semibold uppercase tracking-wide text-[#5c5575]">{label}</span>
-      <span className="text-xs text-[#3a3456]">{sublabel}</span>
-      <div className="mt-1">{children}</div>
     </div>
   );
 }
