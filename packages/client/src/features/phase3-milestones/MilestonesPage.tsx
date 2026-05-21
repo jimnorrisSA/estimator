@@ -96,6 +96,8 @@ export function MilestonesPage() {
         onAdd={addMilestone}
         onUpdate={updateMilestone}
         onDelete={deleteMilestone}
+        focusedMilestoneId={focusedMilestoneId}
+        onFocusMilestone={setFocusedMilestoneId}
       />
 
       {/* Timeline */}
@@ -195,9 +197,11 @@ interface StripProps {
   onAdd: (title: string, startDate: string, endDate: string) => void;
   onUpdate: (id: string, patch: Partial<Pick<Milestone, "title" | "startDate" | "endDate" | "color" | "hardeningDays" | "sprintLengthWeeks">>) => void;
   onDelete: (id: string) => void;
+  focusedMilestoneId: string | null;
+  onFocusMilestone: (id: string | null) => void;
 }
 
-function MilestoneStrip({ milestones, settings, onAdd, onUpdate, onDelete }: StripProps) {
+function MilestoneStrip({ milestones, settings, onAdd, onUpdate, onDelete, focusedMilestoneId, onFocusMilestone }: StripProps) {
   const [adding, setAdding] = useState(false);
   const [stripView, setStripView] = useState<StripView>("list");
   const [draft, setDraft] = useState({ title: "", startDate: settings.startDate, endDate: "" });
@@ -254,7 +258,7 @@ function MilestoneStrip({ milestones, settings, onAdd, onUpdate, onDelete }: Str
       )}
 
       {milestones.length > 0 && stripView === "list" && (
-        <MilestoneList milestones={milestones} onUpdate={onUpdate} onDelete={onDelete} />
+        <MilestoneList milestones={milestones} onUpdate={onUpdate} onDelete={onDelete} focusedMilestoneId={focusedMilestoneId} onFocusMilestone={onFocusMilestone} />
       )}
 
       {adding && (
@@ -295,10 +299,12 @@ function MilestoneStrip({ milestones, settings, onAdd, onUpdate, onDelete }: Str
   );
 }
 
-function MilestoneList({ milestones, onUpdate, onDelete }: {
+function MilestoneList({ milestones, onUpdate, onDelete, focusedMilestoneId, onFocusMilestone }: {
   milestones: Milestone[];
   onUpdate: (id: string, patch: Partial<Pick<Milestone, "title" | "startDate" | "endDate" | "color" | "hardeningDays" | "sprintLengthWeeks">>) => void;
   onDelete: (id: string) => void;
+  focusedMilestoneId: string | null;
+  onFocusMilestone: (id: string | null) => void;
 }) {
   return (
     <div className="rounded-xl border border-[#2e2848] overflow-hidden">
@@ -319,8 +325,10 @@ function MilestoneList({ milestones, onUpdate, onDelete }: {
               key={m.id}
               milestone={m}
               zebra={i % 2 === 1}
+              focused={focusedMilestoneId === m.id}
               onUpdate={onUpdate}
               onDelete={onDelete}
+              onFocus={() => onFocusMilestone(focusedMilestoneId === m.id ? null : m.id)}
             />
           ))}
         </tbody>
@@ -329,18 +337,27 @@ function MilestoneList({ milestones, onUpdate, onDelete }: {
   );
 }
 
-function MilestoneRow({ milestone: m, zebra, onUpdate, onDelete }: {
+function MilestoneRow({ milestone: m, zebra, focused, onUpdate, onDelete, onFocus }: {
   milestone: Milestone;
   zebra: boolean;
+  focused: boolean;
   onUpdate: (id: string, patch: Partial<Pick<Milestone, "title" | "startDate" | "endDate" | "color" | "hardeningDays" | "sprintLengthWeeks">>) => void;
   onDelete: (id: string) => void;
+  onFocus: () => void;
 }) {
   const [editingTitle, setEditingTitle] = useState(false);
 
-  const rowBg = zebra ? "bg-[#1a1628]" : "bg-[#14112a]";
+  const rowBg = focused
+    ? "bg-[#1e1535]"
+    : zebra ? "bg-[#1a1628]" : "bg-[#14112a]";
 
   return (
-    <tr className={`${rowBg} border-t border-[#2e2848] group`}>
+    <tr
+      className={`${rowBg} border-t transition-colors group cursor-pointer`}
+      style={{ borderColor: focused ? m.color : "#2e2848", borderLeftWidth: focused ? 3 : undefined, borderLeftColor: focused ? m.color : undefined }}
+      onClick={onFocus}
+      title={focused ? "Click to exit focus" : "Click to zoom into this milestone"}
+    >
       {/* Name + colour */}
       <td className="px-4 py-2.5">
         <div className="flex items-center gap-2.5">
@@ -373,7 +390,7 @@ function MilestoneRow({ milestone: m, zebra, onUpdate, onDelete }: {
       </td>
 
       {/* Start date */}
-      <td className="px-4 py-2.5">
+      <td className="px-4 py-2.5" onClick={(e) => e.stopPropagation()}>
         <input
           type="date"
           className="bg-transparent text-[#9b93ba] text-xs focus:outline-none focus:text-[#ece7ff] cursor-pointer"
@@ -383,7 +400,7 @@ function MilestoneRow({ milestone: m, zebra, onUpdate, onDelete }: {
       </td>
 
       {/* End date */}
-      <td className="px-4 py-2.5">
+      <td className="px-4 py-2.5" onClick={(e) => e.stopPropagation()}>
         <input
           type="date"
           className="bg-transparent text-[#9b93ba] text-xs focus:outline-none focus:text-[#ece7ff] cursor-pointer"
@@ -393,7 +410,7 @@ function MilestoneRow({ milestone: m, zebra, onUpdate, onDelete }: {
       </td>
 
       {/* Hardening days */}
-      <td className="px-4 py-2.5 text-center">
+      <td className="px-4 py-2.5 text-center" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-center gap-1">
           <input
             type="number"
@@ -408,7 +425,7 @@ function MilestoneRow({ milestone: m, zebra, onUpdate, onDelete }: {
       </td>
 
       {/* Sprint length */}
-      <td className="px-4 py-2.5 text-center">
+      <td className="px-4 py-2.5 text-center" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-center gap-0.5">
           {([undefined, 2, 3] as const).map((v) => (
             <button
@@ -418,7 +435,7 @@ function MilestoneRow({ milestone: m, zebra, onUpdate, onDelete }: {
                   ? "bg-[#7c3aed] text-white font-semibold"
                   : "bg-[#1d1930] text-[#5c5575] hover:text-[#9b93ba]"
               }`}
-              onClick={() => onUpdate(m.id, { sprintLengthWeeks: v })}
+              onClick={(e) => { e.stopPropagation(); onUpdate(m.id, { sprintLengthWeeks: v }); }}
             >
               {v == null ? "—" : `${v}w`}
             </button>
@@ -427,7 +444,7 @@ function MilestoneRow({ milestone: m, zebra, onUpdate, onDelete }: {
       </td>
 
       {/* Delete */}
-      <td className="px-4 py-2.5 text-center">
+      <td className="px-4 py-2.5 text-center" onClick={(e) => e.stopPropagation()}>
         <button
           className="opacity-0 group-hover:opacity-100 text-[#3a3456] hover:text-red-400 transition-all text-lg leading-none"
           onClick={() => onDelete(m.id)}

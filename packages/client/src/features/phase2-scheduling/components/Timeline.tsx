@@ -17,6 +17,7 @@ import {
 // Layout
 const LABEL_W = 124;
 const DAY_W = 22;
+const FOCUSED_DAY_W = 44;
 const WKND_W = 10;   // px for a full 2-day weekend gap (actual-dates mode only)
 const MONTH_H = 22;
 const WEEK_H = 20;
@@ -281,7 +282,8 @@ export function Timeline({ result, features, settings, viewMode, onToggleView, r
   const { setOverride, clearOverride, resources } = useSchedulingStore();
   const updateTaskEstimate = useEstimationsStore((s) => s.updateTaskEstimate);
   const updateTaskLabel = useEstimationsStore((s) => s.updateTaskLabel);
-  const milestones = useMilestonesStore((s) => s.milestones);
+  const rawMilestones = useMilestonesStore((s) => s.milestones);
+  const milestones = useMemo(() => [...rawMilestones].sort((a, b) => a.startDate.localeCompare(b.startDate)), [rawMilestones]);
 
   const [editingTask, setEditingTask] = useState<ScheduledTask | null>(null);
   const milestoneH = milestones.length > 0 ? MILESTONE_LANE_H : 0;
@@ -302,6 +304,8 @@ export function Timeline({ result, features, settings, viewMode, onToggleView, r
     return milestoneWorkingDays(focusedMilestone, settings.calendarMode, settings.startDate, cal);
   }, [focusedMilestone, settings.calendarMode, settings.startDate, cal]);
 
+  const zoomDayW = focusRange ? FOCUSED_DAY_W : DAY_W;
+
   // ─── Coordinate system: working-day → pixel ───────────────────────────────
   const showWeekends = settings.calendarMode === "actual";
 
@@ -311,16 +315,16 @@ export function Timeline({ result, features, settings, viewMode, onToggleView, r
   }, [showWeekends, settings.startDate]);
 
   // Pixels per working-day for drag snap (average accounts for weekend gaps)
-  const effectiveDayW = showWeekends ? DAY_W + WKND_W / 5 : DAY_W;
+  const effectiveDayW = showWeekends ? zoomDayW + WKND_W / 5 : zoomDayW;
 
   const focusOffset = focusRange?.startDay ?? 0;
 
   const wdToX = useCallback((n: number): number => {
     const adjusted = n - focusOffset;
-    if (!showWeekends) return adjusted * DAY_W;
+    if (!showWeekends) return adjusted * zoomDayW;
     const weekends = Math.floor((startWeekday + n) / 5) - Math.floor((startWeekday + focusOffset) / 5);
-    return adjusted * DAY_W + weekends * WKND_W;
-  }, [showWeekends, startWeekday, focusOffset]);
+    return adjusted * zoomDayW + weekends * WKND_W;
+  }, [showWeekends, startWeekday, focusOffset, zoomDayW]);
 
   // X positions where weekend gaps start (for overlay rendering)
   const weekendStrips = useMemo(() => {
@@ -330,7 +334,7 @@ export function Timeline({ result, features, settings, viewMode, onToggleView, r
     const maxWd = projectEndDay + 25;
     for (let n = 0; n <= maxWd; n++) {
       if ((sw + n) % 5 === 4) { // Friday (Mon=0…Fri=4)
-        strips.push(wdToX(n) + DAY_W);
+        strips.push(wdToX(n) + zoomDayW);
       }
     }
     return strips;
@@ -499,6 +503,11 @@ export function Timeline({ result, features, settings, viewMode, onToggleView, r
 
   const svgH = HEADER_H + milestoneH + (viewMode === "detailed" ? detailedH : summaryH) + BOTTOM_PAD;
   const chartW = Math.max(wdToX(visibleEndDay + 20), 480);
+
+  // Prev/next milestones for focus context edges
+  const focusedIdx = focusedMilestone ? milestones.findIndex((m) => m.id === focusedMilestone.id) : -1;
+  const prevMilestone = focusedIdx > 0 ? milestones[focusedIdx - 1] : null;
+  const nextMilestone = focusedIdx >= 0 && focusedIdx < milestones.length - 1 ? milestones[focusedIdx + 1] : null;
 
   return (
     <div className="flex flex-col gap-3">
@@ -782,6 +791,51 @@ export function Timeline({ result, features, settings, viewMode, onToggleView, r
                   }
                   return zones.length > 0 ? zones : null;
                 }).filter(Boolean)
+              )}
+
+              {/* Focused milestone boundary markers */}
+              {focusRange && (
+                <>
+                  {/* Left boundary — end of previous milestone */}
+                  <line x1={0} y1={0} x2={0} y2={svgH}
+                    stroke={focusedMilestone?.color ?? "#7c3aed"} strokeWidth={2} strokeDasharray="6 3" opacity={0.5}
+                    style={{ pointerEvents: "none" }} />
+                  {prevMilestone && (
+                    <g style={{ pointerEvents: "none" }}>
+                      <rect x={4} y={HEADER_H + 4} width={Math.min(140, 10 + prevMilestone.title.length * 6.5)} height={16}
+                        rx={3} fill={prevMilestone.color} opacity={0.18} />
+                      <text x={8} y={HEADER_H + 13}
+                        fontSize={10} fontWeight="600" fill={prevMilestone.color} opacity={0.9}
+                        style={{ userSelect: "none" }}>
+                        ← {prevMilestone.title.length > 18 ? prevMilestone.title.slice(0, 17) + "…" : prevMilestone.title}
+                      </text>
+                    </g>
+                  )}
+
+                  {/* Right boundary — start of next milestone */}
+                  {(() => {
+                    const rx = wdToX(focusRange.endDay);
+                    return (
+                      <>
+                        <line x1={rx} y1={0} x2={rx} y2={svgH}
+                          stroke={focusedMilestone?.color ?? "#7c3aed"} strokeWidth={2} strokeDasharray="6 3" opacity={0.5}
+                          style={{ pointerEvents: "none" }} />
+                        {nextMilestone && (
+                          <g style={{ pointerEvents: "none" }}>
+                            <rect x={rx - Math.min(144, 10 + nextMilestone.title.length * 6.5)} y={HEADER_H + 4}
+                              width={Math.min(144, 10 + nextMilestone.title.length * 6.5)} height={16}
+                              rx={3} fill={nextMilestone.color} opacity={0.18} />
+                            <text x={rx - 6} y={HEADER_H + 13}
+                              textAnchor="end" fontSize={10} fontWeight="600" fill={nextMilestone.color} opacity={0.9}
+                              style={{ userSelect: "none" }}>
+                              {nextMilestone.title.length > 18 ? nextMilestone.title.slice(0, 17) + "…" : nextMilestone.title} →
+                            </text>
+                          </g>
+                        )}
+                      </>
+                    );
+                  })()}
+                </>
               )}
 
               {/* Date headers */}
