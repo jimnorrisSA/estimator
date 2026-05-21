@@ -10,6 +10,7 @@ import { SettingsPanel } from "./components/SettingsPanel.js";
 import { Timeline } from "./components/Timeline.js";
 import { SpecsTable } from "./components/SpecsTable.js";
 import { TeamSidebar } from "./components/TeamSidebar.js";
+import { TeamAllocationTable } from "./components/TeamAllocationTable.js";
 
 const FEATURE_PALETTE = [
   "#7c3aed", "#f59e0b", "#10b981", "#ef4444",
@@ -19,7 +20,7 @@ const FEATURE_PALETTE = [
 
 export function SchedulingPage() {
   const features = useEstimationsStore((s) => s.features);
-  const { settings, overrides, resources, updateSettings, addResource, updateResource, deleteResource, condenseAllTasks } =
+  const { settings, overrides, resources, updateSettings, addResource, updateResource, deleteResource, condenseAllTasks, setMonthlyAllocation } =
     useSchedulingStore();
   const milestones = useMilestonesStore((s) => s.milestones);
 
@@ -121,6 +122,16 @@ export function SchedulingPage() {
             features={features}
             settings={settings}
             currencySymbol={symbol}
+          />
+
+          {/* Team allocation grid */}
+          <TeamAllocationTable
+            resources={resources}
+            projectStart={settings.startDate}
+            projectEnd={settings.targetEndDate}
+            currency={settings.currency}
+            defaultMonthlyRate={settings.defaultMonthlyRate}
+            onSetAllocation={setMonthlyAllocation}
           />
         </div>
       </div>

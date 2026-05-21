@@ -51,7 +51,8 @@ interface SchedulingStore {
   assignResource: (taskId: string, resourceId: string | null) => void;
 
   addResource: (role: Discipline, name: string) => void;
-  updateResource: (id: string, patch: Partial<Pick<Resource, "name" | "email" | "resourceType" | "monthlyRate" | "allocationPct" | "rollOnDate" | "rollOffDate">>) => void;
+  updateResource: (id: string, patch: Partial<Pick<Resource, "name" | "email" | "jiraId" | "resourceType" | "monthlyRate" | "allocationPct" | "rollOnDate" | "rollOffDate">>) => void;
+  setMonthlyAllocation: (resourceId: string, month: string, value: number) => void;
   deleteResource: (id: string) => void;
 
   condenseAllTasks: () => void;
@@ -145,6 +146,18 @@ export const useSchedulingStore = create<SchedulingStore>()(
           resources: s.resources.map((r) =>
             r.id === id ? { ...r, ...patch, updatedAt: new Date().toISOString() } : r
           ),
+        }));
+      },
+
+      setMonthlyAllocation(resourceId, month, value) {
+        set((s) => ({
+          resources: s.resources.map((r) => {
+            if (r.id !== resourceId) return r;
+            const allocs = { ...(r.monthlyAllocations ?? {}) };
+            if (value <= 0) delete allocs[month];
+            else allocs[month] = value;
+            return { ...r, monthlyAllocations: allocs, updatedAt: new Date().toISOString() };
+          }),
         }));
       },
 

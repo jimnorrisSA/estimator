@@ -61,6 +61,7 @@ export interface Resource {
   monthlyRate: number;      // 0 on FTE means "use project default monthly rate"
   currency: string;
   notes: string;
+  monthlyAllocations?: Record<string, number>; // "YYYY-MM" → allocation (0.5, 1.0, 1.5…)
   plantasticUserId?: string;
   updatedAt: string;
 }

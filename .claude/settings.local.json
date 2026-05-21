@@ -52,7 +52,8 @@
       "Read(//c/Users/jnorris/Downloads/**)",
       "Bash(python3 -c ' *)",
       "PowerShell(pip install *)",
-      "Bash(node -e ' *)"
+      "Bash(node -e ' *)",
+      "PowerShell(pnpm *)"
     ]
   }
 }

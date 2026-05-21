@@ -110,7 +110,8 @@ type Resource struct {
 	MonthlyRate      float64            `bson:"monthly_rate"                    json:"monthlyRate"`
 	Currency         string             `bson:"currency"                        json:"currency"`
 	Notes            string             `bson:"notes"                           json:"notes"`
-	PlantasticUserID string             `bson:"plantastic_user_id,omitempty"    json:"plantasticUserId,omitempty"`
+	MonthlyAllocations map[string]float64 `bson:"monthly_allocations,omitempty"   json:"monthlyAllocations,omitempty"`
+	PlantasticUserID   string             `bson:"plantastic_user_id,omitempty"    json:"plantasticUserId,omitempty"`
 	UpdatedAt        time.Time          `bson:"updated_at"                      json:"updatedAt"`
 }
 

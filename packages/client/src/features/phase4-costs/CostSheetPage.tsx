@@ -39,7 +39,17 @@ function effectiveRate(r: Resource, defaultRate: number): number {
   return r.monthlyRate;
 }
 
+function resourceCostFromAllocations(r: Resource, defaultRate: number): number | null {
+  const allocs = r.monthlyAllocations;
+  if (!allocs || Object.keys(allocs).length === 0) return null;
+  const rate = effectiveRate(r, defaultRate);
+  return Object.values(allocs).reduce((s, a) => s + a * rate, 0);
+}
+
 function resourceCost(r: Resource, days: number | null, defaultRate: number, wdpm: number): number | null {
+  // Prefer monthly allocations when set
+  const fromAllocs = resourceCostFromAllocations(r, defaultRate);
+  if (fromAllocs !== null) return fromAllocs;
   if (days === null) return null;
   return (days / wdpm) * effectiveRate(r, defaultRate) * ((r.allocationPct ?? 100) / 100);
 }
@@ -117,9 +127,14 @@ export function CostSheetPage() {
 
   let totalMM = 0, totalMMExcluded = 0;
   for (const r of resources) {
-    const days = resourceWorkingDays(r, startDate, targetEndDate, calendarMode);
-    if (days === null) { totalMMExcluded++; continue; }
-    totalMM += days * ((r.allocationPct ?? 100) / 100) / workingDaysPerMonth;
+    const allocs = r.monthlyAllocations;
+    if (allocs && Object.keys(allocs).length > 0) {
+      totalMM += Object.values(allocs).reduce((s, a) => s + a, 0);
+    } else {
+      const days = resourceWorkingDays(r, startDate, targetEndDate, calendarMode);
+      if (days === null) { totalMMExcluded++; continue; }
+      totalMM += days * ((r.allocationPct ?? 100) / 100) / workingDaysPerMonth;
+    }
   }
 
   const fteSub        = computeSubtotals(fteResources);
