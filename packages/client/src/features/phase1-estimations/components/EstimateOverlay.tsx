@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { motion } from "motion/react";
 import type { EstimateUnit } from "@estimator/shared";
 import type { EstimateEditRequest } from "../context/CanvasContext.js";
 
@@ -38,13 +39,17 @@ export function EstimateOverlay({ edit, onDone }: Props) {
   const OVERLAY_W = 168;
 
   return (
-    <div
+    <motion.div
       style={{
         position: "fixed",
         left: edit.x - OVERLAY_W,
         top: edit.y - 4,
         zIndex: 1001,
+        transformOrigin: "right center",
       }}
+      initial={{ scale: 0.95, opacity: 0 }}
+      animate={{ scale: 1, opacity: 1 }}
+      transition={{ duration: 0.12, ease: [0.23, 1, 0.32, 1] }}
       onMouseDown={(e) => e.stopPropagation()}
     >
       <div
@@ -79,6 +84,6 @@ export function EstimateOverlay({ edit, onDone }: Props) {
           ))}
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 }

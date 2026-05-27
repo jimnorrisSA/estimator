@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { motion } from "motion/react";
 import type { ConfirmRequest } from "../context/CanvasContext.js";
 
 interface Props {
@@ -16,12 +17,19 @@ export function ConfirmDialog({ req, onDone }: Props) {
   }, [onDone]);
 
   return (
-    <div
-      className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/60"
+    <motion.div
+      className="fixed inset-0 z-[2000] flex items-center justify-center"
+      style={{ backgroundColor: "rgba(0,0,0,0.6)" }}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.15 }}
       onMouseDown={onDone}
     >
-      <div
+      <motion.div
         className="bg-[#1d1930] border border-[#2e2848] rounded-xl shadow-2xl p-6 w-80 flex flex-col gap-4"
+        initial={{ scale: 0.94, opacity: 0, y: 6 }}
+        animate={{ scale: 1, opacity: 1, y: 0 }}
+        transition={{ type: "spring", duration: 0.3, bounce: 0.15 }}
         onMouseDown={(e) => e.stopPropagation()}
       >
         <div className="flex flex-col gap-1">
@@ -46,7 +54,7 @@ export function ConfirmDialog({ req, onDone }: Props) {
             Delete
           </button>
         </div>
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 }

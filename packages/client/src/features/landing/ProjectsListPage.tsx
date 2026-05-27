@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { motion } from "motion/react";
 import { useProjectsStore, emptySnapshot } from "../../store/projectsStore.js";
 import { useAuth } from "../auth/AuthGate.js";
 import { api } from "../../lib/api.js";
@@ -161,7 +162,13 @@ export function ProjectsListPage({ onOpenProject, onBack }: Props) {
       {/* New project modal */}
       {naming && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-          <div className="flex flex-col gap-5 p-8 rounded-2xl" style={{ background: "#14112a", border: "1px solid rgba(139,92,246,0.4)", boxShadow: "0 8px 40px rgba(0,0,0,0.6)", minWidth: 360 }}>
+          <motion.div
+            className="flex flex-col gap-5 p-8 rounded-2xl"
+            style={{ background: "#14112a", border: "1px solid rgba(139,92,246,0.4)", boxShadow: "0 8px 40px rgba(0,0,0,0.6)", minWidth: 360 }}
+            initial={{ scale: 0.94, opacity: 0, y: 8 }}
+            animate={{ scale: 1, opacity: 1, y: 0 }}
+            transition={{ type: "spring", duration: 0.3, bounce: 0.15 }}
+          >
             <p className="text-sm font-semibold uppercase tracking-widest text-[#9b93ba]">New Project</p>
             <input
               autoFocus type="text" placeholder="Project name…" value={newName}
@@ -173,21 +180,27 @@ export function ProjectsListPage({ onOpenProject, onBack }: Props) {
               <button onClick={handleCreate} className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white" style={{ background: "linear-gradient(135deg, #7c3aed, #5b21b6)" }}>Create</button>
               <button onClick={() => { setNaming(false); setNewName(""); }} className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-[#5c5575] hover:text-[#9b93ba]" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>Cancel</button>
             </div>
-          </div>
+          </motion.div>
         </div>
       )}
 
       {/* Confirm delete modal */}
       {confirmDelete && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-          <div className="flex flex-col gap-5 p-8 rounded-2xl" style={{ background: "#14112a", border: "1px solid rgba(239,68,68,0.3)", minWidth: 320 }}>
+          <motion.div
+            className="flex flex-col gap-5 p-8 rounded-2xl"
+            style={{ background: "#14112a", border: "1px solid rgba(239,68,68,0.3)", minWidth: 320 }}
+            initial={{ scale: 0.94, opacity: 0, y: 8 }}
+            animate={{ scale: 1, opacity: 1, y: 0 }}
+            transition={{ type: "spring", duration: 0.3, bounce: 0.15 }}
+          >
             <p className="text-base font-semibold text-white">Delete this project?</p>
             <p className="text-sm text-[#5c5575]">This cannot be undone.</p>
             <div className="flex gap-3">
               <button onClick={() => { deleteProject(confirmDelete); setConfirmDelete(null); }} className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white bg-red-600 hover:bg-red-500 transition-colors">Delete</button>
               <button onClick={() => setConfirmDelete(null)} className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-[#5c5575] hover:text-[#9b93ba]" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>Cancel</button>
             </div>
-          </div>
+          </motion.div>
         </div>
       )}
 
@@ -287,10 +300,14 @@ function ProjectGrid({ children }: { children: React.ReactNode }) {
 
 function ProjectCard({ children }: { children: React.ReactNode }) {
   return (
-    <div className="group flex flex-col rounded-2xl border border-[#2e2848] bg-[#14112a] overflow-hidden transition-all duration-200 hover:border-[#7c3aed]/60 hover:shadow-[0_0_24px_rgba(124,58,237,0.15)]">
+    <motion.div
+      className="group flex flex-col rounded-2xl border border-[#2e2848] bg-[#14112a] overflow-hidden"
+      whileHover={{ y: -3, boxShadow: "0 8px 30px rgba(124,58,237,0.2)", borderColor: "rgba(124,58,237,0.5)" }}
+      transition={{ duration: 0.2, ease: [0.23, 1, 0.32, 1] }}
+    >
       <div className="h-1.5 w-full" style={{ background: "linear-gradient(90deg, #7c3aed, #5b21b6)" }} />
       <div className="flex flex-col gap-3 p-5 flex-1">{children}</div>
-    </div>
+    </motion.div>
   );
 }
 

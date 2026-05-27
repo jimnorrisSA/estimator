@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { motion } from "motion/react";
 import type { Feature } from "@estimator/shared";
 import { useEstimationsStore } from "../phase1-estimations/store/estimationsStore.js";
 import { useSchedulingStore, CURRENCY_SYMBOLS, getConversionRate } from "./store/schedulingStore.js";
@@ -80,11 +81,11 @@ export function SchedulingPage() {
           {/* Summary stats */}
           {totalTasks > 0 && (
             <div className="flex flex-wrap gap-3">
-              <Stat label="Tasks" value={String(totalTasks)} />
-              <Stat label="Features" value={String(totalFeatures)} />
-              <Stat label="Team" value={String(resources.length)} sub={resources.length === 0 ? "add in sidebar →" : "members"} />
-              <Stat label="Duration" value={`${result.totalDays}d`} sub="task work" />
-              {result.contingencyDays > 0 && <Stat label="With buffers" value={`${result.projectEndDay}d`} sub={`+${result.contingencyDays}d`} />}
+              <Stat label="Tasks" value={String(totalTasks)} index={0} />
+              <Stat label="Features" value={String(totalFeatures)} index={1} />
+              <Stat label="Team" value={String(resources.length)} sub={resources.length === 0 ? "add in sidebar →" : "members"} index={2} />
+              <Stat label="Duration" value={`${result.totalDays}d`} sub="task work" index={3} />
+              {result.contingencyDays > 0 && <Stat label="With buffers" value={`${result.projectEndDay}d`} sub={`+${result.contingencyDays}d`} index={4} />}
             </div>
           )}
 
@@ -140,13 +141,18 @@ export function SchedulingPage() {
   );
 }
 
-function Stat({ label, value, sub }: { label: string; value: string; sub?: string }) {
+function Stat({ label, value, sub, index = 0 }: { label: string; value: string; sub?: string; index?: number }) {
   return (
-    <div className="bg-[#1d1930] rounded-xl border border-[#2e2848] px-4 py-3 flex flex-col gap-0.5 shadow-sm min-w-[100px]">
+    <motion.div
+      className="bg-[#1d1930] rounded-xl border border-[#2e2848] px-4 py-3 flex flex-col gap-0.5 shadow-sm min-w-[100px]"
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3, delay: index * 0.05, ease: [0.23, 1, 0.32, 1] }}
+    >
       <span className="text-xs text-[#5c5575] font-medium uppercase tracking-wide">{label}</span>
       <span className="text-xl font-bold text-[#ece7ff] tabular-nums">{value}</span>
       {sub && <span className="text-xs text-[#5c5575]">{sub}</span>}
-    </div>
+    </motion.div>
   );
 }
 
@@ -208,7 +214,7 @@ function CostSummary({
                 <span className="text-sm text-[#c5bedf] flex-1 truncate min-w-0">{f.name}</span>
                 <div className="flex items-center gap-2.5 flex-shrink-0">
                   <div className="w-20 h-1.5 rounded-full bg-[#2e2848] overflow-hidden">
-                    <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: f.color }} />
+                    <div className="h-full rounded-full" style={{ width: `${pct}%`, background: f.color, transition: "width 600ms cubic-bezier(0.23, 1, 0.32, 1)" }} />
                   </div>
                   <span className="text-xs text-[#5c5575] w-7 text-right tabular-nums">{Math.round(pct)}%</span>
                   <span className="text-sm font-semibold text-[#ece7ff] tabular-nums w-24 text-right">
@@ -230,7 +236,7 @@ function CostSummary({
                 <span className="text-sm text-[#c5bedf] flex-1">{d.discipline}</span>
                 <div className="flex items-center gap-2.5 flex-shrink-0">
                   <div className="w-20 h-1.5 rounded-full bg-[#2e2848] overflow-hidden">
-                    <div className="h-full rounded-full bg-[#7c3aed] transition-all" style={{ width: `${pct}%` }} />
+                    <div className="h-full rounded-full" style={{ width: `${pct}%`, background: "#7c3aed", transition: "width 600ms cubic-bezier(0.23, 1, 0.32, 1)" }} />
                   </div>
                   <span className="text-xs text-[#5c5575] w-7 text-right tabular-nums">{Math.round(pct)}%</span>
                   <span className="text-sm font-semibold text-[#ece7ff] tabular-nums w-24 text-right">

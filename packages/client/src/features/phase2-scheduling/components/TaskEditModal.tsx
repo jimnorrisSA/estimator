@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { motion } from "motion/react";
 import type { EstimateUnit, Resource } from "@estimator/shared";
 import type { ScheduledTask } from "../utils/scheduler.js";
 
@@ -54,11 +55,20 @@ export function TaskEditModal({ task, resources, onSave, onUnpin, onClose }: Pro
   }
 
   return (
-    <div
-      className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/60 backdrop-blur-sm"
+    <motion.div
+      className="fixed inset-0 z-[2000] flex items-center justify-center backdrop-blur-sm"
+      style={{ backgroundColor: "rgba(0,0,0,0.6)" }}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.15 }}
       onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div className="bg-[#1a1628] border border-[#2e2848] rounded-xl shadow-xl w-[420px] max-w-[90vw] p-5">
+      <motion.div
+        className="bg-[#1a1628] border border-[#2e2848] rounded-xl shadow-xl w-[420px] max-w-[90vw] p-5"
+        initial={{ scale: 0.94, opacity: 0, y: 8 }}
+        animate={{ scale: 1, opacity: 1, y: 0 }}
+        transition={{ type: "spring", duration: 0.3, bounce: 0.15 }}
+      >
         {/* Header */}
         <div className="flex items-start justify-between mb-4">
           <div>
@@ -176,7 +186,7 @@ export function TaskEditModal({ task, resources, onSave, onUnpin, onClose }: Pro
             </button>
           </div>
         </div>
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 }

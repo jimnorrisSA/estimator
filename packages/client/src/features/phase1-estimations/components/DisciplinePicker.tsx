@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { motion } from "motion/react";
 import type { Discipline } from "@estimator/shared";
 import { DISCIPLINE_COLORS, DEFAULT_DISCIPLINES } from "../utils/defaults.js";
 import type { DisciplinePickRequest } from "../context/CanvasContext.js";
@@ -23,10 +24,13 @@ export function DisciplinePicker({ req, onPick, onDone }: Props) {
   const options: Discipline[] = [...DEFAULT_DISCIPLINES, "Custom"];
 
   return (
-    <div
+    <motion.div
       ref={ref}
-      style={{ position: "fixed", left: req.x, top: req.y, zIndex: 1100 }}
+      style={{ position: "fixed", left: req.x, top: req.y, zIndex: 1100, transformOrigin: "top left" }}
       className="bg-[#1d1930] border border-[#2e2848] rounded-lg shadow-2xl p-2 flex flex-col gap-1 min-w-36"
+      initial={{ scale: 0.92, opacity: 0 }}
+      animate={{ scale: 1, opacity: 1 }}
+      transition={{ duration: 0.15, ease: [0.23, 1, 0.32, 1] }}
     >
       <p className="text-xs font-semibold text-[#5c5575] px-1 pb-1 uppercase tracking-wide">Add discipline</p>
       {options.map((d) => (
@@ -45,6 +49,6 @@ export function DisciplinePicker({ req, onPick, onDone }: Props) {
           {d}
         </button>
       ))}
-    </div>
+    </motion.div>
   );
 }

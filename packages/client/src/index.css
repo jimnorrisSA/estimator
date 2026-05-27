@@ -1,5 +1,12 @@
 @import "tailwindcss";
 
+/* ── Custom easing curves (Emil Kowalski) ── */
+:root {
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+}
+
 * {
   box-sizing: border-box;
 }
@@ -20,4 +27,17 @@ body,
 * {
   scrollbar-width: thin;
   scrollbar-color: #3d366a transparent;
+}
+
+/* ── Global button press feedback (Emil Kowalski) ──
+   Buttons scale down slightly on press — instant tactile response.
+   Only on devices that support hover (not touch) to avoid false positives. */
+button {
+  transition: transform 160ms var(--ease-out);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  button:not(:disabled):active {
+    transform: scale(0.97);
+  }
 }

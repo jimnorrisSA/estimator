@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { motion, AnimatePresence } from "motion/react";
 import { EstimationsPage } from "./features/phase1-estimations/EstimationsPage.js";
 import { SchedulingPage } from "./features/phase2-scheduling/SchedulingPage.js";
 import { MilestonesPage } from "./features/phase3-milestones/MilestonesPage.js";
@@ -168,17 +169,25 @@ function AppContent() {
           <img src="/HERO.png" alt="Vigo" className="h-9 w-9 object-contain rounded-lg" />
         </button>
 
-        {/* Active phase tabs */}
+        {/* Active phase tabs — sliding indicator */}
         {TABS.map(({ phase, label, sub }) => (
           <button
             key={phase}
             onClick={() => setActivePhase(phase)}
-            className={`flex flex-col items-start justify-center px-4 py-2.5 text-left border-b-2 transition-colors ${
+            className={`relative flex flex-col items-start justify-center px-4 py-2.5 text-left transition-colors ${
               activePhase === phase
-                ? "border-[#8b5cf6] text-[#a78bfa]"
-                : "border-transparent text-[#5c5575] hover:text-[#9b93ba] hover:border-[#3d366a]"
+                ? "text-[#a78bfa]"
+                : "text-[#5c5575] hover:text-[#9b93ba]"
             }`}
           >
+            {/* Animated sliding underline indicator */}
+            {activePhase === phase && (
+              <motion.div
+                layoutId="tab-indicator"
+                className="absolute bottom-0 left-0 right-0 h-[2px] bg-[#8b5cf6] rounded-t-sm"
+                transition={{ type: "spring", duration: 0.35, bounce: 0.15 }}
+              />
+            )}
             <span className="text-xs font-semibold uppercase tracking-wide leading-none">{label}</span>
             <span className="text-sm font-medium leading-tight mt-0.5">{sub}</span>
           </button>
@@ -193,28 +202,52 @@ function AppContent() {
           )}
           {activePhase === 2 && <ExportMenu />}
           <JiraMenu />
+
+          {/* Save button with label morph animation */}
           <button
             onClick={handleSave}
             disabled={saveState === "saving"}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all disabled:opacity-60"
+            className="relative flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all disabled:opacity-60 overflow-hidden min-w-[56px]"
             style={
               saveState === "saved"
                 ? { background: "rgba(34,197,94,0.15)", border: "1px solid rgba(34,197,94,0.4)", color: "#86efac" }
                 : { background: "rgba(124,58,237,0.15)", border: "1px solid rgba(124,58,237,0.4)", color: "#a78bfa" }
             }
           >
-            {saveState === "saving" ? "Saving…" : saveState === "saved" ? "Saved ✓" : "Save"}
+            <AnimatePresence mode="wait" initial={false}>
+              <motion.span
+                key={saveState}
+                initial={{ opacity: 0, filter: "blur(4px)", y: 4 }}
+                animate={{ opacity: 1, filter: "blur(0px)", y: 0 }}
+                exit={{ opacity: 0, filter: "blur(4px)", y: -4 }}
+                transition={{ duration: 0.15, ease: [0.23, 1, 0.32, 1] }}
+                style={{ display: "block" }}
+              >
+                {saveState === "saving" ? "Saving…" : saveState === "saved" ? "Saved ✓" : "Save"}
+              </motion.span>
+            </AnimatePresence>
           </button>
         </div>
 
       </nav>
 
-      {/* Page content */}
-      <div className="flex-1 min-h-0 overflow-hidden">
-        {activePhase === 1 && <EstimationsPage />}
-        {activePhase === 2 && <SchedulingPage />}
-        {activePhase === 3 && <MilestonesPage />}
-        {activePhase === 4 && <CostSheetPage />}
+      {/* Page content — crossfade between phases */}
+      <div className="flex-1 min-h-0 overflow-hidden relative">
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.div
+            key={activePhase}
+            className="absolute inset-0"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.12, ease: [0.23, 1, 0.32, 1] }}
+          >
+            {activePhase === 1 && <EstimationsPage />}
+            {activePhase === 2 && <SchedulingPage />}
+            {activePhase === 3 && <MilestonesPage />}
+            {activePhase === 4 && <CostSheetPage />}
+          </motion.div>
+        </AnimatePresence>
       </div>
     </div>
   );

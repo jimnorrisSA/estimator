@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { motion } from "motion/react";
 import type { Discipline, Resource, ResourceType } from "@estimator/shared";
 import type { Currency } from "../store/schedulingStore.js";
 import { CURRENCY_SYMBOLS } from "../store/schedulingStore.js";
@@ -371,7 +372,12 @@ function MemberRow({
   }
 
   return (
-    <div className="flex items-start gap-1.5 group rounded-lg px-1.5 py-1 hover:bg-[#1d1930] transition-colors">
+    <motion.div
+      className="flex items-start gap-1.5 group rounded-lg px-1.5 py-1 hover:bg-[#1d1930] transition-colors"
+      initial={{ opacity: 0, x: -8 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ duration: 0.2, ease: [0.23, 1, 0.32, 1] }}
+    >
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5">
           <span className="flex-1 text-sm text-[#ece7ff] truncate">{member.name}</span>
@@ -419,7 +425,7 @@ function MemberRow({
           </svg>
         </button>
       </div>
-    </div>
+    </motion.div>
   );
 }
 
