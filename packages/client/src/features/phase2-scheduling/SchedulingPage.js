@@ -1,5 +1,6 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import { useMemo, useState } from "react";
+import { motion } from "motion/react";
 import { useEstimationsStore } from "../phase1-estimations/store/estimationsStore.js";
 import { useSchedulingStore, CURRENCY_SYMBOLS, getConversionRate } from "./store/schedulingStore.js";
 import { runScheduler } from "./utils/scheduler.js";
@@ -7,8 +8,8 @@ import { useMilestonesStore } from "../phase3-milestones/store/milestonesStore.j
 import { buildWorkingDayCalendar, dateToWorkingDay, parseISODate } from "./utils/calendarUtils.js";
 import { SettingsPanel } from "./components/SettingsPanel.js";
 import { Timeline } from "./components/Timeline.js";
-import { SpecsTable } from "./components/SpecsTable.js";
 import { TeamSidebar } from "./components/TeamSidebar.js";
+import { TeamAllocationTable } from "./components/TeamAllocationTable.js";
 const FEATURE_PALETTE = [
     "#7c3aed", "#f59e0b", "#10b981", "#ef4444",
     "#3b82f6", "#06b6d4", "#f97316", "#a78bfa",
@@ -16,7 +17,7 @@ const FEATURE_PALETTE = [
 ];
 export function SchedulingPage() {
     const features = useEstimationsStore((s) => s.features);
-    const { settings, overrides, resources, updateSettings, addResource, updateResource, deleteResource, condenseAllTasks } = useSchedulingStore();
+    const { settings, overrides, resources, updateSettings, addResource, updateResource, deleteResource, condenseAllTasks, setMonthlyAllocation } = useSchedulingStore();
     const milestones = useMilestonesStore((s) => s.milestones);
     const [viewMode, setViewMode] = useState("detailed");
     const cal = useMemo(() => {
@@ -52,37 +53,10 @@ export function SchedulingPage() {
     const totalFeatures = new Set(result.tasks.map((t) => t.featureId)).size;
     const baseCost = result.tasks.reduce((s, t) => s + t.cost, 0);
     const hasCosts = baseCost > 0;
-    return (_jsxs("div", { className: "flex h-full overflow-hidden", children: [_jsxs("div", { className: "flex-1 flex flex-col overflow-y-auto bg-[#0d0b16] min-w-0", children: [_jsx(SettingsPanel, { settings: settings, onChange: updateSettings }), _jsxs("div", { className: "flex-1 flex flex-col gap-6 p-6", children: [totalTasks > 0 && (_jsxs("div", { className: "flex flex-wrap gap-3", children: [_jsx(Stat, { label: "Tasks", value: String(totalTasks) }), _jsx(Stat, { label: "Features", value: String(totalFeatures) }), _jsx(Stat, { label: "Team", value: String(resources.length), sub: resources.length === 0 ? "add in sidebar →" : "members" }), _jsx(Stat, { label: "Duration", value: `${result.totalDays}d`, sub: "task work" }), result.contingencyDays > 0 && _jsx(Stat, { label: "With buffers", value: `${result.projectEndDay}d`, sub: `+${result.contingencyDays}d` })] })), _jsxs("section", { className: "flex flex-col gap-3", children: [_jsxs("div", { className: "flex items-center justify-between gap-3", children: [_jsx("h2", { className: "text-sm font-semibold text-[#9b93ba] uppercase tracking-wide", children: "Schedule" }), _jsx("button", { onClick: condenseAllTasks, className: "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-[#1d1930] border border-[#2e2848] text-[#9b93ba] hover:text-[#ece7ff] hover:border-[#7c3aed] transition-colors", title: "Remove all manual position pins and pack tasks back-to-back, skipping weekends and hardening periods", children: "Condense tasks" })] }), _jsx(Timeline, { result: result, features: features, settings: settings, viewMode: viewMode, onToggleView: () => setViewMode((v) => (v === "detailed" ? "summary" : "detailed")), resourceWindows: resourceWindows })] }), (hasCosts || settings.revenueGBP > 0) && (_jsx(FinancialOverview, { budgetGBP: settings.revenueGBP, costGBP: baseCost, agencyFeePct: settings.agencyFeePct ?? 0, agencyFeeLabel: settings.agencyFeeLabel || "Agency fee", symbol: symbol, conversionRate: conversionRate })), hasCosts && (_jsx(CostSummary, { tasks: result.tasks, features: features, symbol: symbol, conversionRate: conversionRate })), _jsx(SpecsTable, { tasks: result.tasks, features: features, settings: settings, currencySymbol: symbol })] })] }), _jsx(TeamSidebar, { resources: resources, currency: settings.currency, defaultMonthlyRate: settings.defaultMonthlyRate, onAdd: addResource, onUpdate: updateResource, onDelete: deleteResource })] }));
+    return (_jsxs("div", { className: "flex h-full overflow-hidden", children: [_jsxs("div", { className: "flex-1 flex flex-col overflow-y-auto bg-[#0d0b16] min-w-0", children: [_jsx(SettingsPanel, { settings: settings, onChange: updateSettings }), _jsxs("div", { className: "flex-1 flex flex-col gap-6 p-6", children: [totalTasks > 0 && (_jsxs("div", { className: "flex flex-wrap gap-3", children: [_jsx(Stat, { label: "Tasks", value: String(totalTasks), index: 0 }), _jsx(Stat, { label: "Features", value: String(totalFeatures), index: 1 }), _jsx(Stat, { label: "Team", value: String(resources.length), sub: resources.length === 0 ? "add in sidebar →" : "members", index: 2 }), _jsx(Stat, { label: "Duration", value: `${result.totalDays}d`, sub: "task work", index: 3 }), result.contingencyDays > 0 && _jsx(Stat, { label: "With buffers", value: `${result.projectEndDay}d`, sub: `+${result.contingencyDays}d`, index: 4 })] })), _jsxs("section", { className: "flex flex-col gap-3", children: [_jsxs("div", { className: "flex items-center justify-between gap-3", children: [_jsx("h2", { className: "text-sm font-semibold text-[#9b93ba] uppercase tracking-wide", children: "Schedule" }), _jsx("button", { onClick: condenseAllTasks, className: "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-[#1d1930] border border-[#2e2848] text-[#9b93ba] hover:text-[#ece7ff] hover:border-[#7c3aed] transition-colors", title: "Remove all manual position pins and pack tasks back-to-back, skipping weekends and hardening periods", children: "Condense tasks" })] }), _jsx(Timeline, { result: result, features: features, settings: settings, viewMode: viewMode, onToggleView: () => setViewMode((v) => (v === "detailed" ? "summary" : "detailed")), resourceWindows: resourceWindows })] }), hasCosts && (_jsx(CostSummary, { tasks: result.tasks, features: features, symbol: symbol, conversionRate: conversionRate })), _jsx(TeamAllocationTable, { resources: resources, projectStart: settings.startDate, projectEnd: settings.targetEndDate, currency: settings.currency, defaultMonthlyRate: settings.defaultMonthlyRate, onSetAllocation: setMonthlyAllocation })] })] }), _jsx(TeamSidebar, { resources: resources, currency: settings.currency, defaultMonthlyRate: settings.defaultMonthlyRate, onAdd: addResource, onUpdate: updateResource, onDelete: deleteResource })] }));
 }
-function Stat({ label, value, sub }) {
-    return (_jsxs("div", { className: "bg-[#1d1930] rounded-xl border border-[#2e2848] px-4 py-3 flex flex-col gap-0.5 shadow-sm min-w-[100px]", children: [_jsx("span", { className: "text-xs text-[#5c5575] font-medium uppercase tracking-wide", children: label }), _jsx("span", { className: "text-xl font-bold text-[#ece7ff] tabular-nums", children: value }), sub && _jsx("span", { className: "text-xs text-[#5c5575]", children: sub })] }));
-}
-// Spreadsheet math (NEX tab):
-//   At Cost   = total working days / working days per month × monthly rate
-//   Agency fee = budget × agencyFeePct%   (fee is on revenue, not cost)
-//   Profit    = budget − cost − agency fee
-//   Margin    = profit / budget
-function FinancialOverview({ budgetGBP, costGBP, agencyFeePct, agencyFeeLabel, symbol, conversionRate, }) {
-    const fmt = (gbp) => `${symbol}${Math.round(gbp * conversionRate).toLocaleString()}`;
-    const agencyFeeGBP = budgetGBP * (agencyFeePct / 100);
-    const profitGBP = budgetGBP - costGBP - agencyFeeGBP;
-    const marginPct = budgetGBP > 0 ? (profitGBP / budgetGBP) * 100 : null;
-    const items = [
-        { label: "Budget", value: budgetGBP > 0 ? fmt(budgetGBP) : "—", sub: "Project value" },
-        { label: "At cost", value: costGBP > 0 ? fmt(costGBP) : "—", sub: "Delivery cost" },
-        {
-            label: agencyFeePct > 0 ? `${agencyFeeLabel} (${agencyFeePct}%)` : agencyFeeLabel,
-            value: agencyFeePct > 0 && budgetGBP > 0 ? fmt(agencyFeeGBP) : "—",
-            sub: "% of budget",
-        },
-        {
-            label: "Profit",
-            value: budgetGBP > 0 && costGBP > 0 ? fmt(profitGBP) : "—",
-            sub: marginPct !== null ? `${marginPct.toFixed(1)}% margin` : "Set budget & costs",
-            valueClass: budgetGBP > 0 && costGBP > 0 ? (profitGBP >= 0 ? "text-green-400" : "text-red-400") : undefined,
-        },
-    ];
-    return (_jsxs("section", { className: "flex flex-col gap-3", children: [_jsx("h2", { className: "text-sm font-semibold text-[#9b93ba] uppercase tracking-wide", children: "Financial overview" }), _jsx("div", { className: "rounded-xl border border-[#2e2848] bg-[#14112a] grid grid-cols-2 md:grid-cols-4 divide-y divide-[#2e2848] md:divide-y-0 md:divide-x md:divide-[#2e2848]", children: items.map((item) => (_jsxs("div", { className: "flex flex-col gap-1 px-6 py-5", children: [_jsx("span", { className: "text-xs text-[#5c5575] font-medium uppercase tracking-wide", children: item.label }), _jsx("span", { className: `text-3xl font-bold tabular-nums leading-none ${item.valueClass ?? "text-[#ece7ff]"}`, children: item.value }), item.sub && _jsx("span", { className: "text-xs text-[#3a3456] mt-0.5", children: item.sub })] }, item.label))) })] }));
+function Stat({ label, value, sub, index = 0 }) {
+    return (_jsxs(motion.div, { className: "bg-[#1d1930] rounded-xl border border-[#2e2848] px-4 py-3 flex flex-col gap-0.5 shadow-sm min-w-[100px]", initial: { opacity: 0, y: 8 }, animate: { opacity: 1, y: 0 }, transition: { duration: 0.3, delay: index * 0.05, ease: [0.23, 1, 0.32, 1] }, children: [_jsx("span", { className: "text-xs text-[#5c5575] font-medium uppercase tracking-wide", children: label }), _jsx("span", { className: "text-xl font-bold text-[#ece7ff] tabular-nums", children: value }), sub && _jsx("span", { className: "text-xs text-[#5c5575]", children: sub })] }));
 }
 function CostSummary({ tasks, features, symbol, conversionRate, }) {
     const totalCost = tasks.reduce((s, t) => s + t.cost, 0);
@@ -105,9 +79,9 @@ function CostSummary({ tasks, features, symbol, conversionRate, }) {
         .sort((a, b) => b.cost - a.cost);
     return (_jsxs("section", { className: "flex flex-col gap-3", children: [_jsx("h2", { className: "text-sm font-semibold text-[#9b93ba] uppercase tracking-wide", children: "Project cost" }), _jsxs("div", { className: "rounded-xl border border-[#2e2848] bg-[#14112a] overflow-hidden divide-y divide-[#2e2848] md:divide-y-0 md:divide-x md:flex", children: [_jsxs("div", { className: "flex flex-col justify-center gap-1 px-8 py-6 md:min-w-[200px]", children: [_jsx("span", { className: "text-xs text-[#5c5575] font-medium uppercase tracking-wide", children: "Total" }), _jsx("span", { className: "text-4xl font-bold text-[#ece7ff] tabular-nums leading-none", children: fmt(totalCost) }), _jsxs("span", { className: "text-xs text-[#5c5575] mt-1", children: [featureCosts.length, " feature", featureCosts.length !== 1 ? "s" : "", " \u00B7 ", disciplineCosts.length, " discipline", disciplineCosts.length !== 1 ? "s" : ""] })] }), _jsxs("div", { className: "flex-1 px-6 py-5 flex flex-col gap-2.5", children: [_jsx("span", { className: "text-xs text-[#5c5575] font-medium uppercase tracking-wide", children: "By feature" }), featureCosts.map((f) => {
                                 const pct = (f.cost / totalCost) * 100;
-                                return (_jsxs("div", { className: "flex items-center gap-3", children: [_jsx("div", { className: "w-2.5 h-2.5 rounded-sm flex-shrink-0", style: { background: f.color } }), _jsx("span", { className: "text-sm text-[#c5bedf] flex-1 truncate min-w-0", children: f.name }), _jsxs("div", { className: "flex items-center gap-2.5 flex-shrink-0", children: [_jsx("div", { className: "w-20 h-1.5 rounded-full bg-[#2e2848] overflow-hidden", children: _jsx("div", { className: "h-full rounded-full transition-all", style: { width: `${pct}%`, background: f.color } }) }), _jsxs("span", { className: "text-xs text-[#5c5575] w-7 text-right tabular-nums", children: [Math.round(pct), "%"] }), _jsx("span", { className: "text-sm font-semibold text-[#ece7ff] tabular-nums w-24 text-right", children: fmt(f.cost) })] })] }, f.id));
+                                return (_jsxs("div", { className: "flex items-center gap-3", children: [_jsx("div", { className: "w-2.5 h-2.5 rounded-sm flex-shrink-0", style: { background: f.color } }), _jsx("span", { className: "text-sm text-[#c5bedf] flex-1 truncate min-w-0", children: f.name }), _jsxs("div", { className: "flex items-center gap-2.5 flex-shrink-0", children: [_jsx("div", { className: "w-20 h-1.5 rounded-full bg-[#2e2848] overflow-hidden", children: _jsx("div", { className: "h-full rounded-full", style: { width: `${pct}%`, background: f.color, transition: "width 600ms cubic-bezier(0.23, 1, 0.32, 1)" } }) }), _jsxs("span", { className: "text-xs text-[#5c5575] w-7 text-right tabular-nums", children: [Math.round(pct), "%"] }), _jsx("span", { className: "text-sm font-semibold text-[#ece7ff] tabular-nums w-24 text-right", children: fmt(f.cost) })] })] }, f.id));
                             })] }), _jsxs("div", { className: "px-6 py-5 flex flex-col gap-2.5 md:min-w-[240px]", children: [_jsx("span", { className: "text-xs text-[#5c5575] font-medium uppercase tracking-wide", children: "By discipline" }), disciplineCosts.map((d) => {
                                 const pct = (d.cost / totalCost) * 100;
-                                return (_jsxs("div", { className: "flex items-center gap-3", children: [_jsx("span", { className: "text-sm text-[#c5bedf] flex-1", children: d.discipline }), _jsxs("div", { className: "flex items-center gap-2.5 flex-shrink-0", children: [_jsx("div", { className: "w-20 h-1.5 rounded-full bg-[#2e2848] overflow-hidden", children: _jsx("div", { className: "h-full rounded-full bg-[#7c3aed] transition-all", style: { width: `${pct}%` } }) }), _jsxs("span", { className: "text-xs text-[#5c5575] w-7 text-right tabular-nums", children: [Math.round(pct), "%"] }), _jsx("span", { className: "text-sm font-semibold text-[#ece7ff] tabular-nums w-24 text-right", children: fmt(d.cost) })] })] }, d.discipline));
+                                return (_jsxs("div", { className: "flex items-center gap-3", children: [_jsx("span", { className: "text-sm text-[#c5bedf] flex-1", children: d.discipline }), _jsxs("div", { className: "flex items-center gap-2.5 flex-shrink-0", children: [_jsx("div", { className: "w-20 h-1.5 rounded-full bg-[#2e2848] overflow-hidden", children: _jsx("div", { className: "h-full rounded-full", style: { width: `${pct}%`, background: "#7c3aed", transition: "width 600ms cubic-bezier(0.23, 1, 0.32, 1)" } }) }), _jsxs("span", { className: "text-xs text-[#5c5575] w-7 text-right tabular-nums", children: [Math.round(pct), "%"] }), _jsx("span", { className: "text-sm font-semibold text-[#ece7ff] tabular-nums w-24 text-right", children: fmt(d.cost) })] })] }, d.discipline));
                             })] })] })] }));
 }

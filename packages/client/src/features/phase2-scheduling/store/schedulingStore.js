@@ -89,6 +89,20 @@ export const useSchedulingStore = create()(persist((set) => ({
             resources: s.resources.map((r) => r.id === id ? { ...r, ...patch, updatedAt: new Date().toISOString() } : r),
         }));
     },
+    setMonthlyAllocation(resourceId, month, value) {
+        set((s) => ({
+            resources: s.resources.map((r) => {
+                if (r.id !== resourceId)
+                    return r;
+                const allocs = { ...(r.monthlyAllocations ?? {}) };
+                if (value <= 0)
+                    delete allocs[month];
+                else
+                    allocs[month] = value;
+                return { ...r, monthlyAllocations: allocs, updatedAt: new Date().toISOString() };
+            }),
+        }));
+    },
     deleteResource(id) {
         set((s) => ({ resources: s.resources.filter((r) => r.id !== id) }));
     },

@@ -9,6 +9,7 @@ import { buildWorkingDayCalendar, formatDateShort, formatMonthYear, parseISODate
 // Layout
 const LABEL_W = 124;
 const DAY_W = 22;
+const FOCUSED_DAY_W = 44;
 const WKND_W = 10; // px for a full 2-day weekend gap (actual-dates mode only)
 const MONTH_H = 22;
 const WEEK_H = 20;
@@ -170,7 +171,8 @@ export function Timeline({ result, features, settings, viewMode, onToggleView, r
     const { setOverride, clearOverride, resources } = useSchedulingStore();
     const updateTaskEstimate = useEstimationsStore((s) => s.updateTaskEstimate);
     const updateTaskLabel = useEstimationsStore((s) => s.updateTaskLabel);
-    const milestones = useMilestonesStore((s) => s.milestones);
+    const rawMilestones = useMilestonesStore((s) => s.milestones);
+    const milestones = useMemo(() => [...rawMilestones].sort((a, b) => a.startDate.localeCompare(b.startDate)), [rawMilestones]);
     const [editingTask, setEditingTask] = useState(null);
     const milestoneH = milestones.length > 0 ? MILESTONE_LANE_H : 0;
     const focusedMilestone = focusedMilestoneId
@@ -188,6 +190,7 @@ export function Timeline({ result, features, settings, viewMode, onToggleView, r
             return null;
         return milestoneWorkingDays(focusedMilestone, settings.calendarMode, settings.startDate, cal);
     }, [focusedMilestone, settings.calendarMode, settings.startDate, cal]);
+    const zoomDayW = focusRange ? FOCUSED_DAY_W : DAY_W;
     // ─── Coordinate system: working-day → pixel ───────────────────────────────
     const showWeekends = settings.calendarMode === "actual";
     const startWeekday = useMemo(() => {
@@ -196,15 +199,15 @@ export function Timeline({ result, features, settings, viewMode, onToggleView, r
         return jsWeekdayToMon(parseISODate(settings.startDate).getDay());
     }, [showWeekends, settings.startDate]);
     // Pixels per working-day for drag snap (average accounts for weekend gaps)
-    const effectiveDayW = showWeekends ? DAY_W + WKND_W / 5 : DAY_W;
+    const effectiveDayW = showWeekends ? zoomDayW + WKND_W / 5 : zoomDayW;
     const focusOffset = focusRange?.startDay ?? 0;
     const wdToX = useCallback((n) => {
         const adjusted = n - focusOffset;
         if (!showWeekends)
-            return adjusted * DAY_W;
+            return adjusted * zoomDayW;
         const weekends = Math.floor((startWeekday + n) / 5) - Math.floor((startWeekday + focusOffset) / 5);
-        return adjusted * DAY_W + weekends * WKND_W;
-    }, [showWeekends, startWeekday, focusOffset]);
+        return adjusted * zoomDayW + weekends * WKND_W;
+    }, [showWeekends, startWeekday, focusOffset, zoomDayW]);
     // X positions where weekend gaps start (for overlay rendering)
     const weekendStrips = useMemo(() => {
         if (!showWeekends)
@@ -214,7 +217,7 @@ export function Timeline({ result, features, settings, viewMode, onToggleView, r
         const maxWd = projectEndDay + 25;
         for (let n = 0; n <= maxWd; n++) {
             if ((sw + n) % 5 === 4) { // Friday (Mon=0…Fri=4)
-                strips.push(wdToX(n) + DAY_W);
+                strips.push(wdToX(n) + zoomDayW);
             }
         }
         return strips;
@@ -357,6 +360,10 @@ export function Timeline({ result, features, settings, viewMode, onToggleView, r
         : tasks;
     const svgH = HEADER_H + milestoneH + (viewMode === "detailed" ? detailedH : summaryH) + BOTTOM_PAD;
     const chartW = Math.max(wdToX(visibleEndDay + 20), 480);
+    // Prev/next milestones for focus context edges
+    const focusedIdx = focusedMilestone ? milestones.findIndex((m) => m.id === focusedMilestone.id) : -1;
+    const prevMilestone = focusedIdx > 0 ? milestones[focusedIdx - 1] : null;
+    const nextMilestone = focusedIdx >= 0 && focusedIdx < milestones.length - 1 ? milestones[focusedIdx + 1] : null;
     return (_jsxs("div", { className: "flex flex-col gap-3", children: [focusedMilestone && onFocusMilestone && (_jsxs("div", { className: "flex items-center gap-3 px-4 py-2 rounded-lg border border-[#3d366a] bg-[#1d1930] text-sm", children: [_jsx("span", { className: "w-2.5 h-2.5 rounded-sm flex-shrink-0", style: { background: focusedMilestone.color } }), _jsx("span", { className: "text-[#ece7ff] font-medium", children: focusedMilestone.title }), _jsxs("span", { className: "text-[#5c5575]", children: [focusedMilestone.startDate, " \u2013 ", focusedMilestone.endDate] }), _jsx("button", { className: "ml-auto px-3 py-1 rounded-md bg-[#252041] border border-[#2e2848] text-xs text-[#a78bfa] hover:bg-[#2e2848] transition-colors", onClick: () => onFocusMilestone(null), children: "\u2190 All milestones" })] })), _jsx("div", { className: "flex justify-end", children: _jsx("div", { className: "flex rounded-lg border border-[#2e2848] overflow-hidden text-xs shadow-sm", children: ["detailed", "summary"].map((mode) => (_jsx("button", { className: `px-3 py-1.5 transition-colors ${viewMode === mode
                             ? "bg-[#7c3aed] text-white font-medium"
                             : "bg-[#1d1930] text-[#5c5575] hover:bg-[#252041]"}`, onClick: onToggleView, children: mode === "detailed" ? "Detailed" : "Summary" }, mode))) }) }), _jsx("div", { className: "overflow-hidden rounded-xl border border-[#2e2848] shadow-sm shadow-black/40", children: _jsxs("div", { className: "flex items-stretch", children: [_jsxs("svg", { "data-label-svg": true, width: LABEL_W, height: svgH, className: "flex-shrink-0 border-r border-[#2e2848]", style: { background: "#14112a" }, children: [milestoneH > 0 && (_jsxs(_Fragment, { children: [_jsx("rect", { x: 0, y: HEADER_H, width: LABEL_W, height: milestoneH, fill: "#1a1628" }), _jsx("text", { x: LABEL_W - 12, y: HEADER_H + milestoneH / 2, textAnchor: "end", dominantBaseline: "middle", fontSize: 11, fill: "#5c5575", fontStyle: "italic", children: "Milestones" }), _jsx("line", { x1: 0, y1: HEADER_H + milestoneH, x2: LABEL_W, y2: HEADER_H + milestoneH, stroke: "#2e2848", strokeWidth: 1 })] })), viewMode === "detailed"
@@ -436,7 +443,10 @@ export function Timeline({ result, features, settings, viewMode, onToggleView, r
                                             }
                                         }
                                         return zones.length > 0 ? zones : null;
-                                    }).filter(Boolean)), settings.calendarMode === "four-week" ? (_jsx(FourWeekHeader, { projectEndDay: visibleEndDay, startDay: focusOffset, chartW: chartW, wdToX: wdToX })) : (_jsx(ActualDateHeader, { projectEndDay: visibleEndDay, startDay: focusOffset, cal: cal, chartW: chartW, wdToX: wdToX })), _jsx(GridLines, { projectEndDay: visibleEndDay, startDay: focusOffset, calendarMode: settings.calendarMode, cal: cal, svgH: svgH, milestoneH: milestoneH, wdToX: wdToX }), viewMode === "detailed"
+                                    }).filter(Boolean)), focusRange && (_jsxs(_Fragment, { children: [_jsx("line", { x1: 0, y1: 0, x2: 0, y2: svgH, stroke: focusedMilestone?.color ?? "#7c3aed", strokeWidth: 2, strokeDasharray: "6 3", opacity: 0.5, style: { pointerEvents: "none" } }), prevMilestone && (_jsxs("g", { style: { pointerEvents: "none" }, children: [_jsx("rect", { x: 4, y: HEADER_H + 4, width: Math.min(140, 10 + prevMilestone.title.length * 6.5), height: 16, rx: 3, fill: prevMilestone.color, opacity: 0.18 }), _jsxs("text", { x: 8, y: HEADER_H + 13, fontSize: 10, fontWeight: "600", fill: prevMilestone.color, opacity: 0.9, style: { userSelect: "none" }, children: ["\u2190 ", prevMilestone.title.length > 18 ? prevMilestone.title.slice(0, 17) + "…" : prevMilestone.title] })] })), (() => {
+                                                const rx = wdToX(focusRange.endDay);
+                                                return (_jsxs(_Fragment, { children: [_jsx("line", { x1: rx, y1: 0, x2: rx, y2: svgH, stroke: focusedMilestone?.color ?? "#7c3aed", strokeWidth: 2, strokeDasharray: "6 3", opacity: 0.5, style: { pointerEvents: "none" } }), nextMilestone && (_jsxs("g", { style: { pointerEvents: "none" }, children: [_jsx("rect", { x: rx - Math.min(144, 10 + nextMilestone.title.length * 6.5), y: HEADER_H + 4, width: Math.min(144, 10 + nextMilestone.title.length * 6.5), height: 16, rx: 3, fill: nextMilestone.color, opacity: 0.18 }), _jsxs("text", { x: rx - 6, y: HEADER_H + 13, textAnchor: "end", fontSize: 10, fontWeight: "600", fill: nextMilestone.color, opacity: 0.9, style: { userSelect: "none" }, children: [nextMilestone.title.length > 18 ? nextMilestone.title.slice(0, 17) + "…" : nextMilestone.title, " \u2192"] })] }))] }));
+                                            })()] })), settings.calendarMode === "four-week" ? (_jsx(FourWeekHeader, { projectEndDay: visibleEndDay, startDay: focusOffset, chartW: chartW, wdToX: wdToX })) : (_jsx(ActualDateHeader, { projectEndDay: visibleEndDay, startDay: focusOffset, cal: cal, chartW: chartW, wdToX: wdToX })), _jsx(GridLines, { projectEndDay: visibleEndDay, startDay: focusOffset, calendarMode: settings.calendarMode, cal: cal, svgH: svgH, milestoneH: milestoneH, wdToX: wdToX }), viewMode === "detailed"
                                         ? visibleTasks.map((task) => {
                                             const layout = rowLayouts.find((r) => r.discipline === task.discipline);
                                             if (!layout)
