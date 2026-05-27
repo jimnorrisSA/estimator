@@ -34,3 +34,6 @@ coverage/
 
 # Vite
 .vite/
+
+# Claude Code agent worktrees (never commit these)
+.claude/worktrees/
