@@ -53,7 +53,9 @@
       "Bash(python3 -c ' *)",
       "PowerShell(pip install *)",
       "Bash(node -e ' *)",
-      "PowerShell(pnpm *)"
+      "PowerShell(pnpm *)",
+      "PowerShell(Get-ChildItem *)",
+      "PowerShell(Test-Path *)"
     ]
   }
 }
