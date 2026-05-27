@@ -55,7 +55,9 @@
       "Bash(node -e ' *)",
       "PowerShell(pnpm *)",
       "PowerShell(Get-ChildItem *)",
-      "PowerShell(Test-Path *)"
+      "PowerShell(Test-Path *)",
+      "Bash(Select-Object -First 50)",
+      "Bash(Format-Table FullName)"
     ]
   }
 }
