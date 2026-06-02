@@ -344,28 +344,63 @@ export function Timeline({ result, features, settings, viewMode, onToggleView, r
       setOverride(t.taskId, { startDay: t.startDay, endDay: t.endDay, slotIndex: t.slotIndex });
     }
 
-    setOverride(taskId, { startDay, endDay, slotIndex: targetSlot });
-
-    // Push forward tasks in the target slot that overlap the dropped position.
-    // Pinned tasks are included — intentional insertion should displace whatever is in the way.
-    const targetTasks = tasks
-      .filter(t =>
-        t.taskId !== taskId &&
-        t.discipline === movedTask.discipline &&
-        t.slotIndex === targetSlot
-      )
+    // All other tasks in the target slot, sorted earliest-first.
+    const slotTasks = tasks
+      .filter(t => t.taskId !== taskId && t.discipline === movedTask.discipline && t.slotIndex === targetSlot)
       .sort((a, b) => a.startDay - b.startDay);
 
-    let cursor = endDay;
-    for (const t of targetTasks) {
-      if (t.startDay < startDay) continue; // starts before the insertion point — leave it where it is
+    // The "straddler" is a task that starts BEFORE the drop point but ends AFTER it —
+    // the moved task is being inserted into the middle of it.
+    const straddler = slotTasks.find(t => t.startDay < startDay && t.endDay > startDay) ?? null;
+
+    // Where will X actually start once we resolve the straddler conflict?
+    let actualStart = startDay;
+
+    if (straddler) {
+      // Try to push the straddler LEFT so it ends exactly at startDay.
+      // Left boundary = end of the nearest task that sits fully left of the straddler.
+      const leftNeighbour = slotTasks.filter(t => t.endDay <= straddler.startDay).at(-1) ?? null;
+      const leftBound = leftNeighbour ? leftNeighbour.endDay : 0;
+      const idealStart = startDay - straddler.workingDays;
+
+      let canPushLeft = false;
+      let leftPlacement: { startDay: number; endDay: number } | null = null;
+
+      if (idealStart >= 0 && idealStart >= leftBound) {
+        leftPlacement = computeTaskPlacement(idealStart, straddler.workingDays, blockedPeriods);
+        // Only slide left if the computed placement actually clears before our drop point
+        // (a hardening period could push it into X's space).
+        canPushLeft = leftPlacement.endDay <= startDay;
+      }
+
+      if (canPushLeft && leftPlacement) {
+        // Room to the left — slide straddler back; X plants at the exact drop point.
+        setOverride(straddler.taskId, {
+          startDay: leftPlacement.startDay,
+          endDay:   leftPlacement.endDay,
+          slotIndex: straddler.slotIndex,
+        });
+      } else {
+        // No room left — push X to start after the straddler instead.
+        actualStart = straddler.endDay;
+      }
+    }
+
+    // Place the moved task at its resolved start.
+    const xPlacement = computeTaskPlacement(actualStart, movedTask.workingDays, blockedPeriods);
+    setOverride(taskId, { startDay: xPlacement.startDay, endDay: xPlacement.endDay, slotIndex: targetSlot });
+
+    // Cascade-push every task in the slot that starts at or after actualStart and
+    // would overlap with X's final position (or with any already-pushed task).
+    let cursor = xPlacement.endDay;
+    for (const t of slotTasks) {
+      if (straddler && t.taskId === straddler.taskId) continue; // handled above
+      if (t.startDay < actualStart) continue;                   // upstream — don't move
       if (t.startDay < cursor) {
         const placement = computeTaskPlacement(cursor, t.workingDays, blockedPeriods);
         setOverride(t.taskId, { startDay: placement.startDay, endDay: placement.endDay, slotIndex: t.slotIndex });
         cursor = placement.endDay;
       }
-      // No break — cursor may have jumped past a hardening period, so a later task
-      // that appeared non-overlapping might still need pushing.
     }
   }
 
