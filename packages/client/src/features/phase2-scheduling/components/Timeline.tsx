@@ -105,7 +105,7 @@ function DraggableTaskBar({ task, y, barH, color, slotCount, disciplineBoundarie
         const slotDelta = Math.round(dy / SLOT_H);
         const targetSlot = Math.max(0, Math.min(slotCount - 1, task.slotIndex + slotDelta));
         // Snap start to another task's end, or snap end to another task's start
-        let best = 1.5; // working-day snap radius
+        let best = 2.5; // working-day snap radius
         let snapped = s;
         for (const b of disciplineBoundaries) {
           if (b.slotIndex !== targetSlot) continue;
@@ -115,21 +115,8 @@ function DraggableTaskBar({ task, y, barH, color, slotCount, disciplineBoundarie
           if (d2 < best) { best = d2; snapped = Math.max(0, b.startDay - origWd); }
         }
         s = snapped;
-        // Push past remaining overlaps only when not snapped to a task boundary.
-        // When a snap fires the user is intentionally inserting — the drop handler pushes.
-        if (best >= 1.5) {
-          let moved = true;
-          while (moved) {
-            moved = false;
-            for (const b of disciplineBoundaries) {
-              if (b.slotIndex === targetSlot && s < b.endDay && s + origWd > b.startDay) {
-                s = b.endDay;
-                moved = true;
-                break;
-              }
-            }
-          }
-        }
+        // No push-past-overlaps loop here — the user is dragging to insert, so
+        // overlapping a task during drag is intentional. handleMove pushes on drop.
         const p = computeTaskPlacement(s, origWd, blockedPeriods);
         setPreview({ startDay: p.startDay, endDay: p.endDay, slotIndex: targetSlot, segments: p.segments });
       } else {
@@ -374,11 +361,11 @@ export function Timeline({ result, features, settings, viewMode, onToggleView, r
       if (t.endDay <= startDay) continue; // task ends at or before insertion point — leave it
       if (t.startDay < cursor) {
         const placement = computeTaskPlacement(cursor, t.workingDays, blockedPeriods);
-        setOverride(t.taskId, { startDay: cursor, endDay: placement.endDay });
+        setOverride(t.taskId, { startDay: placement.startDay, endDay: placement.endDay, slotIndex: t.slotIndex });
         cursor = placement.endDay;
-      } else {
-        break;
       }
+      // No break — cursor may have jumped past a hardening period, so a later task
+      // that appeared non-overlapping might still need pushing.
     }
   }
 
