@@ -358,7 +358,7 @@ export function Timeline({ result, features, settings, viewMode, onToggleView, r
 
     let cursor = endDay;
     for (const t of targetTasks) {
-      if (t.endDay <= startDay) continue; // task ends at or before insertion point — leave it
+      if (t.startDay < startDay) continue; // starts before the insertion point — leave it where it is
       if (t.startDay < cursor) {
         const placement = computeTaskPlacement(cursor, t.workingDays, blockedPeriods);
         setOverride(t.taskId, { startDay: placement.startDay, endDay: placement.endDay, slotIndex: t.slotIndex });
